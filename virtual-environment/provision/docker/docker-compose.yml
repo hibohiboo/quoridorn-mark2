@@ -6,36 +6,7 @@ networks:
   backend:
     driver: ${NETWORKS_DRIVER}
 
-volumes:
-  mongo:
-    driver: ${VOLUMES_DRIVER}
-
 services:
-  ### MongoDB ##############################################
-  mongo:
-    build: ./mongo
-    ports:
-      - "${MONGODB_PORT}:27017"
-    volumes:
-      - ${DATA_PATH_HOST}/mongo:/data/db
-    networks:
-      - backend
-  ### MongoWebUI ################################################
-  mongo-webui:
-    build:
-      context: ./mongo-webui
-    environment:
-      - ROOT_URL=${MONGO_WEBUI_ROOT_URL}
-      - MONGO_URL=${MONGO_WEBUI_MONGO_URL}
-      - INSTALL_MONGO=${MONGO_WEBUI_INSTALL_MONGO}
-    volumes:
-      - ${DATA_PATH_HOST}/mongo-webui:/data/db
-    ports:
-      - "${MONGO_WEBUI_PORT}:3000"
-    networks:
-      - backend
-    depends_on:
-      - mongo
   ### ビルド環境 ##############################################
   node-cli:
     build: ${QUORIDORN_PATH_ROOT}
@@ -66,7 +37,6 @@ services:
       - "${NGINX_HOST_HTTPS_PORT}:443"
     depends_on:
       - node-cli
-      - mongo
     networks:
       - frontend
       - backend
