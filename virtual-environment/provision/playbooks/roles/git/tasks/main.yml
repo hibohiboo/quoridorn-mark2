@@ -1,0 +1,60 @@
+---
+- name: gitのバージョンが指定したバージョンか判定。
+  shell: git --version | grep {{ git_version }} warn=no
+  register: res
+  ignore_errors: True
+  check_mode: no
+  failed_when: no
+  changed_when: res.rc != 0
+
+- block:
+    - name: step 0
+      apt: name=git state=absent
+
+    # http://lifeonubuntu.com/ubuntu-missing-add-apt-repository-command/
+    # http://lifeonubuntu.com/upgrading-ubuntu-to-use-the-latest-git-version/
+    - name: step 1
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+          - build-essential
+          - libssl-dev
+          - libcurl4-gnutls-dev
+          - libexpat1-dev
+          - gettext
+          - unzip
+          - software-properties-common
+
+    - name: step2
+      shell: add-apt-repository ppa:git-core/ppa
+
+    - name: step3
+      apt: name=git state=present update_cache=yes
+
+    # bashにgitのブランチを表示する設定
+    # http://tm.root-n.com/unix:command:git:bash_prompt
+    # https://qiita.com/ArimaRyunosuke/items/1f9d840311584d8160bc
+    - name: git/completionのフォルダを作成
+      file: path=/usr/local/git/contrib/completion state=directory owner=vagrant group=vagrant mode=0755
+
+    - name: completion.bashをダウンロード
+      get_url:
+        url: https://raw.github.com/git/git/master/contrib/completion/git-completion.bash
+        dest: /usr/local/git/contrib/completion/git-completion.bash
+
+    - name: completion.bashをダウンロード
+      get_url:
+        url: https://raw.github.com/git/git/master/contrib/completion/git-prompt.sh
+        dest: /usr/local/git/contrib/completion/git-prompt.sh
+
+    # autofcrlfをオフ
+    - git_config: name=core.autocrlf scope=global value=false
+    # エイリアスを設定
+    - git_config: name=alias.st scope=global value=status
+    - git_config: name=alias.br scope=global value=branch
+    - git_config: name=alias.co scope=global value=checkout
+  # バージョンが指定のものではなかったときのみブロックを実行
+  when: res.rc != 0

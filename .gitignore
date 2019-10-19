@@ -2,6 +2,9 @@
 node_modules
 /dist
 
+# 仮想環境
+.vagrant
+
 # local env files
 .env.local
 .env.*.local
