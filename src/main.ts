@@ -11,12 +11,23 @@ import PlayYoutubeWindow from "@/app/basic/music/PlayYoutubeWindow.vue";
 import LoginWindow from "@/app/basic/login/LoginWindow.vue";
 import CreateNewRoomWindow from "@/app/basic/login/CreateNewRoomWindow.vue";
 import BCDiceFacade from "@/app/core/api/bcdice/BCDiceFacade";
+import UserLoginWindow from "@/app/basic/login/UserLoginWindow.vue";
+import AppServerSettingWindow from "@/app/basic/login/AppServerSettingWindow.vue";
+import TermsOfUseWindow from "@/app/basic/login/TermsOfUseWindow.vue";
+import DeleteRoomWindow from "@/app/basic/login/DeleteRoomWindow.vue";
+import ConfirmWindow from "@/app/core/window/ConfirmWindow.vue";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
+import VueI18n from "vue-i18n";
+import LanguageManager from "@/LanguageManager";
+import LoginRoomWindow from "@/app/basic/login/LoginRoomWindow.vue";
 
 Vue.config.productionTip = false;
 Vue.use(ImageDirective);
+Vue.use(VueI18n);
 
-YoutubeManager.instance;
+SocketFacade.instance;
 BCDiceFacade.instance;
+YoutubeManager.instance;
 
 Vue.component("test-window", TestWindow);
 Vue.component("sample-window", SampleWindow);
@@ -24,11 +35,20 @@ Vue.component("bgm-setting-window", BgmSettingWindow);
 Vue.component("play-youtube-window", PlayYoutubeWindow);
 Vue.component("login-window", LoginWindow);
 Vue.component("create-new-room-window", CreateNewRoomWindow);
+Vue.component("user-login-window", UserLoginWindow);
+Vue.component("app-server-setting-window", AppServerSettingWindow);
+Vue.component("terms-of-use-window", TermsOfUseWindow);
+Vue.component("delete-room-window", DeleteRoomWindow);
+Vue.component("confirm-window", ConfirmWindow);
+Vue.component("login-room-window", LoginRoomWindow);
 
-const app = new Vue({
-  // @ts-ignore
-  router,
-  store,
-  render: (h: any) => h(MainVue)
+LanguageManager.instance.init().then((i18n: any) => {
+  const app = new Vue({
+    // @ts-ignore
+    router,
+    i18n,
+    store,
+    render: (h: any) => h(MainVue)
+  });
+  app.$mount("#app");
 });
-app.$mount("#app");

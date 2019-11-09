@@ -1,40 +1,62 @@
-type MapShape = "square" | "horizontal-hex" | "vertical-hex";
+import { UserType } from "@/@types/socket";
 
-export type RoomInfoExtend = {
-  visitable: boolean;
-  chatWindow: boolean;
-  dice: boolean;
-  initiativeWindow: boolean;
-  resourceWindow: boolean;
-  chatPaletteWindow: boolean;
-  counterRemocon: boolean;
-  standImage: boolean;
-  cutIn: boolean;
-  drawMapAddress: boolean;
-  mapShape: MapShape;
-  drawMapShape: boolean;
-  autoFitMapShape: boolean;
-  autoResizeStandImage: boolean;
+type RoomData = {
+  mapId: string;
+  isDrawGridLine: boolean;
+  isDrawGridId: boolean;
+  isFitGrid: boolean;
+  isUseRotateMarker: boolean;
 };
 
-export type RoomInfo = {
-  name: string;
-  hasPassword: boolean;
-  system: string;
-  memberNum: number;
-  extend?: RoomInfoExtend; // 一時的措置
+type UserData = {
+  userName: string;
+  userType: UserType;
+  login: number;
 };
 
-export type RoomInfoWithPassword = {
-  password: string;
-  roomInfo: RoomInfo;
+type ColorSpec = {
+  backgroundType: "color";
+  backgroundColor: string;
 };
 
-export type LoginInfo = {
-  roomNo: number;
-  password: string;
+type ImageSpec = {
+  backgroundType: "image";
+  imageTag: string;
+  imageId: string;
+  reverse: "none" | "horizontal" | "vertical" | "180";
 };
 
-export type CreateRoomInfo = {
-  roomNo: number;
+type ChatLinkable = {
+  chatLinkage: number;
+  chatLinkageSearch: string;
 };
+
+type MapSetting = (ColorSpec | ImageSpec) &
+  ChatLinkable & {
+    shapeType: "square" | "hex-horizontal" | "hex-vertical";
+    totalColumn: number;
+    totalRow: number;
+    gridSize: number;
+    gridBorderColor: string;
+    isPourTile: boolean;
+    isHexFirstCorner: boolean;
+    isHexSecondSmall: boolean;
+    background: (ColorSpec | ImageSpec) & {
+      maskBlur: number;
+    };
+    margin: (ColorSpec | ImageSpec) & {
+      isUseGridColor: boolean;
+      gridColorBold: string;
+      gridColorThin: string;
+      column: number;
+      row: number;
+      isUseMaskColor: boolean;
+      maskColor: string;
+      maskBlur: number;
+      isUseImage: "none" | "same map" | "same background" | "original";
+      borderWidth: number;
+      borderColor: string;
+      borderStyle: "solid" | "ridge" | "double";
+    };
+    portTileMapping: string;
+  };

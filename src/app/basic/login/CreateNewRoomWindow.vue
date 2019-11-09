@@ -1,32 +1,37 @@
 <template>
   <div>
     <div class="base-area">
-      <div>新規プレイルームを作成します。</div>
+      <div v-t="`${windowInfo.type}.message`"></div>
       <label>
-        <span>プレイルーム名：</span>
+        <span v-t="'label.roomName'"></span>
         <base-input
           type="text"
           :value="name"
           @input="name = $event.target.value"
-          placeholder="仮プレイルーム（削除可能）"
+          :placeholder="$t('label.roomNamePlaceholder')"
+          ref="firstFocus"
         />
       </label>
       <label>
-        <span>パスワード(空ならパスワードなし)：</span>
-        <base-input
-          type="password"
-          :value="password"
-          @input="password = $event.target.value"
+        <span v-t="'label.password'"></span>
+        <input-password-component
+          :comp-key="`${key}-password`"
+          v-model="password"
+          :setting="true"
         />
       </label>
       <label>
-        <span>ゲームシステム：</span>
-        <dice-bot-select ref="diceBot" v-model="system" class="diceBotSystem" />
+        <span v-t="'label.gameSystem'"></span>
+        <dice-bot-select v-model="system" />
       </label>
     </div>
     <div class="button-area">
-      <ctrl-button @click.stop="commit()">作成</ctrl-button>
-      <ctrl-button @click.stop="rollback()">キャンセル</ctrl-button>
+      <ctrl-button @click.stop="commit()">
+        <span v-t="'button.next'"></span>
+      </ctrl-button>
+      <ctrl-button @click.stop="rollback()">
+        <span v-t="'button.reject'"></span>
+      </ctrl-button>
     </div>
   </div>
 </template>
@@ -35,16 +40,25 @@
 import { Component, Watch } from "vue-property-decorator";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
 import WindowVue from "@/app/core/window/WindowVue";
-import TableComponent from "@/app/core/component/table/TableComponent.vue";
+import TableComponent from "@/app/core/component/table/SimpleTableComponent.vue";
 import { Mixins } from "vue-mixin-decorator";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import DiceBotSelect from "@/app/basic/common/components/select/DiceBotSelect.vue";
 import TaskManager from "@/app/core/task/TaskManager";
-import { RoomInfo, RoomInfoWithPassword } from "@/@types/room";
 import VueEvent from "@/app/core/decorator/VueEvent";
+import { CreateRoomInput } from "@/@types/socket";
+import LanguageManager from "@/LanguageManager";
+import InputPasswordComponent from "@/app/core/component/InputPasswordComponent.vue";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
 
 @Component({
-  components: { DiceBotSelect, BaseInput, TableComponent, CtrlButton }
+  components: {
+    InputPasswordComponent,
+    DiceBotSelect,
+    BaseInput,
+    TableComponent,
+    CtrlButton
+  }
 })
 export default class CreateNewRoomWindow extends Mixins<WindowVue<never>>(
   WindowVue
@@ -54,6 +68,11 @@ export default class CreateNewRoomWindow extends Mixins<WindowVue<never>>(
   /** 選択されているシステム */
   private system: string = "DiceBot";
 
+  @LifeCycle
+  public async mounted() {
+    await this.init();
+  }
+
   @Watch("currentDiceBotSystem")
   private onChangeCurrentDiceBotSystem(system: string) {
     window.console.log(system);
@@ -61,22 +80,16 @@ export default class CreateNewRoomWindow extends Mixins<WindowVue<never>>(
 
   @VueEvent
   private async commit() {
-    window.console.log("commit");
-    this.finally(
-      {
-        name: this.name,
-        hasPassword: !!this.password,
-        system: this.system,
-        memberNum: 1
-      },
-      this.password
-    );
+    this.finally({
+      name: this.name || LanguageManager.instance.getText(""),
+      system: this.system,
+      roomPassword: this.password
+    });
     await this.close();
   }
 
   @VueEvent
   private async rollback() {
-    window.console.log("rollback");
     this.finally();
     await this.close();
   }
@@ -86,12 +99,12 @@ export default class CreateNewRoomWindow extends Mixins<WindowVue<never>>(
     this.finally();
   }
 
-  private finally(roomInfo?: RoomInfo, password?: string) {
-    const task = TaskManager.instance.getTask<RoomInfoWithPassword>(
+  private finally(roomInfo?: CreateRoomInput) {
+    const task = TaskManager.instance.getTask<CreateRoomInput>(
       "window-open",
       this.windowInfo.taskKey
     );
-    if (task) task.resolve(roomInfo ? [{ roomInfo, password: password! }] : []);
+    if (task) task.resolve(roomInfo ? [roomInfo] : []);
   }
 }
 </script>
@@ -100,8 +113,11 @@ export default class CreateNewRoomWindow extends Mixins<WindowVue<never>>(
 @import "../../../assets/common";
 .base-area {
   @include flex-box(column, stretch, center);
+  line-height: 1.5;
+
   label {
     @include flex-box(row, flex-start, center);
+    margin-top: 0.2rem;
 
     span {
       color: gray;
@@ -112,13 +128,6 @@ export default class CreateNewRoomWindow extends Mixins<WindowVue<never>>(
       flex: 1;
       width: 10px;
     }
-  }
-}
-.button-area {
-  @include flex-box(row, flex-start, center);
-
-  .margin-left-auto {
-    margin-left: auto;
   }
 }
 </style>

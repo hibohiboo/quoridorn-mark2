@@ -1,16 +1,20 @@
 <template>
   <div id="app">
-    <game-table ref="gameTable" />
+    <div id="back-screen"></div>
     <div id="YoutubePlayerContainer">
       <div class="unUse"><div id="YoutubePlayer001"></div></div>
       <div class="unUse"><div id="YoutubePlayer002"></div></div>
       <div class="unUse"><div id="YoutubePlayer003"></div></div>
       <div class="unUse"><div id="YoutubePlayer004"></div></div>
     </div>
-    <Menu />
-    <right-pane />
+
+    <template v-if="roomInitialized">
+      <game-table ref="gameTable" />
+      <Menu />
+      <right-pane />
+      <context />
+    </template>
     <window-area />
-    <context />
     <div id="wheelMarker" :class="{ hide: !isMapWheeling }"></div>
   </div>
 </template>
@@ -18,7 +22,7 @@
 <script lang="ts">
 import { Component, Vue, Watch } from "vue-property-decorator";
 import BaseInput from "@/app/core/component/BaseInput.vue";
-import { Action, Getter } from "vuex-class";
+import { Getter } from "vuex-class";
 import GameTable from "@/app/basic/map/GameTable.vue";
 import Menu from "@/app/basic/menu/Menu.vue";
 import TaskManager from "@/app/core/task/TaskManager";
@@ -33,13 +37,14 @@ import CssManager from "@/app/core/css/CssManager";
 import { WindowOpenInfo } from "@/@types/window";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "@/@types/task";
-import { RoomInfo } from "@/@types/room";
-import SocketFacade, {
-  getStoreObj
-} from "@/app/core/api/app-server/SocketFacade";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
+import {
+  ClientRoomInfo,
+  GetRoomListResponse,
+  RoomViewResponse
+} from "@/@types/socket";
 import { StoreMetaData, StoreObj } from "@/@types/store";
-import QuerySnapshot from "nekostore/lib/QuerySnapshot";
 
 @Component({
   components: {
@@ -53,15 +58,13 @@ import QuerySnapshot from "nekostore/lib/QuerySnapshot";
 })
 export default class App extends Vue {
   @Getter("mapBackgroundColor") private mapBackgroundColor: any;
-  @Getter("isMapWheeling") private isMapWheeling!: boolean;
-  @Action("presetImageLoad") private presetImageLoad: any;
 
   private readonly key = "App";
+  private isMapWheeling: boolean = false;
+  private roomInitialized: boolean = false;
 
   @LifeCycle
-  public async created() {
-    await this.presetImageLoad();
-  }
+  public async created() {}
 
   @LifeCycle
   private async beforeMount() {
@@ -76,61 +79,54 @@ export default class App extends Vue {
 
   @LifeCycle
   public async mounted() {
-    await TaskManager.instance.ignition<WindowOpenInfo<never>, never>({
-      type: "window-open",
-      owner: "Quoridorn",
-      value: {
-        type: "test-window"
-      }
-    });
-    await TaskManager.instance.ignition<WindowOpenInfo<number>, never>({
-      type: "window-open",
-      owner: "Quoridorn",
-      value: {
-        type: "sample-window",
-        args: 1
-      }
-    });
-    await TaskManager.instance.ignition<WindowOpenInfo<never>, never>({
-      type: "window-open",
-      owner: "Quoridorn",
-      value: {
-        type: "bgm-setting-window"
-      }
-    });
-
-    const roomList = await SocketFacade.instance.socketCommunication<
-      (StoreObj<RoomInfo> & StoreMetaData)[]
+    document.documentElement.style.setProperty(
+      "--background-background-color",
+      "transparent"
+    );
+    document.documentElement.style.setProperty(
+      "--background-background-image",
+      "none"
+    );
+    // ログイン画面の表示
+    const serverInfo = await SocketFacade.instance.socketCommunication<
+      never,
+      GetRoomListResponse
     >("get-room-list");
-    const controller = SocketFacade.instance.generateRoomInfoController();
-    await controller.addCollectionSnapshot(
-      this.key,
-      (snapshot: QuerySnapshot<StoreObj<RoomInfo>>) => {
-        snapshot.docs.forEach(async doc => {
-          const obj = getStoreObj<RoomInfo>(doc);
-          if (obj) roomList.splice(obj.order, 1, obj);
-          else {
-            const index = roomList.findIndex(info => info.id === doc.ref.id);
-            roomList.splice(index, 1, {
-              exclusionOwner: null,
+    SocketFacade.instance.socketOn<RoomViewResponse[]>(
+      "result-room-view",
+      (err, changeList) => {
+        changeList.forEach(change => {
+          if (change.changeType === "removed") {
+            const index = serverInfo.roomList.findIndex(
+              (info: StoreObj<ClientRoomInfo> & StoreMetaData) =>
+                info.id === change.id
+            );
+            serverInfo.roomList.splice(index, 1, {
               order: index,
-              createTime: null,
+              exclusionOwner: null,
+              createTime: new Date(),
               updateTime: null,
               id: null
+            });
+          } else {
+            const index = change.data!.order;
+            serverInfo.roomList.splice(index, 1, {
+              ...change.data!,
+              id: change.id
             });
           }
         });
       }
     );
     await TaskManager.instance.ignition<
-      WindowOpenInfo<(StoreObj<RoomInfo> & StoreMetaData)[]>,
+      WindowOpenInfo<GetRoomListResponse>,
       never
     >({
       type: "window-open",
       owner: "Quoridorn",
       value: {
         type: "login-window",
-        args: roomList
+        args: serverInfo
       }
     });
   }
@@ -237,6 +233,25 @@ export default class App extends Vue {
     task.resolve();
   }
 
+  @TaskProcessor("room-initialize-finished")
+  private async roomInitializeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    // 部屋に接続できた
+    this.roomInitialized = true;
+    task.resolve();
+  }
+
+  @TaskProcessor("mode-change-finished")
+  private async modeChangeFinished(
+    task: Task<ModeInfo, never>
+  ): Promise<TaskResult<never> | void> {
+    if (task.value!.type === "wheel") {
+      this.isMapWheeling = task.value!.value === "on";
+      task.resolve();
+    }
+  }
+
   @TaskProcessor("socket-connect-error-finished")
   private async socketConnectErrorFinished(
     task: Task<never, never>
@@ -308,6 +323,18 @@ hr {
   -moz-user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
+
+  #back-screen {
+    position: absolute;
+    background-image: var(--background-image);
+    background-color: var(--background-color);
+    background-size: cover;
+    background-position: center;
+    width: 100%;
+    height: 100%;
+    filter: blur(var(--mask-blur));
+    transform: var(--background-transform);
+  }
 }
 
 .selectable {

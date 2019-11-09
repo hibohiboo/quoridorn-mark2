@@ -7,7 +7,7 @@
       diceSystemList.map(systemObj => ({
         key: systemObj.system,
         value: systemObj.system,
-        text: systemObj.system !== 'DiceBot' ? systemObj.name : '指定なし',
+        text: systemObj.system !== 'DiceBot' ? systemObj.name : noTarget,
         disabled: false
       }))
     "
@@ -18,20 +18,21 @@
 </template>
 
 <script lang="ts">
-import { Component, Emit, Prop, Vue, Watch } from "vue-property-decorator";
-import { Action, Getter } from "vuex-class";
+import { Emit, Prop, Watch } from "vue-property-decorator";
 import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
 import BCDiceFacade from "@/app/core/api/bcdice/BCDiceFacade";
 import { DiceSystem } from "@/@types/bcdice";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "@/@types/task";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
+import LanguageManager from "@/LanguageManager";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Component, Mixins } from "vue-mixin-decorator";
 
 @Component({ components: { CtrlSelect } })
-export default class DiceBotSelect extends Vue {
-  @Action("getBcdiceSystemInfo") private getBcdiceSystemInfo: any;
-
+export default class DiceBotSelect extends Mixins<ComponentVue>(ComponentVue) {
   private diceSystemList: DiceSystem[] = [];
+  private noTarget: string = LanguageManager.instance.getText("label.noTarget");
 
   @Prop({ type: String, required: true })
   private value!: string;
@@ -52,6 +53,14 @@ export default class DiceBotSelect extends Vue {
         this.diceSystemList.push(info);
       });
     }
+  }
+
+  @TaskProcessor("language-change-finished")
+  private async languageChangeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    this.noTarget = LanguageManager.instance.getText("label.noTarget");
+    task.resolve();
   }
 
   @TaskProcessor("bcdice-ready-finished")

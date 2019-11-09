@@ -1,0 +1,111 @@
+button:
+  commit: Confirm
+  reject: Cancel
+  ok: OK
+  cancel: Cancel
+  login: Login
+  create-new: Create
+  delete: Delete
+  send: Send
+  preview: Preview
+  add: Add
+  modify: Modify
+  copy: Copy
+  next: Next
+  execution: Execution
+
+label:
+  terms-of-use: Terms of Use
+  empty-room: (Empty)
+  exist: Exist
+  not-exist: Not Exist
+  possible: 〇
+  creating: Creating
+  termsOfUseWebServer: Terms of use at Web Server
+  termsOfUseAppServer: Terms of use at Application Server
+  userName: User name：
+  password: Password：
+  passwordPlaceholder: (no password if empty)
+  userType: User type：
+  nameless: Nameless
+  authority: Authority
+  player: PL
+  gameMaster: GM
+  visitor: Visitor
+  roomName: Playroom name：
+  roomNamePlaceholder: Temporary playroom (can be deleted)
+  gameSystem: Game system：
+  noTarget: unspecified
+  isVisitor: 参加者ですか？見学者ですか？：
+  participant: 参加者
+
+test-window:
+  window-title: Test Window
+
+sample-window:
+  window-title: Sample Window
+
+play-youtube-window:
+  window-title: Youtube Player
+
+bgm-setting-window:
+  window-title: BGM Setting
+  table-columns:
+    -
+      - Linkage
+      - Tag
+      - Type
+      - Title
+      - Time
+      - Loop
+      - Volume
+      - Fade
+
+login-window:
+  window-title: Login
+  table-columns:
+    -
+      - No.
+      - Room Name
+      - System
+      - Users
+      - Password
+      - Visitor
+      - Update Time
+      - Delete
+
+create-new-room-window:
+  window-title: Create New Room
+  message: Create a new playroom.
+
+user-login-window:
+  window-title: User Login
+  message: Please enter your user information.
+
+app-server-setting-window:
+  window-title: Application Server Settings
+  message: Application server settings
+  testing: Testing
+  not-quoridorn: Not a Quoridorn server
+  no-such-server: Could not connect
+  internal-server-error: An error occurred in the server
+  un-match-version: Incompatible version of server
+  success: Successful connection
+
+terms-of-use-window:
+  window-title: Terms Of Use
+  message: Please check the terms of use for each server and observe all of these contents.
+
+delete-room-window:
+  window-title: Delete Room
+  message: Delete room.
+
+confirm-window:
+  window-title: Confirm Window
+  delete-room:
+    title: Delete room
+    message: Do you want to delete the room?
+
+login-room-window:
+  window-title: ログインチェック
+  message: 部屋にログインします。

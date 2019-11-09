@@ -1,11 +1,38 @@
 <template>
-  <div>
+  <div class="root" ref="login">
+    <div class="message-scroll-area selectable" v-if="message">
+      <img
+        class="logo"
+        src="http://quoridorn.com/img/bg_white_4c.svg"
+        alt="logo"
+        draggable="false"
+      />
+      <div class="message-documents">
+        <div class="term-of-use flat-button" @click="viewTermOfUse()">
+          <span v-t="'label.terms-of-use'"></span>
+        </div>
+        <div class="title-contents flat-button" @click="serverSetting()">
+          <span class="title">{{ message.title }}</span>
+          <span class="icon-cog"></span>
+        </div>
+        <ul>
+          <li v-for="(description, index) in message.descriptions" :key="index">
+            <span v-html="toHtml(description)"></span>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <label class="language-select">
+      Language:
+      <language-select v-model="language" />
+    </label>
     <keep-alive>
       <table-component
         :windowInfo="windowInfo"
         :tableIndex="0"
         :status="status"
         :dataList="roomList"
+        :selectLock="isInputtingRoomInfo"
         keyProp="order"
         :rowClassGetter="getRowClasses"
         @selectLine="selectRoom"
@@ -14,11 +41,25 @@
       >
         <template #contents="{ colDec, data, index }">
           <template v-if="index === 0">{{ data | roomNo }}</template>
-          <template v-else-if="index === 1">{{ data | roomName }}</template>
+          <template v-else-if="index === 1">
+            <span v-if="data.data">{{ data.data.name }}</span>
+            <span v-else v-t="'label.empty-room'"></span>
+          </template>
           <template v-else-if="index === 2">{{ data | system }}</template>
           <template v-else-if="index === 3">{{ data | memberNum }}</template>
-          <template v-else-if="index === 4">{{ data | password }}</template>
-          <template v-else-if="index === 5">{{ data | visitable }}</template>
+          <template v-else-if="index === 4">
+            <span v-if="!data.data || !data.data.hasPassword">--</span>
+            <span v-else v-t="'label.exist'"></span>
+          </template>
+          <template v-else-if="index === 5">
+            <span
+              v-if="
+                !data.data || !data.data.extend || !data.data.extend.visitable
+              "
+              >--</span
+            >
+            <span v-else v-t="'label.possible'"></span>
+          </template>
           <template v-else-if="index === 6">{{ data | updateDate }}</template>
           <template v-else-if="index === 7">
             <ctrl-button
@@ -26,7 +67,7 @@
               @dblclick.stop
               :disabled="data | deleteButtonDisabled"
             >
-              削除
+              <span v-t="'button.delete'"></span>
             </ctrl-button>
           </template>
           <template v-else>
@@ -36,84 +77,226 @@
       </table-component>
     </keep-alive>
     <div class="button-area">
-      <ctrl-button @click="createRoom()" :disabled="unTouchable">
-        新規作成
+      <ctrl-button @click="createRoom()" :disabled="disabledCreate">
+        <span v-t="'button.create-new'"></span>
       </ctrl-button>
-      <ctrl-button>ログイン</ctrl-button>
+      <ctrl-button @click="login()" :disabled="disabledLogin">
+        <span v-t="'button.login'"></span>
+      </ctrl-button>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { Component, Emit } from "vue-property-decorator";
+import { Component, Emit, Watch } from "vue-property-decorator";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
 import WindowVue from "@/app/core/window/WindowVue";
 import TableComponent from "@/app/core/component/table/TableComponent.vue";
-import SocketFacade, {
-  getStoreObj
-} from "@/app/core/api/app-server/SocketFacade";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 import { Mixins } from "vue-mixin-decorator";
 import moment from "moment/moment";
-import { CreateRoomInfo, RoomInfo, RoomInfoWithPassword } from "@/@types/room";
+import {
+  CreateRoomInput,
+  CreateRoomRequest,
+  ClientRoomInfo,
+  ReleaseTouchRequest,
+  TouchRequest,
+  UserLoginInput,
+  GetRoomListResponse,
+  Message,
+  AppServerSettingInput,
+  RoomViewResponse,
+  DeleteRoomInput,
+  DeleteRoomRequest,
+  LoginRoomInput,
+  LoginRequest,
+  LoginResponse
+} from "@/@types/socket";
 import { StoreMetaData, StoreObj } from "@/@types/store";
 import TaskManager from "@/app/core/task/TaskManager";
-import QuerySnapshot from "nekostore/lib/QuerySnapshot";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import { WindowOpenInfo } from "@/@types/window";
+import { ConfirmInfo } from "@/app/core/window/ConfirmWindow.vue";
+import LanguageSelect from "@/app/basic/common/components/select/LanguageSelect.vue";
+import LanguageManager from "@/LanguageManager";
+import TaskProcessor from "@/app/core/task/TaskProcessor";
+import { Task, TaskResult } from "@/@types/task";
+import { loadYaml } from "@/app/core/File";
+import { getFileNameArgList } from "@/app/core/Utility";
+import { Image } from "@/@types/image";
+import { MapSetting, RoomData } from "@/@types/room";
 
 @Component({
-  components: { TableComponent, CtrlButton },
+  components: { LanguageSelect, TableComponent, CtrlButton },
   filters: {
-    roomNo: (storeObj: StoreObj<RoomInfo>) => storeObj.order + 1,
-    roomName: (storeObj: StoreObj<RoomInfo>) =>
-      storeObj.data ? storeObj.data.name : "（空き部屋）",
-    system: (storeObj: StoreObj<RoomInfo>) =>
+    roomNo: (storeObj: StoreObj<ClientRoomInfo>) => storeObj.order,
+    system: (storeObj: StoreObj<ClientRoomInfo>) =>
       storeObj.data ? storeObj.data.system : "",
-    memberNum: (storeObj: StoreObj<RoomInfo>) =>
+    memberNum: (storeObj: StoreObj<ClientRoomInfo>) =>
       storeObj.data ? storeObj.data.memberNum || 0 : 0,
-    password: (storeObj: StoreObj<RoomInfo>) =>
-      storeObj.data && storeObj.data.hasPassword ? "有り" : "--",
-    visitable: (storeObj: StoreObj<RoomInfo>) =>
-      storeObj.data && storeObj.data.extend && storeObj.data.extend.visitable
-        ? "可"
-        : "--",
-    updateDate: (data: StoreMetaData) => {
+    updateDate: (data: StoreObj<ClientRoomInfo>) => {
       if (!data) return "";
-      // return data.updateTime || data.createTime;
-      if (data.createTime)
-        return moment(data.createTime).format("YYYY/MM/DD HH:mm:ss");
-      if (data.updateTime)
-        return moment(data.updateTime).format("YYYY/MM/DD HH:mm:ss");
-      return "";
+      if (!data.data) return "";
+      return moment(data.updateTime ? data.updateTime : data.createTime).format(
+        "YYYY/MM/DD HH:mm:ss"
+      );
     },
-    deleteButtonDisabled: (storeObj: StoreObj<RoomInfo>) =>
-      (!storeObj.data && !storeObj.exclusionOwner) ||
+    deleteButtonDisabled: (storeObj: StoreObj<ClientRoomInfo>) =>
+      !storeObj.data ||
+      !!storeObj.exclusionOwner ||
       (storeObj.data && storeObj.data.memberNum > 0)
   }
 })
-export default class LoginWindow extends Mixins<
-  WindowVue<(StoreObj<RoomInfo> & StoreMetaData)[]>
->(WindowVue) {
-  private roomList: (StoreObj<RoomInfo> & StoreMetaData)[] = [];
+export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
+  WindowVue
+) {
+  private roomList: (StoreObj<ClientRoomInfo> & StoreMetaData)[] = [];
   private selectedRoomNo: number | null = null;
+  private isInputtingServerSetting: boolean = false;
   private isInputtingRoomInfo: boolean = false;
+  private message: Message | null = null;
+  private readonly htmlRegExp: RegExp = new RegExp(
+    "\\[([^\\]]+)]\\(([^)]+)\\)",
+    "g"
+  );
+  private language: string = navigator.language;
+
+  @Watch("language")
+  private onChangeLanguage() {
+    LanguageManager.instance.language = this.language;
+  }
 
   @LifeCycle
   public async mounted() {
     await this.init();
-    try {
-      this.roomList = this.windowInfo.args!;
-    } catch (err) {
-      window.console.error(err);
-    }
+    this.roomList = this.windowInfo.args!.roomList;
+    this.message = this.windowInfo.args!.message;
+    this.elm.style.setProperty(
+      "--msg-creating",
+      `"${LanguageManager.instance.getText("label.creating")}"`
+    );
+  }
+
+  private get elm(): HTMLElement {
+    return this.$refs.login as HTMLElement;
+  }
+
+  @TaskProcessor("language-change-finished")
+  private async languageChangeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    this.elm.style.setProperty(
+      "--msg-creating",
+      `"${LanguageManager.instance.getText("label.creating")}"`
+    );
+    task.resolve();
   }
 
   @VueEvent
-  private get unTouchable() {
+  private async viewTermOfUse() {
+    await TaskManager.instance.ignition<
+      WindowOpenInfo<{ message: Message }>,
+      void
+    >({
+      type: "window-open",
+      owner: "Quoridorn",
+      value: {
+        type: "terms-of-use-window",
+        args: {
+          message: this.message!
+        }
+      }
+    });
+  }
+
+  @VueEvent
+  private async serverSetting() {
+    // 既に入力画面を開いていたら何もしない
+    if (this.isInputtingServerSetting) return;
+
+    this.isInputtingServerSetting = true;
+
+    // アプリケーションサーバ設定入力画面
+    let appServerSettingInput: AppServerSettingInput;
+    try {
+      const appServerSettingInputList = await TaskManager.instance.ignition<
+        WindowOpenInfo<void>,
+        AppServerSettingInput
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "app-server-setting-window"
+        }
+      });
+      appServerSettingInput = appServerSettingInputList[0];
+      this.isInputtingServerSetting = false;
+    } catch (err) {
+      window.console.warn(err);
+      this.isInputtingServerSetting = false;
+      return;
+    }
+
+    // 入力画面がキャンセルされていたら中断
+    if (!appServerSettingInput) return;
+
+    await SocketFacade.instance.setAppServerUrl(appServerSettingInput.url);
+    const serverInfo = await SocketFacade.instance.socketCommunication<
+      never,
+      GetRoomListResponse
+    >("get-room-list");
+    SocketFacade.instance.socketOn<RoomViewResponse[]>(
+      "result-room-view",
+      (err, changeList) => {
+        changeList.forEach(change => {
+          if (change.changeType === "removed") {
+            const index = this.roomList.findIndex(
+              info => info.id === change.id
+            );
+            this.roomList.splice(index, 1, {
+              order: index,
+              exclusionOwner: null,
+              createTime: new Date(),
+              updateTime: null,
+              id: null
+            });
+          } else {
+            const index = change.data!.order;
+            this.roomList.splice(index, 1, {
+              ...change.data!,
+              id: change.id
+            });
+          }
+        });
+      }
+    );
+    this.roomList.splice(0, this.roomList.length);
+    serverInfo.roomList.forEach(
+      (roomInfo: StoreObj<ClientRoomInfo> & StoreMetaData) => {
+        this.roomList.push(roomInfo);
+      }
+    );
+    this.message = serverInfo.message;
+  }
+
+  @VueEvent
+  private toHtml(d: string) {
+    return d.replace(this.htmlRegExp, `<a href="$2" target="_blank">$1</a>`);
+  }
+
+  @VueEvent
+  private get disabledCreate(): boolean {
     if (this.isInputtingRoomInfo) return true;
-    if (this.selectedRoomNo === null) return false;
-    return !!this.roomList[this.selectedRoomNo - 1].data;
+    if (this.selectedRoomNo === null) return true;
+    return !!this.roomList[this.selectedRoomNo].data;
+  }
+
+  @VueEvent
+  private get disabledLogin(): boolean {
+    if (this.isInputtingRoomInfo) return true;
+    if (this.selectedRoomNo === null) return true;
+    return !this.roomList[this.selectedRoomNo].data;
   }
 
   @LifeCycle
@@ -123,7 +306,7 @@ export default class LoginWindow extends Mixins<
 
   @VueEvent
   private selectRoom(order: number) {
-    this.selectedRoomNo = order + 1;
+    this.selectedRoomNo = order;
   }
 
   @VueEvent
@@ -132,18 +315,113 @@ export default class LoginWindow extends Mixins<
   @Emit("adjustWidth")
   private adjustWidth(totalWidth: number) {
     if (this.windowInfo.declare.minSize)
-      this.windowInfo.declare.minSize.width = totalWidth;
+      this.windowInfo.declare.minSize.widthPx = totalWidth;
     if (this.windowInfo.declare.maxSize)
-      this.windowInfo.declare.maxSize.width = totalWidth;
+      this.windowInfo.declare.maxSize.widthPx = totalWidth;
   }
 
   @VueEvent
   private async deleteRoom(order: number) {
-    window.console.log(order);
+    if (this.selectedRoomNo === null) {
+      alert("部屋を選択してください。");
+      return;
+    }
+
+    // タッチ
+    if (!(await this.touchRoom(true))) return;
+    this.isInputtingRoomInfo = true;
+
+    window.console.log("touched");
+
+    // 確認画面
+    let confirmResult: boolean;
+    this.isInputtingRoomInfo = true;
+    try {
+      const confirmResultList = await TaskManager.instance.ignition<
+        WindowOpenInfo<ConfirmInfo>,
+        boolean
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "confirm-window",
+          args: {
+            target: "delete-room",
+            type: "warning"
+          }
+        }
+      });
+      confirmResult = confirmResultList[0];
+    } catch (err) {
+      window.console.warn(err);
+      await this.releaseTouchRoom();
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+
+    // 入力画面がキャンセルされていたらタッチ状態を解除
+    if (!confirmResult) {
+      await this.releaseTouchRoom();
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+
+    // 部屋削除入力画面
+    let deleteRoomInput: DeleteRoomInput;
+    try {
+      const deleteRoomInputList = await TaskManager.instance.ignition<
+        WindowOpenInfo<never>,
+        DeleteRoomInput
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "delete-room-window"
+        }
+      });
+      deleteRoomInput = deleteRoomInputList[0];
+    } catch (err) {
+      window.console.warn(err);
+      await this.releaseTouchRoom();
+      return;
+    } finally {
+      this.isInputtingRoomInfo = false;
+    }
+
+    // 入力画面がキャンセルされていたらタッチ状態を解除
+    if (!deleteRoomInput) {
+      await this.releaseTouchRoom();
+      return;
+    }
+
+    // 部屋削除リクエストを投げる
+    let deleteResult: boolean;
+    try {
+      deleteResult = await SocketFacade.instance.socketCommunication<
+        DeleteRoomRequest,
+        boolean
+      >("delete-room", {
+        roomId: this.roomList[this.selectedRoomNo].id!,
+        roomNo: this.selectedRoomNo,
+        ...deleteRoomInput
+      });
+    } catch (err) {
+      window.console.warn(err);
+      await this.releaseTouchRoom();
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+    setTimeout(() => {
+      alert(
+        deleteResult ? "部屋を削除しました。" : "部屋の削除に失敗しました。"
+      );
+    });
   }
 
   @VueEvent
-  private getRowClasses(data: StoreObj<RoomInfo> & StoreMetaData): string[] {
+  private getRowClasses(
+    data: StoreObj<ClientRoomInfo> & StoreMetaData
+  ): string[] {
     const classList: string[] = [];
     if (data.exclusionOwner) {
       classList.push(data.data ? "isEditing" : "isCreating");
@@ -151,11 +429,30 @@ export default class LoginWindow extends Mixins<
     return classList;
   }
 
+  private async touchRoom(isModify: boolean): Promise<boolean> {
+    try {
+      await SocketFacade.instance.socketCommunication<TouchRequest, never>(
+        isModify ? "touch-room-modify" : "touch-room",
+        {
+          roomNo: this.selectedRoomNo!
+        }
+      );
+      return true;
+    } catch (err) {
+      window.console.warn(err);
+      return false;
+    }
+  }
+
   private async releaseTouchRoom() {
-    if (!this.selectedRoomNo) return;
-    if (!this.roomList[this.selectedRoomNo - 1].exclusionOwner) return;
-    const controller = SocketFacade.instance.generateRoomInfoController();
-    await controller.releaseTouch(this.selectedRoomNo - 1);
+    if (this.selectedRoomNo === null) return;
+    if (!this.roomList[this.selectedRoomNo].exclusionOwner) return;
+    await SocketFacade.instance.socketCommunication<ReleaseTouchRequest, never>(
+      "release-touch-room",
+      {
+        roomNo: this.selectedRoomNo
+      }
+    );
   }
 
   @VueEvent
@@ -165,21 +462,17 @@ export default class LoginWindow extends Mixins<
       return;
     }
 
-    // タッチ
-    try {
-      const controller = SocketFacade.instance.generateRoomInfoController();
-      await controller.touch(this.selectedRoomNo - 1);
-    } catch (err) {
-      return;
-    }
-
-    // 入力画面
-    let info: RoomInfoWithPassword;
     this.isInputtingRoomInfo = true;
+
+    // タッチ
+    if (!(await this.touchRoom(false))) return;
+
+    // 部屋情報入力画面
+    let createRoomInput: CreateRoomInput;
     try {
       const roomInfoList = await TaskManager.instance.ignition<
         WindowOpenInfo<never>,
-        RoomInfoWithPassword
+        CreateRoomInput
       >({
         type: "window-open",
         owner: "Quoridorn",
@@ -187,46 +480,412 @@ export default class LoginWindow extends Mixins<
           type: "create-new-room-window"
         }
       });
-      info = roomInfoList[0];
+      createRoomInput = roomInfoList[0];
     } catch (err) {
       window.console.warn(err);
-      return;
-    }
-
-    // 入力画面がキャンセルされていたらタッチ状態を解除
-    if (!info) {
       await this.releaseTouchRoom();
       this.isInputtingRoomInfo = false;
       return;
     }
 
-    this.isInputtingRoomInfo = false;
+    // 入力画面がキャンセルされていたらタッチ状態を解除
+    if (!createRoomInput) {
+      await this.releaseTouchRoom();
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+
+    // ユーザログイン画面
+    let userLoginInput: UserLoginInput;
+    try {
+      const userLoginInputList = await TaskManager.instance.ignition<
+        WindowOpenInfo<boolean>,
+        UserLoginInput
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "user-login-window",
+          args: true
+        }
+      });
+      userLoginInput = userLoginInputList[0];
+    } catch (err) {
+      window.console.warn(err);
+      await this.releaseTouchRoom();
+      return;
+    } finally {
+      this.isInputtingRoomInfo = false;
+    }
+
+    // 入力画面がキャンセルされていたらタッチ状態を解除
+    if (!userLoginInput) {
+      await this.releaseTouchRoom();
+      return;
+    }
 
     // 部屋作成リクエストを投げる
     try {
-      const roomCollectionSuffix = await SocketFacade.instance.socketCommunication(
-        "create-room",
-        {
-          roomNo: this.selectedRoomNo,
-          password: info.password,
-          roomInfo: info.roomInfo
-        }
+      SocketFacade.instance.roomCollectionPrefix = await SocketFacade.instance.socketCommunication<
+        CreateRoomRequest,
+        string
+      >("create-room", {
+        roomId: this.roomList[this.selectedRoomNo].id!,
+        roomNo: this.selectedRoomNo,
+        ...createRoomInput,
+        ...userLoginInput
+      });
+
+      const imageList: Image[] = await loadYaml<Image[]>(
+        "./static/conf/image.yaml"
       );
-      window.console.log(roomCollectionSuffix);
+      const imageTagList: string[] = await loadYaml<string[]>(
+        "./static/conf/imageTag.yaml"
+      );
+      imageList.forEach((image: Image, index: number) => {
+        if (!image.tag)
+          image.tag = imageTagList.length ? imageTagList[0] : "default";
+        if (image.standImageInfo) {
+          // 立ち絵パラメータの値を正しく設定
+          const si = image.standImageInfo;
+          if (!si.status) si.status = "";
+          if (si.type !== "pile" && si.type !== "replace") si.type = "pile";
+          if (
+            si.viewStart === undefined ||
+            si.viewStart < 0 ||
+            si.viewStart > 100
+          )
+            si.viewStart = 0;
+          if (si.viewEnd === undefined || si.viewEnd < 0 || si.viewEnd > 100)
+            si.viewEnd = 100;
+        } else {
+          // 立ち絵パラメータを推測＆設定
+          image.standImageInfo = getFileNameArgList(image.data) || null;
+        }
+
+        const regExp = new RegExp("[ 　]+", "g");
+        const tagStrList = image.tag.split(regExp);
+        tagStrList.forEach((tagStr: string) => {
+          const imageTag: string = imageTagList.filter(
+            (imageTag: string) => imageTag === tagStr
+          )[0];
+          if (!imageTag) imageTagList.push(tagStr);
+        });
+      });
+
+      /* --------------------------------------------------
+       * 画像タグのプリセットデータ投入
+       */
+      const imageTagStore = SocketFacade.instance.imageTagCollectionController();
+
+      const pushImageTag = async (imageTag: string): Promise<void> => {
+        await imageTagStore.add(await imageTagStore.touch(), imageTag);
+      };
+
+      // pushImageTagを直列の非同期で全部実行する
+      await imageTagList
+        .map((imageTag: string) => () => pushImageTag(imageTag))
+        .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+      /* --------------------------------------------------
+       * 画像データのプリセットデータ投入
+       */
+      const imageDataStore = SocketFacade.instance.imageDataCollectionController();
+
+      let imageId: string | null = null;
+      const pushImage = async (image: Image): Promise<void> => {
+        const docId = await imageDataStore.touch();
+        if (!imageId) imageId = docId;
+        await imageDataStore.add(docId, image);
+      };
+
+      // pushImageを直列の非同期で全部実行する
+      await imageList
+        .map((image: Image) => () => pushImage(image))
+        .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+      /* --------------------------------------------------
+       * マップデータのプリセットデータ投入
+       */
+      const mapDataStore = SocketFacade.instance.mapListCollectionController();
+
+      const mapSetting: MapSetting = {
+        backgroundType: "image",
+        imageTag: imageList[0].tag,
+        imageId: imageId!,
+        reverse: "none",
+        shapeType: "square",
+        totalColumn: 20,
+        totalRow: 15,
+        gridSize: 50,
+        gridBorderColor: "#000000",
+        isPourTile: false,
+        isHexFirstCorner: false,
+        isHexSecondSmall: false,
+        background: {
+          backgroundType: "image",
+          imageTag: imageList[0].tag,
+          imageId: imageId!,
+          reverse: "none",
+          // , backgroundColor: "rgb(146, 168, 179)"
+          maskBlur: 3
+        },
+        margin: {
+          backgroundType: "image",
+          imageTag: imageList[0].tag,
+          imageId: imageId!,
+          reverse: "none",
+          isUseGridColor: true,
+          gridColorBold: "rgba(255, 255, 255, 0.3)",
+          gridColorThin: "rgba(255, 255, 255, 0.1)",
+          column: 5,
+          row: 5,
+          isUseMaskColor: true,
+          maskColor: "rgba(20, 80, 20, 0.1)",
+          maskBlur: 3,
+          isUseImage: "none",
+          borderWidth: 10,
+          borderColor: "gray",
+          borderStyle: "ridge"
+        },
+        chatLinkage: 0,
+        chatLinkageSearch: "",
+        portTileMapping: ""
+      };
+      const mapDataDocId = await mapDataStore.add(
+        await mapDataStore.touch(),
+        mapSetting
+      );
+
+      /* --------------------------------------------------
+       * 部屋データのプリセットデータ投入
+       */
+      const roomDataStore = SocketFacade.instance.roomDataCollectionController();
+
+      const roomData: RoomData = {
+        mapId: mapDataDocId,
+        isDrawGridLine: true,
+        isDrawGridId: true,
+        isFitGrid: true,
+        isUseRotateMarker: true
+      };
+      await roomDataStore.add(await roomDataStore.touch(), roomData);
+
+      const initRoomInfo = null;
+
+      await TaskManager.instance.ignition<void, void>({
+        type: "room-initialize",
+        owner: "Quoridorn",
+        value: initRoomInfo
+      });
+      await this.close();
     } catch (err) {
       window.console.warn(err);
     }
+  }
+
+  @VueEvent
+  private async login() {
+    if (this.selectedRoomNo === null) {
+      alert("部屋を選択してから新規作成をしてください。");
+      return;
+    }
+
+    this.isInputtingRoomInfo = true;
+
+    // タッチ
+    if (!(await this.touchRoom(true))) {
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+
+    // 部屋情報入力画面
+    let loginRoomInput: LoginRoomInput;
+    this.isInputtingRoomInfo = true;
+    try {
+      const loginRoomInputList = await TaskManager.instance.ignition<
+        WindowOpenInfo<never>,
+        LoginRoomInput
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "login-room-window"
+        }
+      });
+      loginRoomInput = loginRoomInputList[0];
+    } catch (err) {
+      window.console.warn(err);
+      await this.releaseTouchRoom();
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+
+    // 入力画面がキャンセルされていたらタッチ状態を解除
+    if (!loginRoomInput) {
+      await this.releaseTouchRoom();
+      this.isInputtingRoomInfo = false;
+      return;
+    }
+
+    // ユーザログイン画面
+    let userLoginInput: UserLoginInput;
+    try {
+      const userLoginInputList = await TaskManager.instance.ignition<
+        WindowOpenInfo<boolean>,
+        UserLoginInput
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "user-login-window",
+          args: false
+        }
+      });
+      userLoginInput = userLoginInputList[0];
+    } catch (err) {
+      window.console.warn(err);
+      await this.releaseTouchRoom();
+      return;
+    } finally {
+      this.isInputtingRoomInfo = false;
+    }
+
+    // 入力画面がキャンセルされていたらタッチ状態を解除
+    if (!userLoginInput) {
+      await this.releaseTouchRoom();
+      return;
+    }
+
+    // ログインリクエストを投げる
+    try {
+      const loginResult = await SocketFacade.instance.socketCommunication<
+        LoginRequest,
+        LoginResponse
+      >("login", {
+        roomId: this.roomList[this.selectedRoomNo].id!,
+        roomNo: this.selectedRoomNo,
+        ...loginRoomInput,
+        ...userLoginInput
+      });
+      if (!loginResult) return;
+      SocketFacade.instance.roomCollectionPrefix =
+        loginResult.roomCollectionPrefix;
+    } catch (err) {
+      window.console.warn(err);
+    }
+
+    await TaskManager.instance.ignition<void, void>({
+      type: "room-initialize",
+      owner: "Quoridorn",
+      value: null
+    });
+    await this.close();
   }
 }
 </script>
 
 <style scoped lang="scss">
 @import "../../../assets/common";
-.button-area {
-  @include flex-box(row, flex-start, center);
+.root {
+  @include flex-box(column, stretch, flex-start);
+  position: relative;
+  height: 100%;
 
-  .margin-left-auto {
-    margin-left: auto;
+  .language-select {
+    position: absolute;
+    bottom: calc(24em + 0.5rem + 5px);
+    right: 0;
+  }
+
+  .message-scroll-area {
+    overflow-y: auto;
+    border: 1px solid gray;
+    margin-bottom: 0.5rem;
+    flex: 1;
+    background-color: var(--uni-color-white);
+    background-image: url("http://quoridorn.com/img/mascot/normal/mascot_normal.png");
+    background-size: 18rem;
+    background-position: top 2rem right var(--scroll-bar-width);
+    background-repeat: no-repeat;
+
+    .logo {
+      position: absolute;
+      top: 0.4rem;
+      right: calc(var(--scroll-bar-width) + 0.5rem);
+      height: 1.5rem;
+    }
+
+    .message-documents {
+      @include flex-box(column, flex-start, center);
+
+      .welcome {
+        font-size: 80%;
+        margin-top: 0.5em;
+        margin-left: 1em;
+        margin-right: 1rem;
+        align-self: flex-end;
+      }
+
+      .flat-button {
+        @include flex-box(row, center, center);
+        padding: 0.3rem 0.8rem;
+        border-radius: 0.5em;
+        cursor: pointer;
+
+        &:hover {
+          text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.66);
+          box-shadow: inset 0 0 0 rgba(255, 255, 255, 0.5),
+            0 2px 2px rgba(0, 0, 0, 0.19);
+          background-color: var(--uni-color-light-skyblue);
+        }
+
+        &:active {
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5),
+            0 1px 2px rgba(0, 0, 0, 0.19);
+          border-bottom: none;
+          transform: translateY(1px);
+        }
+      }
+
+      .term-of-use {
+        margin-top: 0.2rem;
+        margin-left: 0.2rem;
+        font-size: 90%;
+      }
+
+      .title-contents {
+        margin-top: 0;
+        margin-left: 3rem;
+        font-size: 110%;
+
+        .icon-cog {
+          @include inline-flex-box(row, center, center);
+          color: var(--uni-color-gray);
+          margin-left: 0.3rem;
+        }
+      }
+
+      ul {
+        position: relative;
+        font-size: 80%;
+        padding-left: 2rem;
+        width: 100%;
+        box-sizing: border-box;
+
+        li {
+          width: 100%;
+          line-height: 1.6;
+
+          span {
+            background-color: rgba(255, 255, 255, 0.6);
+            white-space: pre-wrap;
+            line-break: normal;
+            word-wrap: normal;
+          }
+        }
+      }
+    }
   }
 }
 </style>
@@ -236,6 +895,11 @@ export default class LoginWindow extends Mixins<
 .isCreating {
   position: relative;
   pointer-events: none;
+
+  &.isSelected:before {
+    outline: 2px solid var(--uni-color-red);
+    outline-offset: -2px;
+  }
 
   &:before {
     content: "";
@@ -261,7 +925,7 @@ export default class LoginWindow extends Mixins<
   }
 
   &:after {
-    content: "作成中";
+    content: var(--msg-creating, "さくせいちゅう");
     @include inline-flex-box(row, center, center);
     position: absolute;
     left: 50%;

@@ -1,0 +1,111 @@
+button:
+  commit: 確認
+  reject: キャンセル
+  ok: OK
+  cancel: Cancel
+  login: ログイン
+  create-new: 新規作成
+  delete: 削除
+  send: 送信
+  preview: プレビュー
+  add: 追加
+  modify: 変更
+  copy: コピー
+  next: 次へ
+  execution: 実行
+
+label:
+  terms-of-use: 利用規約
+  empty-room: （空部屋）
+  exist: あり
+  not-exist: なし
+  possible: 可
+  creating: 作成中
+  termsOfUseWebServer: Webサーバの利用規約
+  termsOfUseAppServer: Appサーバの利用規約
+  userName: ユーザ名：
+  password: パスワード：
+  passwordPlaceholder: (空ならパスワードなし)
+  userType: ユーザ種別：
+  nameless: ななし
+  authority: 権限
+  player: PL
+  gameMaster: GM
+  visitor: 見学者
+  roomName: プレイルーム名：
+  roomNamePlaceholder: 仮プレイルーム（削除可能）
+  gameSystem: ゲームシステム：
+  noTarget: 指定なし
+  isVisitor: 参加者ですか？見学者ですか？：
+  participant: 参加者
+
+test-window:
+  window-title: テスト画面
+
+sample-window:
+  window-title: サンプル画面
+
+play-youtube-window:
+  window-title: Youtube再生画面
+
+bgm-setting-window:
+  window-title: BGM設定画面
+  table-columns:
+    -
+      - 連動
+      - タグ
+      - 種別
+      - タイトル
+      - 時間
+      - 繰
+      - 音量
+      - fade
+
+login-window:
+  window-title: ログイン画面
+  table-columns:
+    -
+      - No.
+      - プレイルーム名
+      - ゲームシステム
+      - 入室人数
+      - パスワード
+      - 見学
+      - 最終更新時刻
+      - 削除
+
+create-new-room-window:
+  window-title: 新規プレイルーム作成
+  message: 新規プレイルームを作成します。
+
+user-login-window:
+  window-title: ユーザログイン
+  message: ユーザ情報を入力してください。
+
+app-server-setting-window:
+  window-title: アプリケーションサーバ設定
+  message: アプリケーションサーバに関する設定
+  testing: テスト中
+  not-quoridorn: Quoridornサーバではありません
+  no-such-server: 接続できませんでした
+  internal-server-error: サーバ内でエラーが発生しました
+  un-match-version: 互換性の無いバージョンのサーバです
+  success: 接続成功
+
+terms-of-use-window:
+  window-title: 利用規約確認
+  message: 各サーバの利用規約をご確認いただき、これらすべての内容を守ってご利用ください。
+
+delete-room-window:
+  window-title: 部屋削除
+  message: 部屋を削除します。
+
+confirm-window:
+  window-title: 確認画面
+  delete-room:
+    title: 部屋削除
+    message: 部屋を削除しますか？
+
+login-room-window:
+  window-title: ログインチェック
+  message: 部屋にログインします。

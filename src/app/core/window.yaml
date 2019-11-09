@@ -2,18 +2,29 @@
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
-  title: テスト画面
   message: ""
   position: center
   size:
-    width: 350
-    height: 200
+    widthPx: 350
+    widthEm: 0
+    widthRem: 0
+    heightPx: 200
+    heightEm: 0
+    heightRem: 0
   minSize:
-    width: 150
-    height: 150
+    widthPx: 150
+    widthEm: 0
+    widthRem: 0
+    heightPx: 150
+    heightEm: 0
+    heightRem: 0
   maxSize:
-    width: 500
-    height: 450
+    widthPx: 500
+    widthEm: 0
+    widthRem: 0
+    heightPx: 450
+    heightEm: 0
+    heightRem: 0
   closable: true
   fontSizePickable: true
   resizable: true
@@ -22,18 +33,29 @@
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
-  title: サンプル画面
   message: ""
   position: center
   size:
-    width: 350
-    height: 200
+    widthPx: 350
+    widthEm: 0
+    widthRem: 0
+    heightPx:
+    heightEm: 0
+    heightRem: 0
   minSize:
-    width: 150
-    height: 150
+    widthPx: 150
+    widthEm: 0
+    widthRem: 0
+    heightPx: 150
+    heightEm: 0
+    heightRem: 0
   maxSize:
-    width: 500
-    height: 450
+    widthPx: 500
+    widthEm: 0
+    widthRem: 0
+    heightPx: 450
+    heightEm: 0
+    heightRem: 0
   closable: true
   fontSizePickable: true
   resizable: true
@@ -42,15 +64,22 @@
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
-  title: Youtube再生画面
   message: ""
   position: right-bottom
   size:
-    width: 426
-    height: 256
+    widthPx: 426
+    widthEm: 0
+    widthRem: 0
+    heightPx: 256
+    heightEm: 0
+    heightRem: 0
   minSize:
-    width: 160
-    height: 106
+    widthPx: 160
+    widthEm: 0
+    widthRem: 0
+    heightPx: 106
+    heightEm: 0
+    heightRem: 0
   closable: true
   fontSizePickable: false
   resizable: true
@@ -59,144 +88,352 @@
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: true
-  title: BGM設定画面
   message: ""
   position: center
   size:
-    width: 271
-    height: 300
+    widthPx: 271
+    widthEm: 0
+    widthRem: 0
+    heightPx: 5
+    heightEm: 26
+    heightRem: 0.5
   minSize:
-    width: 271
-    height: 100
+    widthPx: 271
+    widthEm: 0
+    widthRem: 0
+    heightPx: 5
+    heightEm: 26
+    heightRem: 0.5
   maxSize:
-    width: 271
-    height: 1000
+    widthPx: 271
+    widthEm: 0
+    widthRem: 0
+    heightPx: 5
+    heightEm: 26
+    heightRem: 0.5
   closable: true
   fontSizePickable: true
   resizable: true
   tableInfoList:
     - type: free
-      height: 11
+      height: 10
+      classificationProp: tag
+      classificationType: string
       columnList:
         - width: 28
           type: text
           align: center
-          title: 連動
           target: isLinkage
         - width: 28
           type: text
           align: center
-          title: タグ
           target: tag
         - width: 34
           type: icon
           align: center
-          title: 種別
           target: type
         - width: 64
           type: text
           align: left
-          title: タイトル
           target: title
         - width: 28
           type: text
           align: center
-          title: 時間
           target: time
         - width: 24
           type: icon
           align: center
-          title: 繰
           target: isRepeat
         - width: 28
           type: text
           align: center
-          title: 音量
           target: volume
         - width: 28
           type: text
           align: center
-          title: fade
           target: fade
 "login-window":
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: true
-  title: ログイン画面
   message: ""
   position: center
   size:
-    width: 545
-    height: 300
+    widthPx: 545
+    widthEm: 0
+    widthRem: 0
+    heightPx: 120
+    heightEm: 26
+    heightRem: 3
   minSize:
-    width: 545
-    height: 200
+    widthPx: 545
+    widthEm: 0
+    widthRem: 0
+    heightPx: 8
+    heightEm: 26
+    heightRem: 3
   maxSize:
-    width: 545
-    height: 700
-  closable: true
+    widthPx: 545
+    widthEm: 0
+    widthRem: 0
+    heightPx: 253
+    heightEm: 26
+    heightRem: 3
+  closable: false
   fontSizePickable: true
   resizable: true
   tableInfoList:
     - type: free
-      height: 11
+      height: 10
+      classificationProp: order
+      classificationType: range
+      classificationOrdinal: 0
       columnList:
         - width: 30
           type: text
           align: center
-          title: No.
           target: order
         - width: 100
           type: text
           align: center
-          title: プレイルーム名
           target: name
         - width: 90
           type: text
           align: center
-          title: ゲームシステム
           target: system
         - width: 50
           type: text
           align: center
-          title: 入室人数
           target: memberNum
         - width: 75
           type: text
           align: center
-          title: パスワード
           target: hasPassword
         - width: 34
           type: text
           align: center
-          title: 見学
           target: visitable
         - width: 120
           type: text
           align: center
-          title: 最終更新時刻
           target: updateTime
         - width: 34
           type: deleteButton
           align: center
-          title: 削除
           target: ""
 "create-new-room-window":
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
-  title: 新規プレイルーム作成
   message: ""
   position: center
   size:
-    width: 350
-    height: 200
+    widthPx: 450
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 10
+    heightRem: 1.1
   minSize:
-    width: 300
-    height: 150
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 10
+    heightRem: 1.1
   maxSize:
-    width: 500
-    height: 450
+    widthPx: 550
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 10
+    heightRem: 1.1
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"user-login-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 350
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 10
+    heightRem: 1.1
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 10
+    heightRem: 1.1
+  maxSize:
+    widthPx: 500
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 10
+    heightRem: 1.1
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"app-server-setting-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 350
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 8.5
+    heightRem: 0.5
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 8.5
+    heightRem: 0.5
+  maxSize:
+    widthPx: 500
+    widthEm: 0
+    widthRem: 0
+    heightPx: 26
+    heightEm: 8.5
+    heightRem: 0.5
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"terms-of-use-window":
+  parentTypeList: []
+  isInputWindow: false
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 300
+    heightEm: 0
+    heightRem: 0
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 150
+    heightEm: 0
+    heightRem: 0
+  maxSize:
+    widthPx: 700
+    widthEm: 0
+    widthRem: 0
+    heightPx: 700
+    heightEm: 0
+    heightRem: 0
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"delete-room-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 220
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 5.5
+    heightRem: 0.7
+  minSize:
+    widthPx: 190
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 5.5
+    heightRem: 0.7
+  maxSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 5.5
+    heightRem: 0.7
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"confirm-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  minSize:
+    widthPx: 250
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  maxSize:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"login-room-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 380
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 7.5
+    heightRem: 0.9
+  minSize:
+    widthPx: 250
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 7.5
+    heightRem: 0.9
+  maxSize:
+    widthPx: 500
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 7.5
+    heightRem: 0.9
   closable: true
   fontSizePickable: true
   resizable: true

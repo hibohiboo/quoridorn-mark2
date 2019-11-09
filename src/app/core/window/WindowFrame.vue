@@ -16,7 +16,8 @@
     >
       <!-- タイトル文言 -->
       <div class="title-message-area">
-        <span>{{ windowInfo.title }}</span>
+        <span v-if="windowInfo.title">{{ windowInfo.title }}</span>
+        <span v-else v-t="`${windowInfo.type}.window-title`"></span>
         <span class="message" v-if="windowInfo.message">{{
           windowInfo.message
         }}</span>
@@ -28,7 +29,6 @@
         class="fontSizeSlider"
         @click.prevent
       >
-        文字サイズ{{ fontSize }}px
         <input
           type="range"
           min="10"
@@ -42,6 +42,7 @@
           @keydown.229.stop
           @keyup.229.stop
         />
+        {{ fontSize }}px
       </label>
 
       <!-- 最小化 -->
@@ -149,7 +150,8 @@ import {
   createPoint,
   createRectangle,
   createSize,
-  getEventPoint
+  getEventPoint,
+  getWindowSize
 } from "../Coordinate";
 import TitleIcon from "./TitleIcon.vue";
 import WindowManager from "./WindowManager";
@@ -195,14 +197,26 @@ export default class WindowFrame extends Vue {
   private get horizontalArrangeable(): boolean {
     const minSize = this.windowInfo.declare.minSize;
     const maxSize = this.windowInfo.declare.maxSize;
-    return !(minSize && maxSize && minSize.width === maxSize.width);
+    return !(
+      minSize &&
+      maxSize &&
+      minSize.widthEm === maxSize.widthEm &&
+      minSize.widthRem === maxSize.widthRem &&
+      minSize.widthPx === maxSize.widthPx
+    );
   }
 
   @VueEvent
   private get verticalArrangeable(): boolean {
     const minSize = this.windowInfo.declare.minSize;
     const maxSize = this.windowInfo.declare.maxSize;
-    return !(minSize && maxSize && minSize.height === maxSize.height);
+    return !(
+      minSize &&
+      maxSize &&
+      minSize.heightEm === maxSize.heightEm &&
+      minSize.heightRem === maxSize.heightRem &&
+      minSize.heightPx === maxSize.heightPx
+    );
   }
 
   @VueEvent
@@ -245,8 +259,8 @@ export default class WindowFrame extends Vue {
 
     this.windowInfo.x += this.diff.x;
     this.windowInfo.y += this.diff.y;
-    this.windowInfo.width += this.diff.width;
-    this.windowInfo.height += this.diff.height;
+    this.windowInfo.widthPx += this.diff.width;
+    this.windowInfo.heightPx += this.diff.height;
 
     this.diff.x = 0;
     this.diff.y = 0;
@@ -330,27 +344,31 @@ export default class WindowFrame extends Vue {
       this.diff.height = point.y - this.dragFrom.y;
     }
 
-    const simulationSize: Size = {
-      width: this.windowInfo.width + this.diff.width,
-      height: this.windowInfo.height + this.diff.height
-    };
+    const simulationSize: Size = getWindowSize(this.windowInfo, this.windowElm);
+    simulationSize.width += this.diff.width;
+    simulationSize.height += this.diff.height;
+
     const correctSize: Size = {
       width: 0,
       height: 0
     };
     const minSize = this.windowInfo.declare.minSize;
     if (minSize) {
-      if (simulationSize.width < minSize.width)
-        correctSize.width = minSize.width - simulationSize.width;
-      if (simulationSize.height < minSize.height)
-        correctSize.height = minSize.height - simulationSize.height;
+      if (simulationSize.width < getWindowSize(minSize, this.windowElm).width)
+        correctSize.width =
+          getWindowSize(minSize, this.windowElm).width - simulationSize.width;
+      if (simulationSize.height < getWindowSize(minSize, this.windowElm).height)
+        correctSize.height =
+          getWindowSize(minSize, this.windowElm).height - simulationSize.height;
     }
     const maxSize = this.windowInfo.declare.maxSize;
     if (maxSize) {
-      if (simulationSize.width > maxSize.width)
-        correctSize.width = maxSize.width - simulationSize.width;
-      if (simulationSize.height > maxSize.height)
-        correctSize.height = maxSize.height - simulationSize.height;
+      if (simulationSize.width > getWindowSize(maxSize, this.windowElm).width)
+        correctSize.width =
+          getWindowSize(maxSize, this.windowElm).width - simulationSize.width;
+      if (simulationSize.height > getWindowSize(maxSize, this.windowElm).height)
+        correctSize.height =
+          getWindowSize(maxSize, this.windowElm).height - simulationSize.height;
     }
 
     if (param.type.indexOf("left") > -1) this.diff.x -= correctSize.width;
@@ -488,12 +506,12 @@ export default class WindowFrame extends Vue {
   @VueEvent
   private adjustWidth() {
     const maxSize = this.windowInfo.declare.maxSize;
-    if (maxSize && this.windowInfo.width > maxSize.width)
-      this.windowInfo.width = maxSize.width;
+    if (maxSize && this.windowInfo.widthPx > maxSize.widthPx)
+      this.windowInfo.widthPx = maxSize.widthPx;
 
     const minSize = this.windowInfo.declare.maxSize;
-    if (minSize && this.windowInfo.width < minSize.width)
-      this.windowInfo.width = minSize.width;
+    if (minSize && this.windowInfo.widthPx < minSize.widthPx)
+      this.windowInfo.widthPx = minSize.widthPx;
   }
 
   @Watch("isMounted")
@@ -516,38 +534,47 @@ export default class WindowFrame extends Vue {
 
   @Watch("isMounted")
   @Watch("diff.width")
-  @Watch("windowInfo.width")
+  @Watch("windowInfo.widthPx")
   private async onChangeWindowWidth() {
     if (!this.isMounted) return;
-    const width = this.windowInfo.width + this.diff.width;
-    const height = this.windowInfo.height + this.diff.height;
-    this.windowElm.style.setProperty("--windowWidth", `${width}px`);
+    const widthPx = this.windowInfo.widthPx + this.diff.width;
+    const widthEm = this.windowInfo.widthEm;
+    const widthRem = this.windowInfo.widthRem;
+    const heightPx = this.windowInfo.heightPx + this.diff.height;
+    this.windowElm.style.setProperty("--windowWidthPx", `${widthPx}px`);
+    this.windowElm.style.setProperty("--windowWidthEm", `${widthEm}em`);
+    this.windowElm.style.setProperty("--windowWidthRem", `${widthRem}rem`);
     await TaskManager.instance.ignition<WindowResizeInfo, never>({
       type: "window-resize",
       owner: "Quoridorn",
       value: {
         key: this.key,
         status: this.status,
-        size: createSize(width, height)
+        size: createSize(widthPx, heightPx)
       }
     });
   }
 
   @Watch("isMounted")
   @Watch("diff.height")
-  @Watch("windowInfo.height")
+  @Watch("windowInfo.heightPx")
+  @Watch("windowInfo.heightEm")
   private async onChangeWindowHeight() {
     if (!this.isMounted) return;
-    const width = this.windowInfo.width + this.diff.width;
-    const height = this.windowInfo.height + this.diff.height;
-    this.windowElm.style.setProperty("--windowHeight", `${height}px`);
+    const widthPx = this.windowInfo.widthPx + this.diff.width;
+    const heightPx = this.windowInfo.heightPx + this.diff.height;
+    const heightEm = this.windowInfo.heightEm;
+    const heightRem = this.windowInfo.heightRem;
+    this.windowElm.style.setProperty("--windowHeightPx", `${heightPx}px`);
+    this.windowElm.style.setProperty("--windowHeightEm", `${heightEm}em`);
+    this.windowElm.style.setProperty("--windowHeightRem", `${heightRem}rem`);
     await TaskManager.instance.ignition<WindowResizeInfo, never>({
       type: "window-resize",
       owner: "Quoridorn",
       value: {
         key: this.key,
         status: this.status,
-        size: createSize(width, height)
+        size: createSize(widthPx, heightPx)
       }
     });
   }
@@ -612,11 +639,12 @@ export default class WindowFrame extends Vue {
     scale(1, 1);
   */
   width: calc(
-    var(--windowWidth) + var(--scroll-bar-width) + var(--window-padding) * 2 +
-      2px
+    var(--windowWidthPx) + var(--windowWidthEm) + var(--windowWidthRem) +
+      var(--scroll-bar-width) + var(--window-padding) * 2 + 2px
   );
   height: calc(
-    var(--windowHeight) + var(--window-title-height) + var(--window-padding) * 2
+    var(--windowHeightPx) + var(--windowHeightEm) + var(--windowHeightRem) +
+      var(--window-title-height) + var(--window-padding) * 2
   );
   font-size: var(--windowFontSize);
   z-index: var(--windowOrder);
@@ -724,7 +752,6 @@ export default class WindowFrame extends Vue {
   .fontSizeSlider {
     @include flex-box(row, center, center);
     font-size: 10px;
-    margin-right: auto;
     color: #444;
 
     input[type="range"] {
@@ -735,7 +762,7 @@ export default class WindowFrame extends Vue {
         rgb(201, 199, 200) 100%
       );
       height: 0.4em;
-      width: 100%;
+      width: 5rem;
       border-radius: 0.3em;
       border: 1px solid rgb(167, 167, 167);
       border-top: 1px solid rgb(105, 110, 106);

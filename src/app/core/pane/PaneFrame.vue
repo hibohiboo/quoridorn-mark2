@@ -23,7 +23,11 @@
       <title-icon className="icon-arrow-down-left" @emit="normalizeWindow" />
 
       <!-- 閉じる -->
-      <title-icon className="icon-cross" @emit="closeWindow" />
+      <title-icon
+        className="icon-cross"
+        @emit="closeWindow"
+        v-if="windowInfo.declare.closable"
+      />
     </div>
 
     <!-- コンテンツ -->
@@ -253,7 +257,7 @@ export default class PaneFrame extends Vue {
    */
   private async normalizeWindow() {
     // 現在のサイズのまま、初期配置場所に設置しなおす
-    const size = createSize(this.windowInfo.width, this.windowInfo.height);
+    const size = createSize(this.windowInfo.widthPx, this.windowInfo.heightPx);
     const point = calcWindowPosition(
       this.windowInfo.declare.position,
       size,
@@ -277,15 +281,15 @@ export default class PaneFrame extends Vue {
   @Emit("changeMinMaxWidth")
   @Watch("windowInfo.declare.minSize.width")
   private onChangeMinWidth(width: number) {
-    if (this.windowInfo.width >= width) return;
-    this.windowInfo.width = width;
+    if (this.windowInfo.widthPx >= width) return;
+    this.windowInfo.widthPx = width;
   }
 
   @Emit("changeMinMaxWidth")
   @Watch("windowInfo.declare.maxSize.width")
   private onChangeMaxWidth(width: number) {
-    if (this.windowInfo.width <= width) return;
-    this.windowInfo.width = width;
+    if (this.windowInfo.widthPx <= width) return;
+    this.windowInfo.widthPx = width;
   }
 
   @Watch("isMounted")

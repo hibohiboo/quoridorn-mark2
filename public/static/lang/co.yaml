@@ -1,0 +1,111 @@
+button:
+  commit: 확인
+  reject: 취소
+  ok: OK
+  cancel: Cancel
+  login: 로그인
+  create-new: 작성
+  delete: 삭제
+  send: 보내다
+  preview: 시사
+  add: 더하다
+  modify: 수정하다
+  copy: 부
+  next: 진행
+  execution: 실행
+
+label:
+  terms-of-use: 이용 약관
+  empty-room: (빈 방)
+  exist: 유
+  not-exist: 없음
+  possible: 수
+  creating: 작성 중
+  termsOfUseWebServer: Web 서버 약관
+  termsOfUseAppServer: Application 서버 약관
+  userName: 사용자 이름：
+  password: 비밀번호：
+  passwordPlaceholder: (비어있는 경우 비밀번호 없음)
+  userType: 사용자 유형：
+  nameless: 무명
+  authority: 권한
+  player: PL
+  gameMaster: GM
+  visitor: 견학자
+  roomName: 놀이방 이름：
+  roomNamePlaceholder: 임시 놀이방 (삭제 가능)
+  gameSystem: 게임 시스템：
+  noTarget: 지정 없음
+  isVisitor: 参加者ですか？見学者ですか？：
+  participant: 参加者
+
+test-window:
+  window-title: 시험 화면
+
+sample-window:
+  window-title: 샘플 화면
+
+play-youtube-window:
+  window-title: Youtube 재생
+
+bgm-setting-window:
+  window-title: 음악 설정
+  table-columns:
+    -
+      - 연동
+      - 태그
+      - 종별
+      - 제목
+      - 시간
+      - 루프
+      - 볼륨
+      - Fade
+
+login-window:
+  window-title: 로그인
+  table-columns:
+    -
+      - No.
+      - 방 이름
+      - 시스템
+      - 인원
+      - 비밀번호
+      - 견학
+      - 마지막 시간
+      - 삭제
+
+create-new-room-window:
+  window-title: 방 만들기
+  message: 신규 놀이방을 만듭니다.
+
+user-login-window:
+  window-title: 사용자 로그인
+  message: 사용자 정보를 입력하십시오
+
+app-server-setting-window:
+  window-title: 응용 프로그램 서버 설정
+  message: 응용 프로그램 서버에 대한 설정
+  testing: 테스트 중
+  not-quoridorn: Quoridorn 서버가 없습니다
+  no-such-server: 연결할 수 없습니다
+  internal-server-error: 서버에 오류가 발생했습니다
+  un-match-version: 호환되지 않는 버전의 서버입니다
+  success: 연결 성공
+
+terms-of-use-window:
+  window-title: 이용 약관
+  message: 각 서버의 이용 약관을 확인 하시고,이 모든 내용을 지켜 이용해주십시오.
+
+delete-room-window:
+  window-title: 방 삭제
+  message: 방을 삭제합니다
+
+confirm-window:
+  window-title: 확인 화면
+  delete-room:
+    title: 객실 삭제
+    message: 방을 삭제 하시겠습니까?
+
+login-room-window:
+  window-title: ログインチェック
+  message: 部屋にログインします。
