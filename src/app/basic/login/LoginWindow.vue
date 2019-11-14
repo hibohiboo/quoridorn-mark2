@@ -8,8 +8,15 @@
         draggable="false"
       />
       <div class="message-documents">
-        <div class="term-of-use flat-button" @click="viewTermOfUse()">
-          <span v-t="'label.terms-of-use'"></span>
+        <div class="h-box">
+          <div class="term-of-use flat-button" @click="viewTermOfUse()">
+            <span v-t="'label.terms-of-use'"></span>
+          </div>
+          <!--
+          <div class="version-info flat-button" @click="viewVersionInfo()">
+            <span v-t="'label.version-info'"></span>
+          </div>
+          -->
         </div>
         <div class="title-contents flat-button" @click="serverSetting()">
           <span class="title">{{ message.title }}</span>
@@ -109,10 +116,11 @@ import {
   DeleteRoomInput,
   DeleteRoomRequest,
   LoginRoomInput,
-  LoginRequest,
-  LoginResponse
+  RoomLoginInfo,
+  UserLoginWindowInput,
+  UserLoginRequest
 } from "@/@types/socket";
-import { StoreMetaData, StoreObj } from "@/@types/store";
+import { StoreObj, StoreUseData } from "@/@types/store";
 import TaskManager from "@/app/core/task/TaskManager";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
@@ -126,6 +134,7 @@ import { loadYaml } from "@/app/core/File";
 import { getFileNameArgList } from "@/app/core/Utility";
 import { Image } from "@/@types/image";
 import { MapSetting, RoomData } from "@/@types/room";
+import GameObjectManager from "@/app/basic/GameObjectManager";
 
 @Component({
   components: { LanguageSelect, TableComponent, CtrlButton },
@@ -151,11 +160,12 @@ import { MapSetting, RoomData } from "@/@types/room";
 export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
   WindowVue
 ) {
-  private roomList: (StoreObj<ClientRoomInfo> & StoreMetaData)[] = [];
+  private roomList: StoreUseData<ClientRoomInfo>[] = [];
   private selectedRoomNo: number | null = null;
   private isInputtingServerSetting: boolean = false;
   private isInputtingRoomInfo: boolean = false;
   private message: Message | null = null;
+  private version: string | null = null;
   private readonly htmlRegExp: RegExp = new RegExp(
     "\\[([^\\]]+)]\\(([^)]+)\\)",
     "g"
@@ -172,6 +182,7 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
     await this.init();
     this.roomList = this.windowInfo.args!.roomList;
     this.message = this.windowInfo.args!.message;
+    this.version = this.windowInfo.args!.version;
     this.elm.style.setProperty(
       "--msg-creating",
       `"${LanguageManager.instance.getText("label.creating")}"`
@@ -205,6 +216,27 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
         type: "terms-of-use-window",
         args: {
           message: this.message!
+        }
+      }
+    });
+  }
+
+  @VueEvent
+  private async viewVersionInfo() {
+    await TaskManager.instance.ignition<
+      WindowOpenInfo<{
+        message: Message;
+        version: string;
+      }>,
+      void
+    >({
+      type: "window-open",
+      owner: "Quoridorn",
+      value: {
+        type: "version-info-window",
+        args: {
+          message: this.message!,
+          version: this.version!
         }
       }
     });
@@ -272,11 +304,9 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
       }
     );
     this.roomList.splice(0, this.roomList.length);
-    serverInfo.roomList.forEach(
-      (roomInfo: StoreObj<ClientRoomInfo> & StoreMetaData) => {
-        this.roomList.push(roomInfo);
-      }
-    );
+    serverInfo.roomList.forEach((roomInfo: StoreUseData<ClientRoomInfo>) => {
+      this.roomList.push(roomInfo);
+    });
     this.message = serverInfo.message;
   }
 
@@ -327,11 +357,13 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
       return;
     }
 
-    // タッチ
-    if (!(await this.touchRoom(true))) return;
     this.isInputtingRoomInfo = true;
 
-    window.console.log("touched");
+    // タッチ
+    if (!(await this.touchRoom(true))) {
+      this.isInputtingRoomInfo = false;
+      return;
+    }
 
     // 確認画面
     let confirmResult: boolean;
@@ -419,9 +451,7 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
   }
 
   @VueEvent
-  private getRowClasses(
-    data: StoreObj<ClientRoomInfo> & StoreMetaData
-  ): string[] {
+  private getRowClasses(data: StoreUseData<ClientRoomInfo>): string[] {
     const classList: string[] = [];
     if (data.exclusionOwner) {
       classList.push(data.data ? "isEditing" : "isCreating");
@@ -455,6 +485,9 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
     );
   }
 
+  /** ====================================================================================================
+   * 部屋を作成する
+   */
   @VueEvent
   private async createRoom() {
     if (this.selectedRoomNo === null) {
@@ -465,9 +498,14 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
     this.isInputtingRoomInfo = true;
 
     // タッチ
-    if (!(await this.touchRoom(false))) return;
+    if (!(await this.touchRoom(false))) {
+      this.isInputtingRoomInfo = false;
+      return;
+    }
 
-    // 部屋情報入力画面
+    /* ----------------------------------------------------------------------
+     * 部屋情報入力画面
+     */
     let createRoomInput: CreateRoomInput;
     try {
       const roomInfoList = await TaskManager.instance.ignition<
@@ -481,6 +519,13 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
         }
       });
       createRoomInput = roomInfoList[0];
+
+      if (!createRoomInput) {
+        // 入力画面キャンセル
+        await this.releaseTouchRoom();
+        this.isInputtingRoomInfo = false;
+        return;
+      }
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom();
@@ -488,28 +533,32 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
       return;
     }
 
-    // 入力画面がキャンセルされていたらタッチ状態を解除
-    if (!createRoomInput) {
-      await this.releaseTouchRoom();
-      this.isInputtingRoomInfo = false;
-      return;
-    }
-
-    // ユーザログイン画面
+    /* ----------------------------------------------------------------------
+     * ユーザログイン画面
+     */
     let userLoginInput: UserLoginInput;
     try {
       const userLoginInputList = await TaskManager.instance.ignition<
-        WindowOpenInfo<boolean>,
+        WindowOpenInfo<UserLoginWindowInput>,
         UserLoginInput
       >({
         type: "window-open",
         owner: "Quoridorn",
         value: {
           type: "user-login-window",
-          args: true
+          args: {
+            isSetting: true,
+            userNameList: []
+          }
         }
       });
       userLoginInput = userLoginInputList[0];
+
+      if (!userLoginInput) {
+        // 入力画面キャンセル
+        await this.releaseTouchRoom();
+        return;
+      }
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom();
@@ -518,172 +567,88 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
       this.isInputtingRoomInfo = false;
     }
 
-    // 入力画面がキャンセルされていたらタッチ状態を解除
-    if (!userLoginInput) {
-      await this.releaseTouchRoom();
-      return;
-    }
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "create-room",
+        value: "on"
+      }
+    });
 
-    // 部屋作成リクエストを投げる
+    window.console.log("部屋作成リクエスト");
+
+    /* ----------------------------------------------------------------------
+     * 部屋作成リクエスト
+     */
     try {
       SocketFacade.instance.roomCollectionPrefix = await SocketFacade.instance.socketCommunication<
         CreateRoomRequest,
         string
-      >("create-room", {
-        roomId: this.roomList[this.selectedRoomNo].id!,
-        roomNo: this.selectedRoomNo,
-        ...createRoomInput,
-        ...userLoginInput
-      });
-
-      const imageList: Image[] = await loadYaml<Image[]>(
-        "./static/conf/image.yaml"
-      );
-      const imageTagList: string[] = await loadYaml<string[]>(
-        "./static/conf/imageTag.yaml"
-      );
-      imageList.forEach((image: Image, index: number) => {
-        if (!image.tag)
-          image.tag = imageTagList.length ? imageTagList[0] : "default";
-        if (image.standImageInfo) {
-          // 立ち絵パラメータの値を正しく設定
-          const si = image.standImageInfo;
-          if (!si.status) si.status = "";
-          if (si.type !== "pile" && si.type !== "replace") si.type = "pile";
-          if (
-            si.viewStart === undefined ||
-            si.viewStart < 0 ||
-            si.viewStart > 100
-          )
-            si.viewStart = 0;
-          if (si.viewEnd === undefined || si.viewEnd < 0 || si.viewEnd > 100)
-            si.viewEnd = 100;
-        } else {
-          // 立ち絵パラメータを推測＆設定
-          image.standImageInfo = getFileNameArgList(image.data) || null;
-        }
-
-        const regExp = new RegExp("[ 　]+", "g");
-        const tagStrList = image.tag.split(regExp);
-        tagStrList.forEach((tagStr: string) => {
-          const imageTag: string = imageTagList.filter(
-            (imageTag: string) => imageTag === tagStr
-          )[0];
-          if (!imageTag) imageTagList.push(tagStr);
-        });
-      });
-
-      /* --------------------------------------------------
-       * 画像タグのプリセットデータ投入
-       */
-      const imageTagStore = SocketFacade.instance.imageTagCollectionController();
-
-      const pushImageTag = async (imageTag: string): Promise<void> => {
-        await imageTagStore.add(await imageTagStore.touch(), imageTag);
-      };
-
-      // pushImageTagを直列の非同期で全部実行する
-      await imageTagList
-        .map((imageTag: string) => () => pushImageTag(imageTag))
-        .reduce((prev, curr) => prev.then(curr), Promise.resolve());
-
-      /* --------------------------------------------------
-       * 画像データのプリセットデータ投入
-       */
-      const imageDataStore = SocketFacade.instance.imageDataCollectionController();
-
-      let imageId: string | null = null;
-      const pushImage = async (image: Image): Promise<void> => {
-        const docId = await imageDataStore.touch();
-        if (!imageId) imageId = docId;
-        await imageDataStore.add(docId, image);
-      };
-
-      // pushImageを直列の非同期で全部実行する
-      await imageList
-        .map((image: Image) => () => pushImage(image))
-        .reduce((prev, curr) => prev.then(curr), Promise.resolve());
-
-      /* --------------------------------------------------
-       * マップデータのプリセットデータ投入
-       */
-      const mapDataStore = SocketFacade.instance.mapListCollectionController();
-
-      const mapSetting: MapSetting = {
-        backgroundType: "image",
-        imageTag: imageList[0].tag,
-        imageId: imageId!,
-        reverse: "none",
-        shapeType: "square",
-        totalColumn: 20,
-        totalRow: 15,
-        gridSize: 50,
-        gridBorderColor: "#000000",
-        isPourTile: false,
-        isHexFirstCorner: false,
-        isHexSecondSmall: false,
-        background: {
-          backgroundType: "image",
-          imageTag: imageList[0].tag,
-          imageId: imageId!,
-          reverse: "none",
-          // , backgroundColor: "rgb(146, 168, 179)"
-          maskBlur: 3
-        },
-        margin: {
-          backgroundType: "image",
-          imageTag: imageList[0].tag,
-          imageId: imageId!,
-          reverse: "none",
-          isUseGridColor: true,
-          gridColorBold: "rgba(255, 255, 255, 0.3)",
-          gridColorThin: "rgba(255, 255, 255, 0.1)",
-          column: 5,
-          row: 5,
-          isUseMaskColor: true,
-          maskColor: "rgba(20, 80, 20, 0.1)",
-          maskBlur: 3,
-          isUseImage: "none",
-          borderWidth: 10,
-          borderColor: "gray",
-          borderStyle: "ridge"
-        },
-        chatLinkage: 0,
-        chatLinkageSearch: "",
-        portTileMapping: ""
-      };
-      const mapDataDocId = await mapDataStore.add(
-        await mapDataStore.touch(),
-        mapSetting
-      );
-
-      /* --------------------------------------------------
-       * 部屋データのプリセットデータ投入
-       */
-      const roomDataStore = SocketFacade.instance.roomDataCollectionController();
-
-      const roomData: RoomData = {
-        mapId: mapDataDocId,
-        isDrawGridLine: true,
-        isDrawGridId: true,
-        isFitGrid: true,
-        isUseRotateMarker: true
-      };
-      await roomDataStore.add(await roomDataStore.touch(), roomData);
-
-      const initRoomInfo = null;
-
-      await TaskManager.instance.ignition<void, void>({
-        type: "room-initialize",
-        owner: "Quoridorn",
-        value: initRoomInfo
-      });
-      await this.close();
+      >("create-room", createRoomInput);
     } catch (err) {
       window.console.warn(err);
+      return;
     }
+
+    window.console.log("ログインリクエスト");
+
+    /* ----------------------------------------------------------------------
+     * ログインリクエスト
+     */
+    try {
+      await SocketFacade.instance.socketCommunication<UserLoginRequest, void>(
+        "user-login",
+        userLoginInput
+      );
+    } catch (err) {
+      window.console.warn(err);
+      alert("ログイン失敗");
+      SocketFacade.instance.roomCollectionPrefix = null;
+      return;
+    }
+
+    window.console.log("部屋使用準備");
+
+    /* ----------------------------------------------------------------------
+     * 部屋の使用準備
+     */
+    await this.close();
+
+    await this.addPresetData();
+
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "create-room",
+        value: "off"
+      }
+    });
+
+    window.console.log("最終準備");
+
+    const loginResult: ClientRoomInfo = {
+      name: createRoomInput.name,
+      system: createRoomInput.system,
+      extend: createRoomInput.extend,
+      memberNum: 0,
+      hasPassword: !!createRoomInput.roomPassword,
+      roomNo: this.selectedRoomNo
+    };
+    GameObjectManager.instance.clientRoomInfo = loginResult;
+    await TaskManager.instance.ignition<ClientRoomInfo, void>({
+      type: "room-initialize",
+      owner: "Quoridorn",
+      value: loginResult
+    });
+
+    window.console.log("おわり");
   }
 
+  /** ====================================================================================================
+   * ログイン
+   */
   @VueEvent
   private async login() {
     if (this.selectedRoomNo === null) {
@@ -699,7 +664,9 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
       return;
     }
 
-    // 部屋情報入力画面
+    /* ----------------------------------------------------------------------
+     * 部屋情報入力画面
+     */
     let loginRoomInput: LoginRoomInput;
     this.isInputtingRoomInfo = true;
     try {
@@ -714,6 +681,13 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
         }
       });
       loginRoomInput = loginRoomInputList[0];
+
+      if (!loginRoomInput) {
+        // 入力画面キャンセル
+        await this.releaseTouchRoom();
+        this.isInputtingRoomInfo = false;
+        return;
+      }
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom();
@@ -721,66 +695,246 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
       return;
     }
 
-    // 入力画面がキャンセルされていたらタッチ状態を解除
-    if (!loginRoomInput) {
-      await this.releaseTouchRoom();
+    /* ----------------------------------------------------------------------
+     * 部屋ログインリクエスト
+     */
+    try {
+      SocketFacade.instance.roomCollectionPrefix = await SocketFacade.instance.socketCommunication<
+        RoomLoginInfo,
+        string
+      >("room-login", {
+        roomId: this.roomList[this.selectedRoomNo].id!,
+        roomNo: this.selectedRoomNo,
+        roomPassword: loginRoomInput.roomPassword
+      });
+    } catch (err) {
+      window.console.warn(err);
+      alert("ログイン失敗");
       this.isInputtingRoomInfo = false;
       return;
     }
 
-    // ユーザログイン画面
+    /* ----------------------------------------------------------------------
+     * ユーザログイン画面
+     */
     let userLoginInput: UserLoginInput;
     try {
       const userLoginInputList = await TaskManager.instance.ignition<
-        WindowOpenInfo<boolean>,
+        WindowOpenInfo<UserLoginWindowInput>,
         UserLoginInput
       >({
         type: "window-open",
         owner: "Quoridorn",
         value: {
           type: "user-login-window",
-          args: false
+          args: {
+            isSetting: false,
+            userNameList: (await SocketFacade.instance.userCC().getList()).map(
+              userData => userData.data!.userName
+            )
+          }
         }
       });
       userLoginInput = userLoginInputList[0];
+
+      if (!userLoginInput) {
+        // 入力画面キャンセル
+        // TODO 部屋ログアウト
+        this.isInputtingRoomInfo = false;
+        return;
+      }
     } catch (err) {
       window.console.warn(err);
-      await this.releaseTouchRoom();
-      return;
-    } finally {
+      // TODO 部屋ログアウト
       this.isInputtingRoomInfo = false;
-    }
-
-    // 入力画面がキャンセルされていたらタッチ状態を解除
-    if (!userLoginInput) {
-      await this.releaseTouchRoom();
       return;
     }
 
-    // ログインリクエストを投げる
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "create-room",
+        value: "on"
+      }
+    });
+
+    /* ----------------------------------------------------------------------
+     * ログインリクエスト
+     */
     try {
-      const loginResult = await SocketFacade.instance.socketCommunication<
-        LoginRequest,
-        LoginResponse
-      >("login", {
-        roomId: this.roomList[this.selectedRoomNo].id!,
-        roomNo: this.selectedRoomNo,
-        ...loginRoomInput,
-        ...userLoginInput
-      });
-      if (!loginResult) return;
-      SocketFacade.instance.roomCollectionPrefix =
-        loginResult.roomCollectionPrefix;
+      await SocketFacade.instance.socketCommunication<UserLoginRequest, void>(
+        "user-login",
+        userLoginInput
+      );
     } catch (err) {
       window.console.warn(err);
+      alert("ログイン失敗");
+      SocketFacade.instance.roomCollectionPrefix = null;
+      return;
     }
 
-    await TaskManager.instance.ignition<void, void>({
+    /* ----------------------------------------------------------------------
+     * 部屋の使用準備
+     */
+    await this.close();
+
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "create-room",
+        value: "off"
+      }
+    });
+
+    const loginResult: ClientRoomInfo = this.roomList[this.selectedRoomNo]
+      .data!;
+    loginResult.roomNo = this.selectedRoomNo;
+    GameObjectManager.instance.clientRoomInfo = loginResult;
+
+    await TaskManager.instance.ignition<ClientRoomInfo, void>({
       type: "room-initialize",
       owner: "Quoridorn",
-      value: null
+      value: loginResult
     });
-    await this.close();
+  }
+
+  private async addPresetData() {
+    const imageList: Image[] = await loadYaml<Image[]>(
+      "./static/conf/image.yaml"
+    );
+    const imageTagList: string[] = await loadYaml<string[]>(
+      "./static/conf/imageTag.yaml"
+    );
+    imageList.forEach((image: Image) => {
+      if (!image.tag)
+        image.tag = imageTagList.length ? imageTagList[0] : "default";
+      if (image.standImageInfo) {
+        // 立ち絵パラメータの値を正しく設定
+        const si = image.standImageInfo;
+        if (!si.status) si.status = "";
+        if (si.type !== "pile" && si.type !== "replace") si.type = "pile";
+        if (
+          si.viewStart === undefined ||
+          si.viewStart < 0 ||
+          si.viewStart > 100
+        )
+          si.viewStart = 0;
+        if (si.viewEnd === undefined || si.viewEnd < 0 || si.viewEnd > 100)
+          si.viewEnd = 100;
+      } else {
+        // 立ち絵パラメータを推測＆設定
+        image.standImageInfo = getFileNameArgList(image.data) || null;
+      }
+
+      const regExp = new RegExp("[ 　]+", "g");
+      const tagStrList = image.tag.split(regExp);
+      tagStrList.forEach((tagStr: string) => {
+        const imageTag: string = imageTagList.filter(
+          (imageTag: string) => imageTag === tagStr
+        )[0];
+        if (!imageTag) imageTagList.push(tagStr);
+      });
+    });
+
+    /* --------------------------------------------------
+     * 画像タグのプリセットデータ投入
+     */
+    const imageTagStore = SocketFacade.instance.imageTagCC();
+
+    const pushImageTag = async (imageTag: string): Promise<void> => {
+      await imageTagStore.add(await imageTagStore.touch(), imageTag);
+    };
+
+    // pushImageTagを直列の非同期で全部実行する
+    await imageTagList
+      .map((imageTag: string) => () => pushImageTag(imageTag))
+      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+    /* --------------------------------------------------
+     * 画像データのプリセットデータ投入
+     */
+    const imageDataStore = SocketFacade.instance.imageDataCC();
+
+    let imageId: string | null = null;
+    const pushImage = async (image: Image): Promise<void> => {
+      const docId = await imageDataStore.touch();
+      if (!imageId) imageId = docId;
+      await imageDataStore.add(docId, image);
+    };
+
+    // pushImageを直列の非同期で全部実行する
+    await imageList
+      .map((image: Image) => () => pushImage(image))
+      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+    /* --------------------------------------------------
+     * マップデータのプリセットデータ投入
+     */
+    const mapDataStore = SocketFacade.instance.mapListCC();
+
+    const mapSetting: MapSetting = {
+      backgroundType: "image",
+      imageTag: imageList[0].tag,
+      imageId: imageId!,
+      reverse: "none",
+      shapeType: "square",
+      totalColumn: 20,
+      totalRow: 15,
+      gridSize: 50,
+      gridBorderColor: "#000000",
+      isPourTile: false,
+      isHexFirstCorner: false,
+      isHexSecondSmall: false,
+      background: {
+        backgroundType: "image",
+        imageTag: imageList[0].tag,
+        imageId: imageId!,
+        reverse: "none",
+        // , backgroundColor: "rgb(146, 168, 179)"
+        maskBlur: 3
+      },
+      margin: {
+        backgroundType: "image",
+        imageTag: imageList[0].tag,
+        imageId: imageId!,
+        reverse: "none",
+        isUseGridColor: true,
+        gridColorBold: "rgba(255, 255, 255, 0.3)",
+        gridColorThin: "rgba(255, 255, 255, 0.1)",
+        column: 5,
+        row: 5,
+        isUseMaskColor: true,
+        maskColor: "rgba(20, 80, 20, 0.1)",
+        maskBlur: 3,
+        isUseImage: "none",
+        borderWidth: 10,
+        borderColor: "gray",
+        borderStyle: "ridge"
+      },
+      chatLinkage: 0,
+      chatLinkageSearch: "",
+      portTileMapping: ""
+    };
+    const mapDataDocId = await mapDataStore.add(
+      await mapDataStore.touch(),
+      mapSetting
+    );
+
+    /* --------------------------------------------------
+     * 部屋データのプリセットデータ投入
+     */
+    const roomDataStore = SocketFacade.instance.roomDataCC();
+
+    const roomData: RoomData = {
+      mapId: mapDataDocId,
+      isDrawGridLine: true,
+      isDrawGridId: true,
+      isFitGrid: true,
+      isUseRotateMarker: true
+    };
+    await roomDataStore.add(await roomDataStore.touch(), roomData);
   }
 }
 </script>
@@ -848,7 +1002,8 @@ export default class LoginWindow extends Mixins<WindowVue<GetRoomListResponse>>(
         }
       }
 
-      .term-of-use {
+      .term-of-use,
+      .version-info {
         margin-top: 0.2rem;
         margin-left: 0.2rem;
         font-size: 90%;

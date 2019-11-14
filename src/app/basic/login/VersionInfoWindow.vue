@@ -1,40 +1,6 @@
 <template>
   <div>
-    <div class="base-area">
-      <div v-t="`${windowInfo.type}.message`"></div>
-      <label>
-        <span class="label-input" v-t="'label.user-name'"></span>
-        <base-input
-          type="text"
-          :value="name"
-          @input="name = $event.target.value"
-          :placeholder="$t('label.nameless')"
-          :list="`${key}-user-list`"
-          ref="firstFocus"
-        />
-        <datalist :id="`${key}-user-list`">
-          <option
-            :value="userName"
-            v-for="userName in userNameList"
-            :key="userName"
-          >
-            {{ userName }}
-          </option>
-        </datalist>
-      </label>
-      <label>
-        <span class="label-input" v-t="'label.password'"></span>
-        <input-password-component
-          :comp-key="`${key}-password`"
-          v-model="password"
-          :setting="isSetting"
-        />
-      </label>
-      <label>
-        <span class="label-input" v-t="'label.user-type'"></span>
-        <user-type-select v-model="userType" />
-      </label>
-    </div>
+    <div class="base-area"></div>
     <div class="button-area">
       <ctrl-button @click.stop="commit()">
         <span v-t="'button.login'"></span>
@@ -56,15 +22,17 @@ import BaseInput from "@/app/core/component/BaseInput.vue";
 import DiceBotSelect from "@/app/basic/common/components/select/DiceBotSelect.vue";
 import TaskManager from "@/app/core/task/TaskManager";
 import VueEvent from "@/app/core/decorator/VueEvent";
-import {
-  UserLoginInput,
-  UserLoginWindowInput,
-  UserType
-} from "@/@types/socket";
+import { UserLoginInput, UserType, VersionWindowInfo } from "@/@types/socket";
 import UserTypeSelect from "@/app/basic/common/components/select/UserTypeSelect.vue";
 import LanguageManager from "@/LanguageManager";
 import InputPasswordComponent from "@/app/core/component/InputPasswordComponent.vue";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
+import { CommitHistory } from "@/app/core/api/Github";
+
+type ServerVersionInfo = {
+  commit: CommitHistory;
+  requireClientVersion: string;
+};
 
 @Component({
   components: {
@@ -76,28 +44,62 @@ import LifeCycle from "@/app/core/decorator/LifeCycle";
     CtrlButton
   }
 })
-export default class UserLoginWindow extends Mixins<
-  WindowVue<UserLoginWindowInput>
+export default class VersionInfoWindow extends Mixins<
+  WindowVue<VersionWindowInfo>
 >(WindowVue) {
   private name: string = "";
   private password: string = "";
   private userType: UserType = "PL";
   private isSetting: boolean = false;
-  private userNameList: string[] = [];
 
   @LifeCycle
   public async mounted() {
     await this.init();
-    this.inputEnter(`${this.key}-password`, this.commit);
-    this.inputEnter(this.$refs.firstFocus, this.commit);
-    this.isSetting = this.windowInfo.args!.isSetting;
-    this.userNameList = this.windowInfo.args!.userNameList;
-    if (!this.isSetting) {
-      this.windowInfo.heightEm = 9.5;
-      this.windowInfo.declare.size.heightEm = 9.5;
-      this.windowInfo.declare.minSize!.heightEm = 9.5;
-      this.windowInfo.declare.maxSize!.heightEm = 9.5;
-    }
+    // const clientVersion = process.env.VUE_APP_VERSION as string;
+    // const clientRowList = await getCurrentVersionSource(
+    //   "quoridorn-mark2",
+    //   ".env",
+    //   clientVersion
+    // );
+    // window.console.log(clientRowList);
+    // const args = this.windowInfo.args!;
+    // const serverVersion = args.version;
+    // const serverRequireClientVersion = args.requireClientVersion;
+    // const serverRowList = await getCurrentVersionSource(
+    //   "quoridorn-server",
+    //   ".env",
+    //   serverVersion
+    // );
+    // const getServerRequireClientVersion = (serverRow: string) => {
+    //   const propMap: any = {};
+    //   serverRow.split("\n").forEach(line => {
+    //     const matchResult = line.match(/([0-9a-zA-Z_]) *= *"([^"]+)"/);
+    //     if (!matchResult) return;
+    //     propMap[matchResult[1]] = matchResult[2];
+    //   });
+    //   return propMap["REQUIRE_CLIENT_VERSION"];
+    // };
+    // const serverVersionInfoList: ServerVersionInfo[] = [];
+    // serverRowList.forEach(info => {
+    //   serverVersionInfoList.push({
+    //     commit: info.commit,
+    //     requireClientVersion: getServerRequireClientVersion(info.row)
+    //   });
+    // });
+    //
+    // if (!serverVersionInfoList.length) {
+    //   alert("対応するサーバのバージョンが無いです。");
+    // }
+    // const startPoint = serverVersionInfoList[0];
+    // let endPoint: ServerVersionInfo | null = null;
+    // const clientVersionInfo = stringToVersion(clientVersion);
+    // for (const info of serverVersionInfoList) {
+    //   const compResult = compareVersion(clientVersionInfo, info.commit.version);
+    //   if (compResult < 0) {
+    //     endPoint = info;
+    //     return;
+    //   }
+    // }
   }
 
   @Watch("currentDiceBotSystem")

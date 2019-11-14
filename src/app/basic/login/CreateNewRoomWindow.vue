@@ -3,17 +3,17 @@
     <div class="base-area">
       <div v-t="`${windowInfo.type}.message`"></div>
       <label>
-        <span v-t="'label.roomName'"></span>
+        <span v-t="'label.room-name'"></span>
         <base-input
           type="text"
           :value="name"
           @input="name = $event.target.value"
-          :placeholder="$t('label.roomNamePlaceholder')"
+          :placeholder="$t('label.room-name-placeholder')"
           ref="firstFocus"
         />
       </label>
       <label>
-        <span v-t="'label.password'"></span>
+        <span class="label-input" v-t="'label.password'"></span>
         <input-password-component
           :comp-key="`${key}-password`"
           v-model="password"
@@ -21,7 +21,7 @@
         />
       </label>
       <label>
-        <span v-t="'label.gameSystem'"></span>
+        <span class="label-input" v-t="'label.game-system'"></span>
         <dice-bot-select v-model="system" />
       </label>
     </div>

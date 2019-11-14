@@ -1,5 +1,5 @@
 import { ChangeType } from "nekostore/lib/DocumentChange";
-import { StoreMetaData, StoreObj } from "@/@types/store";
+import { StoreObj, StoreUseData } from "@/@types/store";
 
 type MapShape = "square" | "horizontal-hex" | "vertical-hex";
 
@@ -20,7 +20,7 @@ export type RoomInfoExtend = {
   autoResizeStandImage: boolean;
 };
 
-export type BaseRoomInfo = {
+type BaseRoomInfo = {
   name: string;
   system: string;
   extend?: RoomInfoExtend; // 一時的措置
@@ -32,23 +32,25 @@ export type RoomLoginInfo = {
   roomPassword: string;
 };
 
-type UserType = "GM" | "PL" | "VISITOR";
+export type UserType = "GM" | "PL" | "VISITOR";
+
+export type UserLoginWindowInput = {
+  isSetting: boolean;
+  userNameList: string[];
+};
 
 export type UserLoginInput = {
   userName: string;
   userType?: UserType;
   userPassword: string;
 };
-export type UserLoginRequest = UserLoginInput & {
-  roomId: string;
-};
+export type UserLoginRequest = UserLoginInput;
 
 export type TouchRequest = {
   roomNo: number;
 };
 export type ReleaseTouchRequest = TouchRequest;
 
-export type LoginRequest = RoomLoginInfo & UserLoginRequest;
 export type CreateRoomInput = BaseRoomInfo & {
   roomPassword: string;
 };
@@ -58,15 +60,13 @@ export type DeleteRoomInput = {
 export type LoginRoomInput = DeleteRoomInput & {
   isVisitor: boolean;
 };
-export type CreateRoomRequest = CreateRoomInput &
-  UserLoginInput &
-  LoginRequest &
-  BaseRoomInfo;
+export type CreateRoomRequest = CreateRoomInput;
 export type DeleteRoomRequest = RoomLoginInfo;
 
 export type ClientRoomInfo = BaseRoomInfo & {
   memberNum: number;
   hasPassword: boolean;
+  roomNo: number;
 };
 export type Message = {
   title: string;
@@ -74,8 +74,9 @@ export type Message = {
   termsOfUse: string;
 };
 export type GetRoomListResponse = {
-  roomList: (StoreObj<ClientRoomInfo> & StoreMetaData)[];
+  roomList: StoreUseData<ClientRoomInfo>[];
   message: Message;
+  version: string;
 };
 
 export type RoomViewResponse = {
@@ -95,4 +96,9 @@ export type AppServerSettingInput = {
 export type GetVersionResponse = {
   version: string;
   title: string;
+};
+
+export type VersionWindowInfo = {
+  message: Message;
+  version: string;
 };
