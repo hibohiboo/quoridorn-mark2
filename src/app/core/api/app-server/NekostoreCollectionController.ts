@@ -19,7 +19,7 @@ import {
   UpdateDataRequest
 } from "@/@types/data";
 
-export default class NecostoreCollectionController<T> {
+export default class NekostoreCollectionController<T> {
   constructor(
     private readonly socket: any,
     private readonly nekostore: Nekostore,
@@ -66,26 +66,57 @@ export default class NecostoreCollectionController<T> {
       );
   }
 
-  public async getList(column?: string): Promise<StoreUseData<T>[]> {
+  public async getList(
+    isSync: boolean,
+    column?: string
+  ): Promise<StoreUseData<T>[]> {
     const c = this.getCollection();
-    return (await c.orderBy(column || "order").get()).docs
+    const list = (await c.orderBy(column || "order").get()).docs
       .filter(doc => doc.exists() && doc.data.data)
       .map(doc => getStoreObj<T>(doc)!);
+    await this.setCollectionSnapshot(
+      "NekostoreCollectionController",
+      (snapshot: QuerySnapshot<StoreObj<T>>) => {
+        snapshot.docs.forEach(doc => {
+          const index = list.findIndex(p => p.id === doc.ref.id);
+          if (doc.type === "removed") {
+            list.splice(index, 1);
+          } else {
+            list.splice(index, index < 0 ? 0 : 1, getStoreObj(doc)!);
+          }
+        });
+      }
+    );
+    return list;
   }
 
   public async getData(id: string): Promise<StoreUseData<T> | null> {
     const c = this.getCollection();
     const docSnap = await c.doc(id).get();
-    if (!docSnap || !docSnap.exists()) return null;
+    if (!docSnap || !docSnap.data || !docSnap.exists()) return null;
     return getStoreObj<T>(docSnap);
   }
 
-  public async touch(): Promise<string> {
+  public async find(
+    property: string,
+    operand: "==",
+    value: any
+  ): Promise<StoreUseData<T>[] | null> {
+    const c = this.getCollection();
+    const docs = (await c.where(property, operand, value).get()).docs;
+    if (!docs) return null;
+    return docs
+      .filter(item => item && item.exists())
+      .map(item => getStoreObj(item)!);
+  }
+
+  public async touch(createId?: string): Promise<string> {
     const docId = await SocketFacade.instance.socketCommunication<
       TouchRequest,
-      never
+      string
     >("touch-data", {
-      collection: this.collectionName
+      collection: this.collectionName,
+      id: createId
     });
     this.touchList.push(docId);
     return docId;
@@ -157,22 +188,30 @@ export default class NecostoreCollectionController<T> {
     ownerKey: string,
     docId: string,
     onNext: (snapshot: DocumentSnapshot<StoreObj<T>>) => void
-  ): Promise<void> {
+  ): Promise<() => void> {
     let target: DocumentReference<StoreObj<T>> = this.getCollection().doc(
       docId
     );
     const unsubscribe = await target.onSnapshot(onNext);
-    if (!this.snapshotMap[ownerKey]) this.snapshotMap[ownerKey]();
+    if (this.snapshotMap[ownerKey]) this.snapshotMap[ownerKey]();
     this.snapshotMap[ownerKey] = unsubscribe;
+    return () => {
+      unsubscribe();
+      delete this.snapshotMap[ownerKey];
+    };
   }
 
   public async setCollectionSnapshot(
     ownerKey: string,
     onNext: (snapshot: QuerySnapshot<StoreObj<T>>) => void
-  ): Promise<void> {
+  ): Promise<() => void> {
     let target: CollectionReference<StoreObj<T>> = this.getCollection();
     const unsubscribe = await target.onSnapshot(onNext);
     if (this.snapshotMap[ownerKey]) this.snapshotMap[ownerKey]();
     this.snapshotMap[ownerKey] = unsubscribe;
+    return () => {
+      unsubscribe();
+      delete this.snapshotMap[ownerKey];
+    };
   }
 }

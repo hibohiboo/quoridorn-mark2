@@ -2,15 +2,16 @@
   <div id="right-pane" ref="pane" :class="{ minimized: isMinimized }">
     <!-- コンテンツ -->
     <div class="v-scroll" @wheel.stop :class="{ isAnimationY }">
-      <pane-frame
-        v-for="windowInfo in windowInfoList"
-        :key="windowInfo.key"
-        v-show="windowInfo.status.indexOf('right-pane') > -1"
-        :windowInfo="windowInfo"
-        :status="'right-pane'"
-        :isResizing="false"
-        @changeMinMaxWidth="changeMinMaxWidth"
-      />
+      <template v-for="windowInfo in windowInfoList">
+        <pane-frame
+          :key="windowInfo.key"
+          v-if="windowInfo.status.indexOf('right-pane') > -1"
+          :windowInfo="windowInfo"
+          :status="'right-pane'"
+          :isResizing="false"
+          @changeMinMaxWidth="changeMinMaxWidth"
+        />
+      </template>
     </div>
 
     <div class="pane-knob" @click="onClickPaneKnob(!isMinimized)">
@@ -191,7 +192,9 @@ export default class RightPane extends Vue {
         const windowInfo = WindowManager.instance.getWindowInfo(
           this.hoverWindowKey
         );
-        windowInfo.status = "window";
+        if (windowInfo) {
+          windowInfo.status = "window";
+        }
         this.hoverWindowKey = null;
         this.diffX = 0;
       }

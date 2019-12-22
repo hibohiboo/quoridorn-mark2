@@ -14,6 +14,8 @@ button:
   next: Suivant
   execution: Exécution
   close: 閉じる
+  logout: ログアウト
+  exit-room: 退室
 
 label:
   terms-of-use: Conditions d'utilisation
@@ -34,14 +36,22 @@ label:
   gameMaster: GM
   visitor: Visiteur
   room-name: Nom de la salle de jeux
-  room-name-placeholder: Salle de jeux temporaire (peut être supprimé)
-  game-system: Système de jeu
+  room-name-placeholder: 部屋名(必須項目)
+  game-system: Système de jeu(入力指定も可)
   no-target: Non spécifié
-  is-visitor: 参加者ですか？見学者ですか？
   participant: 参加者
   version-info: バージョン情報
   invite-url: 招待URL
   room-member-num: 入室数
+  comeback-url: 復帰URL
+  default-dicebot: ダイスボット(指定なし)
+  room-no: 部屋番号
+  text: テキスト
+  background-color: 背景色
+  height: 高さ
+  width: 幅
+  alpha: 透過度
+  multi-create: 複数作成
 
 message:
   copy-to-clipboard: クリップボードにコピーしました。
@@ -55,8 +65,8 @@ sample-window:
 play-youtube-window:
   window-title: Youtube Jouer
 
-bgm-setting-window:
-  window-title: BGM Ensemble
+cut-in-setting-window:
+  window-title: カットイン設定画面
   table-columns:
     -
       - Emboîtement

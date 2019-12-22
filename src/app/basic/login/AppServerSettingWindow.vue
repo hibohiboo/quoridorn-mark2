@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div ref="window-container">
     <div class="base-area">
       <div v-t="`${windowInfo.type}.message`"></div>
       <div class="item">
@@ -74,7 +74,6 @@ import TableComponent from "@/app/core/component/table/SimpleTableComponent.vue"
 import { Mixins } from "vue-mixin-decorator";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import DiceBotSelect from "@/app/basic/common/components/select/DiceBotSelect.vue";
-import TaskManager from "@/app/core/task/TaskManager";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import { AppServerSettingInput } from "@/@types/socket";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
@@ -85,9 +84,9 @@ import SocketFacade, {
 @Component({
   components: { DiceBotSelect, BaseInput, TableComponent, CtrlButton }
 })
-export default class AppServerSettingWindow extends Mixins<WindowVue<never>>(
-  WindowVue
-) {
+export default class AppServerSettingWindow extends Mixins<
+  WindowVue<never, AppServerSettingInput>
+>(WindowVue) {
   private url: string = "";
   private readonly originalUrlList: DefaultServerInfo[] =
     SocketFacade.instance.appServerUrlList;
@@ -138,29 +137,14 @@ export default class AppServerSettingWindow extends Mixins<WindowVue<never>>(
 
   @VueEvent
   private async commit() {
-    this.finally({
+    await this.finally({
       url: this.url
     });
-    await this.close();
   }
 
   @VueEvent
   private async rollback() {
-    this.finally();
-    await this.close();
-  }
-
-  @VueEvent
-  private async beforeDestroy() {
-    this.finally();
-  }
-
-  private finally(appServerSetting?: AppServerSettingInput) {
-    const task = TaskManager.instance.getTask<AppServerSettingInput>(
-      "window-open",
-      this.windowInfo.taskKey
-    );
-    if (task) task.resolve(appServerSetting ? [appServerSetting] : []);
+    await this.finally();
   }
 }
 </script>

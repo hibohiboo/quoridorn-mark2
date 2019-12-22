@@ -14,6 +14,8 @@ button:
   next: 진행
   execution: 실행
   close: 閉じる
+  logout: ログアウト
+  exit-room: 退室
 
 label:
   terms-of-use: 이용 약관
@@ -34,14 +36,22 @@ label:
   gameMaster: GM
   visitor: 견학자
   room-name: 놀이방 이름
-  room-name-placeholder: 임시 놀이방 (삭제 가능)
-  game-system: 게임 시스템
+  room-name-placeholder: 部屋名(必須項目)
+  game-system: 게임 시스템(入力指定も可)
   no-target: 지정 없음
-  is-visitor: 参加者ですか？見学者ですか？
   participant: 参加者
   version-info: バージョン情報
   invite-url: 招待URL
   room-member-num: 入室数
+  comeback-url: 復帰URL
+  default-dicebot: ダイスボット(指定なし)
+  room-no: 部屋番号
+  text: テキスト
+  background-color: 背景色
+  height: 高さ
+  width: 幅
+  alpha: 透過度
+  multi-create: 複数作成
 
 message:
   copy-to-clipboard: クリップボードにコピーしました。
@@ -55,8 +65,8 @@ sample-window:
 play-youtube-window:
   window-title: Youtube 재생
 
-bgm-setting-window:
-  window-title: 음악 설정
+cut-in-setting-window:
+  window-title: カットイン設定画面
   table-columns:
     -
       - 연동

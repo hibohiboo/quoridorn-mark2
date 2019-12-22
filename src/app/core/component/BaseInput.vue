@@ -22,17 +22,37 @@ export default class BaseInput extends Vue {
     };
   }
 
+  private get elm(): HTMLInputElement {
+    return this.$refs.component as HTMLInputElement;
+  }
+
   public focus() {
-    const elm = this.$refs.component as HTMLElement;
-    elm.focus();
+    this.elm.focus();
+  }
+
+  public get value() {
+    return this.elm.value;
+  }
+
+  public blur() {
+    window.console.log("blur");
+    this.elm.blur();
+  }
+
+  public getBoundingClientRect(): ClientRect | DOMRect {
+    return this.elm.getBoundingClientRect();
   }
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 input {
   font-size: inherit;
   height: 2em;
   box-sizing: border-box;
+
+  &:read-only {
+    outline: none;
+  }
 }
 </style>

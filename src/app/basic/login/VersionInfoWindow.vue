@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div ref="window-container">
     <div class="base-area"></div>
     <div class="button-area">
       <ctrl-button @click.stop="commit()">
@@ -20,7 +20,6 @@ import TableComponent from "@/app/core/component/table/SimpleTableComponent.vue"
 import { Component, Mixins } from "vue-mixin-decorator";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import DiceBotSelect from "@/app/basic/common/components/select/DiceBotSelect.vue";
-import TaskManager from "@/app/core/task/TaskManager";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import { UserLoginInput, UserType, VersionWindowInfo } from "@/@types/socket";
 import UserTypeSelect from "@/app/basic/common/components/select/UserTypeSelect.vue";
@@ -45,7 +44,7 @@ type ServerVersionInfo = {
   }
 })
 export default class VersionInfoWindow extends Mixins<
-  WindowVue<VersionWindowInfo>
+  WindowVue<VersionWindowInfo, UserLoginInput>
 >(WindowVue) {
   private name: string = "";
   private password: string = "";
@@ -109,31 +108,16 @@ export default class VersionInfoWindow extends Mixins<
 
   @VueEvent
   private async commit() {
-    this.finally({
+    await this.finally({
       userName: this.name || LanguageManager.instance.getText("label.nameless"),
       userType: this.userType,
       userPassword: this.password
     });
-    await this.close();
   }
 
   @VueEvent
   private async rollback() {
-    this.finally();
-    await this.close();
-  }
-
-  @VueEvent
-  private async beforeDestroy() {
-    this.finally();
-  }
-
-  private finally(userInfo?: UserLoginInput) {
-    const task = TaskManager.instance.getTask<UserLoginInput>(
-      "window-open",
-      this.windowInfo.taskKey
-    );
-    if (task) task.resolve(userInfo ? [userInfo] : []);
+    await this.finally();
   }
 }
 </script>

@@ -1,5 +1,8 @@
+import { Point } from "@/@types/address";
+
 export type TouchRequest = {
   collection: string;
+  id?: string;
 };
 export type TouchModifyRequest = TouchRequest & {
   id: string;
@@ -11,3 +14,13 @@ export type CreateDataRequest = TouchModifyRequest & {
 };
 export type DeleteDataRequest = TouchModifyRequest;
 export type UpdateDataRequest = CreateDataRequest;
+
+export type DataReference = {
+  type: string;
+  docId: string;
+};
+
+export type AddObjectInfo = {
+  dropWindow: string;
+  point: Point;
+};

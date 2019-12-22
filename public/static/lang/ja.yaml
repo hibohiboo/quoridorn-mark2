@@ -14,6 +14,17 @@ button:
   next: 次へ
   execution: 実行
   close: 閉じる
+  logout: ログアウト
+  exit-room: 退室
+
+type:
+  map-mask: マップマスク
+  chit: チット
+  character: キャラクター
+  map: マップ
+  floor-tile: フロアタイル
+  stand-image: 立ち絵
+  stand-image-diff: 立ち絵差分
 
 label:
   terms-of-use: 利用規約
@@ -34,14 +45,34 @@ label:
   gameMaster: GM
   visitor: 見学者
   room-name: プレイルーム名
-  room-name-placeholder: 仮プレイルーム（削除可能）
-  game-system: ゲームシステム
+  room-name-placeholder: 部屋名(必須項目)
+  game-system: ゲームシステム(入力指定も可)
   no-target: 指定なし
-  is-visitor: 参加者ですか？見学者ですか？
   participant: 参加者
   version-info: バージョン情報
   invite-url: 招待URL
   room-member-num: 入室数
+  comeback-url: 復帰URL
+  default-dicebot: ダイスボット(指定なし)
+  room-no: 部屋番号
+  text: テキスト
+  background-color: 背景色
+  height: 高さ
+  width: 幅
+  alpha: 透過度
+  multi-create: 複数作成
+  reverse-label: 向き
+  reverse-none: そのまま
+  reverse-horizontal: 左右反転
+  reverse-vertical: 上下反転
+  reverse-180: 180度回転
+  background-size: 画像
+  background-size-label: 画像サイズ
+  background-size-contain: 内包
+  background-size-cover-start: カバー(始)
+  background-size-cover-center: カバー(中)
+  background-size-cover-end: カバー(終)
+  background-size-100%: 100%
 
 message:
   copy-to-clipboard: クリップボードにコピーしました。
@@ -55,8 +86,8 @@ sample-window:
 play-youtube-window:
   window-title: Youtube再生画面
 
-bgm-setting-window:
-  window-title: BGM設定画面
+cut-in-setting-window:
+  window-title: カットイン設定画面
   table-columns:
     -
       - 連動
@@ -122,3 +153,12 @@ version-info-window:
 
 room-info-window:
   window-title: プレイルーム情報表示
+
+add-map-mask-window:
+  window-title: マップマスク追加
+
+edit-map-mask-window:
+  window-title: マップマスク編集
+
+add-chit-window:
+  window-title: チット追加

@@ -21,21 +21,23 @@
         @touchstart="leftDown"
       >
         <map-board />
+
+        <map-mask
+          v-for="obj in getMapObjectList(mapMaskList, 'field')"
+          :key="obj.id"
+          :docId="obj.id"
+          type="map-mask"
+        />
+
+        <chit
+          v-for="obj in getMapObjectList(chitList, 'field')"
+          :key="obj.id"
+          :docId="obj.id"
+          type="chit"
+        />
       </div>
 
       <!--
-      <label>
-        <base-input type="button" value="ccc" @click.left="clickButton3" />
-      </label>
-      -->
-
-      <map-mask
-        v-for="obj in getMapObjectList({ kind: 'mapMask', place: 'field' })"
-        :key="obj.key"
-        :objKey="obj.key"
-        type="mapMask"
-      />
-
       <character
         v-for="obj in getMapObjectList({ kind: 'character', place: 'field' })"
         :key="obj.key"
@@ -63,6 +65,7 @@
         :objKey="obj.key"
         type="diceSymbol"
       />
+      -->
     </div>
   </div>
 </template>
@@ -79,7 +82,6 @@ import FloorTile from "@/app/basic/map-object/floor-tile/FloorTile.vue";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 
 import { Component } from "vue-mixin-decorator";
-import { Getter } from "vuex-class";
 import { Watch } from "vue-property-decorator";
 import {
   arrangeAngle,
@@ -99,6 +101,9 @@ import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 import { StoreUseData } from "@/@types/store";
 import { ApplicationError } from "@/app/core/error/ApplicationError";
 import { ColorSpec, ImageSpec, MapSetting, RoomData } from "@/@types/room";
+import { MapMaskStore, MapObject } from "@/@types/gameObject";
+import GameObjectManager from "@/app/basic/GameObjectManager";
+import { AddObjectInfo } from "@/@types/data";
 
 @Component({
   components: {
@@ -112,6 +117,8 @@ import { ColorSpec, ImageSpec, MapSetting, RoomData } from "@/@types/room";
   }
 })
 export default class GameTable extends AddressCalcMixin {
+  private mapMaskList = GameObjectManager.instance.mapMaskList;
+  private chitList = GameObjectManager.instance.chitList;
   // @Action("addListObj") private addListObj: any;
   // @Action("windowOpen") private windowOpen: any;
   // @Action("setProperty") private setProperty: any;
@@ -120,9 +127,15 @@ export default class GameTable extends AddressCalcMixin {
   // @Mutation("setIsWheeling") private setIsWheeling: any;
   // @Getter("isFitGrid") private isFitGrid: any;
   // @Getter("playerKey") private playerKey: any;
-  @Getter("getMapObjectList") private getMapObjectList!: any;
   // @Getter("propertyList") private propertyList: any;
   // @Getter("getObj") private getObj: any;
+
+  private getMapObjectList(
+    list: StoreUseData<MapObject>[],
+    place: "field" | "graveyard" | "backstage"
+  ) {
+    return GameObjectManager.filterPlaceList(list, place);
+  }
 
   private wheelTimer: number | null = null;
   private wheel: number = 0;
@@ -148,7 +161,9 @@ export default class GameTable extends AddressCalcMixin {
   private async mounted() {
     const mapDataStore = SocketFacade.instance.mapListCC();
     const roomDataStore = SocketFacade.instance.roomDataCC();
-    const roomData: StoreUseData<RoomData> = (await roomDataStore.getList())[0];
+    const roomData: StoreUseData<RoomData> = (await roomDataStore.getList(
+      false
+    ))[0];
     if (!roomData) throw new ApplicationError("No such roomData.");
 
     const mapId = roomData.data!.mapId;
@@ -156,6 +171,7 @@ export default class GameTable extends AddressCalcMixin {
     if (!mapData) throw new ApplicationError("No such mapData.");
     this.mapSetting = mapData.data!;
     this.isMounted = true;
+    document.documentElement.style.setProperty("--wheel", `0px`);
   }
 
   @Watch("isMounted")
@@ -543,8 +559,10 @@ export default class GameTable extends AddressCalcMixin {
 
   @TaskProcessor("mouse-move-end-left-finished")
   private async mouseLeftUpFinished(
-    task: Task<Point, never>
+    task: Task<Point, never>,
+    param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
+    if (!param || param.key !== this.key) return;
     this.point.x += this.pointDiff.x;
     this.point.y += this.pointDiff.y;
     this.pointDiff.x = 0;
@@ -561,6 +579,7 @@ export default class GameTable extends AddressCalcMixin {
     task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
+    if (!param || param.key !== this.key) return;
     const point: Point = task.value!;
 
     const eventType = param ? param.type!.split("-")[1] : "";
@@ -571,7 +590,7 @@ export default class GameTable extends AddressCalcMixin {
           type: "context-open",
           owner: "Quoridorn",
           value: {
-            type: "game-table",
+            type: "map",
             target: null,
             x: point.x,
             y: point.y
@@ -588,6 +607,42 @@ export default class GameTable extends AddressCalcMixin {
     TaskManager.instance.setTaskParam("mouse-move-end-right-finished", null);
 
     task.resolve();
+  }
+
+  @VueEvent
+  private async drop(event: DragEvent): Promise<void> {
+    const type = event.dataTransfer!.getData("dropType");
+    const dropWindow = event.dataTransfer!.getData("dropWindow");
+    const offsetX = event.dataTransfer!.getData("offsetX");
+    const offsetY = event.dataTransfer!.getData("offsetY");
+    const canvasAddress = this.calcCanvasAddress(
+      event.pageX,
+      event.pageY,
+      this.currentAngle,
+      offsetX ? parseInt(offsetX, 10) : undefined,
+      offsetY ? parseInt(offsetY, 10) : undefined
+    );
+    const locateOnCanvas = canvasAddress.locateOnCanvas;
+
+    // TODO isGridFit
+    const isGridFit = true;
+    if (isGridFit) {
+      locateOnCanvas.x =
+        Math.floor(locateOnCanvas.x / this.mapGridSize) * this.mapGridSize;
+      locateOnCanvas.y =
+        Math.floor(locateOnCanvas.y / this.mapGridSize) * this.mapGridSize;
+    }
+
+    if (["map-mask", "chit"].findIndex(t => t === type) > -1) {
+      await TaskManager.instance.ignition<AddObjectInfo, never>({
+        type: "added-object",
+        owner: "Quoridorn",
+        value: {
+          dropWindow,
+          point: locateOnCanvas
+        }
+      });
+    }
   }
 
   // private drop(this: any, event: any): void {

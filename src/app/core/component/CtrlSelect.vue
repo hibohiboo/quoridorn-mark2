@@ -2,7 +2,8 @@
   <div class="ctrl-select-wrapper" :disabled="disabled" @contextmenu.prevent>
     <select
       v-model="localValue"
-      ref="select"
+      :id="id || undefined"
+      ref="component"
       :disabled="disabled"
       :style="{
         webkitTextFillColor: fontColor,
@@ -15,6 +16,7 @@
       @keyup.enter.stop
       @keydown.229.stop
       @keyup.229.stop
+      :tabindex="disabled ? -1 : 0"
     >
       <option
         v-for="optionInfo in optionInfoList"
@@ -48,8 +50,8 @@ export default class CtrlSelect extends SelectMixin {
 
   private fontColor: string = "";
 
-  public requestFocus(): void {
-    const elm: HTMLSelectElement = this.$refs.select as HTMLSelectElement;
+  public focus(): void {
+    const elm: HTMLSelectElement = this.$refs.component as HTMLSelectElement;
     elm.focus();
   }
 

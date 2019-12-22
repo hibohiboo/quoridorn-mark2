@@ -51,7 +51,9 @@ import {
   GetRoomListResponse,
   RoomViewResponse
 } from "@/@types/socket";
-import { StoreUseData } from "@/@types/store";
+import { StoreObj, StoreUseData } from "@/@types/store";
+import QuerySnapshot from "nekostore/lib/QuerySnapshot";
+import BgmManager from "@/app/basic/music/BgmManager";
 
 @Component({
   components: {
@@ -120,6 +122,7 @@ export default class App extends Vue {
             serverInfo.roomList.splice(index, 1, {
               order: index,
               exclusionOwner: null,
+              status: null,
               createTime: new Date(),
               updateTime: null,
               id: null
@@ -148,6 +151,72 @@ export default class App extends Vue {
     this.isMounted = true;
   }
 
+  private async cutInDbInspection() {
+    /* カットインを再生処理 */
+    const privatePlayListCC = SocketFacade.instance.privatePlayListCC();
+
+    const playCutIn = async (targetId: string) => {
+      try {
+        const data = await privatePlayListCC.getData(targetId);
+        if (!data) {
+          await privatePlayListCC.touch(targetId);
+          await privatePlayListCC.add(targetId, {
+            duration: 0
+          });
+        }
+        const cutInDataCC = SocketFacade.instance.cutInDataCC();
+        const cutInData = await cutInDataCC.getData(targetId);
+        if (BgmManager.isYoutube(cutInData!.data!)) {
+          // カットインがYoutube動画だったらYoutube動画再生する
+          await TaskManager.instance.ignition<WindowOpenInfo<string>, never>({
+            type: "window-open",
+            owner: "Quoridorn",
+            value: {
+              type: "play-youtube-window",
+              args: targetId
+            }
+          });
+        }
+      } catch (err) {
+        window.console.warn(err);
+      }
+    };
+
+    (await privatePlayListCC.getList(false)).forEach(async item => {
+      await playCutIn(item.id!);
+    });
+    const playListCC = SocketFacade.instance.playListCC();
+    await playListCC.setCollectionSnapshot(
+      "App",
+      (snapshot: QuerySnapshot<StoreObj<CutInPlayingInfo>>) => {
+        snapshot.docs.forEach(async doc => {
+          const targetId = doc.ref.id;
+          if (doc.type === "modified") {
+            const status = doc.data!.status;
+            if (
+              status === "added" ||
+              status === "modified" ||
+              status === "touched-released"
+            )
+              await playCutIn(targetId);
+          }
+          if (doc.type === "removed") {
+            const privatePlayData = await privatePlayListCC.getData(targetId);
+            if (privatePlayData) {
+              try {
+                await privatePlayListCC.touchModify(targetId);
+              } catch (err) {
+                window.console.warn(err);
+                return;
+              }
+              await privatePlayListCC.delete(targetId);
+            }
+          }
+        });
+      }
+    );
+  }
+
   /**
    * キーダウンイベント
    * @param event
@@ -168,6 +237,11 @@ export default class App extends Vue {
     }
     if (event.key === "Enter") {
       window.console.log("GLOBAL enter");
+      await TaskManager.instance.ignition<never, never>({
+        type: "global-enter",
+        owner: "Quoridorn",
+        value: null
+      });
     }
   }
 
@@ -204,7 +278,7 @@ export default class App extends Vue {
   private async mouseTouchMove(event: MouseEvent | TouchEvent): Promise<void> {
     const point = getEventPoint(event);
     if (point.x === this.mouse.x && point.y === this.mouse.y) return;
-    TaskManager.instance.ignition<Point, never>({
+    await TaskManager.instance.ignition<Point, never>({
       type: "mouse-moving",
       owner: "Quoridorn",
       value: point
@@ -263,6 +337,7 @@ export default class App extends Vue {
     // 部屋に接続できた
     this.roomInitialized = true;
     this.roomInfo = task.value!;
+    await this.cutInDbInspection();
     task.resolve();
   }
 
@@ -322,6 +397,11 @@ body {
   height: 100%;
   overflow: hidden;
   font-size: 14px;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
 }
 
 /* サイズ調整（コンテンツを比率を変えずに内側にフィット） */

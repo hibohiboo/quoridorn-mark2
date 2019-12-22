@@ -5,7 +5,7 @@ import store from "@/app/store/store";
 import ImageDirective from "@/app/basic/common/directive/Image";
 import TestWindow from "@/app/basic/common/window/TestWindow.vue";
 import SampleWindow from "@/app/basic/common/window/SampleWindow.vue";
-import BgmSettingWindow from "@/app/basic/music/BgmSettingWindow.vue";
+import CutInSettingWindow from "@/app/basic/music/CutInSettingWindow.vue";
 import YoutubeManager from "@/app/basic/music/YoutubeManager";
 import PlayYoutubeWindow from "@/app/basic/music/PlayYoutubeWindow.vue";
 import LoginWindow from "@/app/basic/login/LoginWindow.vue";
@@ -22,6 +22,9 @@ import LanguageManager from "@/LanguageManager";
 import LoginRoomWindow from "@/app/basic/login/LoginRoomWindow.vue";
 import VersionInfoWindow from "@/app/basic/login/VersionInfoWindow.vue";
 import RoomInfoWindow from "@/app/basic/login/RoomInfoWindow.vue";
+import AddMapMaskWindow from "@/app/basic/map-object/map-mask/AddMapMaskWindow.vue";
+import EditMapMaskWindow from "@/app/basic/map-object/map-mask/EditMapMaskWindow.vue";
+import AddChitWindow from "@/app/basic/map-object/chit/AddChitWindow.vue";
 
 Vue.config.productionTip = false;
 Vue.use(ImageDirective);
@@ -33,7 +36,7 @@ YoutubeManager.instance;
 
 Vue.component("test-window", TestWindow);
 Vue.component("sample-window", SampleWindow);
-Vue.component("bgm-setting-window", BgmSettingWindow);
+Vue.component("cut-in-setting-window", CutInSettingWindow);
 Vue.component("play-youtube-window", PlayYoutubeWindow);
 Vue.component("login-window", LoginWindow);
 Vue.component("create-new-room-window", CreateNewRoomWindow);
@@ -45,6 +48,9 @@ Vue.component("confirm-window", ConfirmWindow);
 Vue.component("login-room-window", LoginRoomWindow);
 Vue.component("version-info-window", VersionInfoWindow);
 Vue.component("room-info-window", RoomInfoWindow);
+Vue.component("add-map-mask-window", AddMapMaskWindow);
+Vue.component("edit-map-mask-window", EditMapMaskWindow);
+Vue.component("add-chit-window", AddChitWindow);
 
 LanguageManager.instance.init().then((i18n: any) => {
   const app = new Vue({

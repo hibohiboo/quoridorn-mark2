@@ -7,16 +7,19 @@ export default class SelectMixin extends Vue {
   @Prop({ type: String, default: "" })
   public value!: string;
 
+  @Prop({ type: String, default: null })
+  public id!: string | null;
+
   @Prop({ type: Boolean, default: false })
   private test!: boolean;
 
   @Emit("input")
   public input(value: string | null) {}
 
-  public requestFocus(): void {
+  public focus(): void {
     const elm: CtrlSelect = this.$refs.select as CtrlSelect;
     // @ts-ignore
-    elm.requestFocus();
+    elm.focus();
   }
 
   private get localValue(): string | null {

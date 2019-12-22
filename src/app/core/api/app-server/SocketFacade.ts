@@ -1,7 +1,7 @@
 import * as Socket from "socket.io-client";
 import SocketDriver from "nekostore/lib/driver/socket";
 import Nekostore from "nekostore/lib/Nekostore";
-import NecostoreCollectionController from "@/app/core/api/app-server/NecostoreCollectionController";
+import NekostoreCollectionController from "@/app/core/api/app-server/NekostoreCollectionController";
 import { StoreObj, StoreUseData } from "@/@types/store";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
 import { ConnectInfo } from "@/@types/connect";
@@ -22,6 +22,7 @@ import {
   PropertyStore,
   TagNoteStore
 } from "@/@types/gameObject";
+import { ApplicationError } from "@/app/core/error/ApplicationError";
 
 const connectYamlPath = "/static/conf/connect.yaml";
 
@@ -30,6 +31,7 @@ export function getStoreObj<T>(
 ): StoreUseData<T> | null {
   if (doc.exists()) {
     const data: StoreObj<T> = doc.data;
+    if (!data) return null;
     return {
       ...data,
       id: doc.ref.id
@@ -59,9 +61,10 @@ export default class SocketFacade {
   private __appServerUrl: string | null = null;
   private readonly __appServerUrlList: DefaultServerInfo[] = [];
   private readonly collectionControllerMap: {
-    [name: string]: NecostoreCollectionController<unknown>;
+    [name: string]: NekostoreCollectionController<unknown>;
   } = {};
   private __roomCollectionPrefix: string | null = null;
+  private __userId: string | null = null;
   private __connectInfo: ConnectInfo | null = null;
 
   public get appServerUrl(): string {
@@ -174,6 +177,14 @@ export default class SocketFacade {
     this.__roomCollectionPrefix = val;
   }
 
+  public set userId(val: string | null) {
+    this.__userId = val;
+  }
+
+  public get userId(): string | null {
+    return this.__userId;
+  }
+
   public async socketCommunication<T, U>(event: string, args?: T): Promise<U> {
     if (this.socket) {
       return this.doSocketCommunication<T, U>(event, args);
@@ -261,46 +272,60 @@ export default class SocketFacade {
 
   private roomCollectionController<T>(
     collectionNamePrefix: string
-  ): NecostoreCollectionController<T> {
+  ): NekostoreCollectionController<T> {
     const collectionName = `${this.__roomCollectionPrefix}-DATA-${collectionNamePrefix}`;
     let controller = this.collectionControllerMap[collectionName];
     if (controller) {
-      return controller as NecostoreCollectionController<T>;
+      return controller as NekostoreCollectionController<T>;
     }
     return (this.collectionControllerMap[
       collectionName
-    ] = new NecostoreCollectionController<T>(
+    ] = new NekostoreCollectionController<T>(
       this.socket,
       this.nekostore!,
       collectionName
     ));
   }
 
-  public mapListCC(): NecostoreCollectionController<MapSetting> {
+  public mapListCC(): NekostoreCollectionController<MapSetting> {
     return this.roomCollectionController<MapSetting>("map-list");
   }
 
-  public roomDataCC(): NecostoreCollectionController<RoomData> {
+  public roomDataCC(): NekostoreCollectionController<RoomData> {
     return this.roomCollectionController<RoomData>("room-data");
   }
 
-  public imageDataCC(): NecostoreCollectionController<Image> {
+  public imageDataCC(): NekostoreCollectionController<Image> {
     return this.roomCollectionController<Image>("image-list");
   }
 
-  public imageTagCC(): NecostoreCollectionController<string> {
+  public imageTagCC(): NekostoreCollectionController<string> {
     return this.roomCollectionController<string>("image-tag-list");
   }
 
-  public userCC(): NecostoreCollectionController<UserData> {
+  public cutInDataCC(): NekostoreCollectionController<CutInDeclareInfo> {
+    return this.roomCollectionController<CutInDeclareInfo>("cut-in-list");
+  }
+
+  public playListCC(): NekostoreCollectionController<CutInPlayingInfo> {
+    return this.roomCollectionController<CutInPlayingInfo>("play-list");
+  }
+
+  public privatePlayListCC(): NekostoreCollectionController<CutInPlayingInfo> {
+    return this.roomCollectionController<CutInPlayingInfo>(
+      `${this.userId}-play-list`
+    );
+  }
+
+  public userCC(): NekostoreCollectionController<UserData> {
     return this.roomCollectionController<UserData>("user-list");
   }
 
-  public propertyCC(): NecostoreCollectionController<PropertyStore> {
+  public propertyCC(): NekostoreCollectionController<PropertyStore> {
     return this.roomCollectionController<PropertyStore>("property-list");
   }
 
-  public propertySelectionCC(): NecostoreCollectionController<
+  public propertySelectionCC(): NekostoreCollectionController<
     PropertySelectionStore
   > {
     return this.roomCollectionController<PropertySelectionStore>(
@@ -308,37 +333,80 @@ export default class SocketFacade {
     );
   }
 
-  public propertyFaceCC(): NecostoreCollectionController<PropertyFaceStore> {
+  public propertyFaceCC(): NekostoreCollectionController<PropertyFaceStore> {
     return this.roomCollectionController<PropertyFaceStore>(
       "property-face-list"
     );
   }
 
-  public characterCC(): NecostoreCollectionController<CharacterStore> {
+  public characterCC(): NekostoreCollectionController<CharacterStore> {
     return this.roomCollectionController<CharacterStore>("character-list");
   }
 
-  public extraCC(): NecostoreCollectionController<ExtraStore> {
+  public extraCC(): NekostoreCollectionController<ExtraStore> {
     return this.roomCollectionController<ExtraStore>("extra-list");
   }
 
-  public diceSymbolCC(): NecostoreCollectionController<DiceSymbolStore> {
+  public diceSymbolCC(): NekostoreCollectionController<DiceSymbolStore> {
     return this.roomCollectionController<DiceSymbolStore>("dice-symbol-list");
   }
 
-  public floorTileCC(): NecostoreCollectionController<FloorTileStore> {
+  public floorTileCC(): NekostoreCollectionController<FloorTileStore> {
     return this.roomCollectionController<FloorTileStore>("floor-tile-list");
   }
 
-  public chitCC(): NecostoreCollectionController<ChitStore> {
+  public chitCC(): NekostoreCollectionController<ChitStore> {
     return this.roomCollectionController<ChitStore>("chit-list");
   }
 
-  public mapMaskCC(): NecostoreCollectionController<MapMaskStore> {
+  public mapMaskCC(): NekostoreCollectionController<MapMaskStore> {
     return this.roomCollectionController<MapMaskStore>("map-mask-list");
   }
 
-  public tagNoteCC(): NecostoreCollectionController<TagNoteStore> {
+  public tagNoteCC(): NekostoreCollectionController<TagNoteStore> {
     return this.roomCollectionController<TagNoteStore>("tag-note-list");
+  }
+
+  public getCC(type: string): NekostoreCollectionController<any> {
+    switch (type) {
+      case "map-list":
+        return this.mapListCC();
+      case "room-data":
+        return this.roomDataCC();
+      case "image-list":
+        return this.imageDataCC();
+      case "image-tag-list":
+        return this.imageTagCC();
+      case "cut-in-list":
+        return this.cutInDataCC();
+      case "play-list":
+        return this.playListCC();
+      case "private-play-list":
+        return this.privatePlayListCC();
+      case "user-list":
+        return this.userCC();
+      case "property-list":
+        return this.propertyCC();
+      case "property-selection-list":
+        return this.propertySelectionCC();
+      case "property-face-list":
+        return this.propertyFaceCC();
+      case "character":
+        return this.characterCC();
+      case "extra":
+        return this.extraCC();
+      case "dice-symbol":
+        return this.diceSymbolCC();
+      case "floor-tile":
+        return this.floorTileCC();
+      case "chit":
+        return this.chitCC();
+      case "map-mask":
+        return this.mapMaskCC();
+      case "tag-note-list":
+        return this.tagNoteCC();
+      default:
+        throw new ApplicationError(`Invalid type error. type=${type}`);
+    }
   }
 }

@@ -84,7 +84,7 @@
   fontSizePickable: false
   resizable: true
   tableInfoList: []
-"bgm-setting-window":
+"cut-in-setting-window":
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: true
@@ -418,22 +418,22 @@
     widthEm: 0
     widthRem: 0
     heightPx: 2
-    heightEm: 7.5
-    heightRem: 0.9
+    heightEm: 5.5
+    heightRem: 0.7
   minSize:
     widthPx: 250
     widthEm: 0
     widthRem: 0
     heightPx: 2
-    heightEm: 7.5
-    heightRem: 0.9
+    heightEm: 5.5
+    heightRem: 0.7
   maxSize:
     widthPx: 500
     widthEm: 0
     widthRem: 0
     heightPx: 2
-    heightEm: 7.5
-    heightRem: 0.9
+    heightEm: 5.5
+    heightRem: 0.7
   closable: true
   fontSizePickable: true
   resizable: true
@@ -481,21 +481,117 @@
     widthRem: 0
     heightPx: 3
     heightEm: 8
-    heightRem: 0.9
+    heightRem: 1.1
   minSize:
     widthPx: 300
     widthEm: 0
     widthRem: 0
     heightPx: 3
     heightEm: 8
-    heightRem: 0.9
+    heightRem: 1.1
   maxSize:
     widthPx: 700
     widthEm: 0
     widthRem: 0
     heightPx: 3
     heightEm: 8
-    heightRem: 0.9
+    heightRem: 1.1
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"add-map-mask-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 6
+    heightEm: 12
+    heightRem: 0
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 6
+    heightEm: 12
+    heightRem: 0
+  maxSize:
+    widthPx: 700
+    widthEm: 0
+    widthRem: 0
+    heightPx: 6
+    heightEm: 12
+    heightRem: 0
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"edit-map-mask-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 6
+    heightEm: 12
+    heightRem: 0.3
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 6
+    heightEm: 12
+    heightRem: 0.3
+  maxSize:
+    widthPx: 700
+    widthEm: 0
+    widthRem: 0
+    heightPx: 6
+    heightEm: 12
+    heightRem: 0.3
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"add-chit-window":
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    # スクロールバー１本分
+    widthPx: 68
+    widthEm: 32
+    widthRem: 0
+    heightPx: 2
+    heightEm: 18
+    heightRem: 0
+  minSize:
+    # スクロールバー１本分
+    widthPx: 20
+    widthEm: 32
+    widthRem: 0
+    heightPx: 2
+    heightEm: 18
+    heightRem: 0
+  maxSize:
+    # スクロールバー１本分
+    widthPx: 260
+    widthEm: 32
+    widthRem: 0
+    heightPx: 2
+    heightEm: 18
+    heightRem: 0
   closable: true
   fontSizePickable: true
   resizable: true

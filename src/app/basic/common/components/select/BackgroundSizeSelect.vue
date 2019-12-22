@@ -2,6 +2,7 @@
   <ctrl-select
     v-model="localValue"
     :optionInfoList="optionInfoList"
+    :id="id"
     ref="component"
   />
 </template>
@@ -17,9 +18,10 @@ import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "@/@types/task";
 import LanguageManager from "@/LanguageManager";
 import ComponentVue from "@/app/core/window/ComponentVue";
+import { BackgroundSize, Reverse } from "@/@types/room";
 
 type Item = {
-  val: UserType;
+  val: BackgroundSize;
   text: string;
 };
 
@@ -28,7 +30,7 @@ interface MultiMixin extends SelectMixin, ComponentVue {}
 @Component({
   components: { CtrlSelect }
 })
-export default class UserTypeSelect extends Mixins<MultiMixin>(
+export default class BackgroundSizeSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
 ) {
@@ -36,13 +38,21 @@ export default class UserTypeSelect extends Mixins<MultiMixin>(
 
   @VueEvent
   private mounted() {
+    const getText = LanguageManager.instance.getText.bind(
+      LanguageManager.instance
+    );
     const choice: Item[] = [
-      { val: "PL", text: LanguageManager.instance.getText("label.player") },
-      { val: "GM", text: LanguageManager.instance.getText("label.gameMaster") },
+      { val: "contain", text: getText("label.background-size-contain") },
       {
-        val: "VISITOR",
-        text: LanguageManager.instance.getText("label.visitor")
-      }
+        val: "cover-start",
+        text: getText("label.background-size-cover-start")
+      },
+      {
+        val: "cover-center",
+        text: getText("label.background-size-cover-center")
+      },
+      { val: "cover-end", text: getText("label.background-size-cover-end") },
+      { val: "100%", text: getText("label.background-size-100%") }
     ];
     this.optionInfoList = choice.map((c: Item) => ({
       key: c.val,
@@ -53,7 +63,7 @@ export default class UserTypeSelect extends Mixins<MultiMixin>(
     this.optionInfoList.unshift({
       key: null,
       value: "",
-      text: LanguageManager.instance.getText("label.authority"),
+      text: LanguageManager.instance.getText("label.background-size-label"),
       disabled: true
     });
   }
@@ -67,18 +77,15 @@ export default class UserTypeSelect extends Mixins<MultiMixin>(
   private async languageChangeFinished(
     task: Task<never, never>
   ): Promise<TaskResult<never> | void> {
-    this.optionInfoList[0].text = LanguageManager.instance.getText(
-      "label.authority"
+    const getText = LanguageManager.instance.getText.bind(
+      LanguageManager.instance
     );
-    this.optionInfoList[1].text = LanguageManager.instance.getText(
-      "label.player"
-    );
-    this.optionInfoList[2].text = LanguageManager.instance.getText(
-      "label.gameMaster"
-    );
-    this.optionInfoList[3].text = LanguageManager.instance.getText(
-      "label.visitor"
-    );
+    this.optionInfoList[0].text = getText("label.background-size-label");
+    this.optionInfoList[1].text = getText("label.background-size-contain");
+    this.optionInfoList[2].text = getText("label.background-size-cover-start");
+    this.optionInfoList[3].text = getText("label.background-size-cover-center");
+    this.optionInfoList[4].text = getText("label.background-size-cover-end");
+    this.optionInfoList[5].text = getText("label.background-size-100%");
     task.resolve();
   }
 }
