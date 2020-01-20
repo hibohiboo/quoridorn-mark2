@@ -10,9 +10,8 @@
       :disabled="!defaultSelectable"
       value=""
       v-if="defaultLabel !== undefined"
-    >
-      {{ defaultLabel }}
-    </option>
+      v-t="defaultLabel"
+    ></option>
     <slot />
   </ctrl-select>
 </template>
@@ -26,9 +25,6 @@ import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
 
 @Component({ components: { CtrlSelect } })
 export default class SelectBase extends Mixins<SelectMixin>(SelectMixin) {
-  @Prop({ type: Boolean, default: false })
-  private disabled!: boolean;
-
   @Prop({ type: Array, required: true })
   private optionInfoList!: any[];
 }

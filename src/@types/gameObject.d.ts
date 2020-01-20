@@ -1,5 +1,5 @@
 import { Point } from "@/@types/address";
-import { ColorSpec, ImageSpec } from "@/@types/room";
+import { Texture } from "@/@types/room";
 
 type VolatileMapObject = {
   moveFrom: Point;
@@ -11,6 +11,7 @@ type VolatileMapObject = {
   angleDiff: number;
 };
 
+type Place = "field" | "graveyard" | "backstage";
 type MapObject = Point & {
   owner: string; // id
   columns: number;
@@ -19,8 +20,9 @@ type MapObject = Point & {
   isHideHighlight: boolean;
   isLock: boolean;
   otherText: string;
-  place: "field" | "graveyard" | "backstage";
-  backgroundList: (ColorSpec | ImageSpec)[];
+  place: Place;
+  layerId: string;
+  textures: Texture[];
   useBackGround: number;
   angle: number;
 };
@@ -33,7 +35,7 @@ type DiceSymbolStore = {
   size: number;
   isHideBorder: boolean;
   isHideHighlight: boolean;
-  place: "field" | "graveyard" | "backstage";
+  place: Place;
   type: string;
   pips: number;
   faceNum: number;
@@ -47,6 +49,7 @@ type ExtraStore = {
 };
 
 type CharacterStore = MapObject & {
+  name: string;
   fontColorType: "owner" | "original";
   fontColor: string;
   status: string; // id
@@ -93,4 +96,13 @@ type PropertySelectionStore = {
   selection: string;
   label: string;
   value: string;
+};
+
+type OtherTextViewInfo = {
+  type: string;
+  docId: string;
+  text: string;
+  point: Point;
+  columns: number;
+  rows: number;
 };

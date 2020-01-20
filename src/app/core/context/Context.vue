@@ -13,10 +13,10 @@
         :key="index"
         v-if="item.type !== 'hr'"
         class="item"
-        @click.left.stop="emitEvent(item.taskName, item.arg)"
-      >
-        {{ item.text }}
-      </div>
+        :class="{ disabled: item.disabled }"
+        @click.left.stop="emitEvent(item.taskName, item.arg, item.disabled)"
+        v-t="item.text"
+      ></div>
     </template>
   </div>
 </template>
@@ -25,7 +25,10 @@
 import { Component } from "vue-mixin-decorator";
 import { Vue } from "vue-property-decorator";
 import {
+  ContextDeclare,
   ContextDeclareInfo,
+  ContextItemDeclare,
+  ContextItemDeclareBlock,
   ContextItemDeclareInfo,
   ContextTaskInfo
 } from "@/@types/context";
@@ -38,13 +41,15 @@ import LifeCycle from "@/app/core/decorator/LifeCycle";
 import { clone } from "@/app/core/Utility";
 import LanguageManager from "@/LanguageManager";
 
-const contextInfo: ContextDeclareInfo = require("../context.yaml");
+const contextInfo: ContextDeclare = require("../context.yaml");
+const contextItemInfo: ContextItemDeclareBlock = require("../context-item.yaml");
 
 type Item = {
   type: string;
   text?: string;
   taskName?: string;
   arg?: any;
+  disabled?: boolean;
 };
 
 @Component
@@ -86,12 +91,18 @@ export default class Context extends Vue {
     this.itemList.length = 0;
 
     // 定義を元に要素を構築していく
-    const itemInfoList: ContextItemDeclareInfo[] = contextInfo[this.type!];
-    if (!itemInfoList) return;
+    let itemInfo: ContextDeclareInfo = contextInfo[this.type!];
+    if (!itemInfo) return;
+
+    const refFunc = (itemInfo: ContextDeclareInfo): ContextItemDeclare[] => {
+      if ("ref" in itemInfo) return refFunc(contextInfo[itemInfo.ref]);
+      return itemInfo;
+    };
+    itemInfo = refFunc(itemInfo);
 
     // 直列の非同期で全部実行する
-    await itemInfoList
-      .map((item: ContextItemDeclareInfo | null) => () => this.addItem(item))
+    await itemInfo
+      .map((item: ContextItemDeclare | null) => () => this.addItem(item))
       .reduce((prev, curr) => prev.then(curr), Promise.resolve());
 
     task.resolve();
@@ -101,9 +112,9 @@ export default class Context extends Vue {
    * 項目追加
    * @param item
    */
-  private async addItem(item: ContextItemDeclareInfo | null) {
+  private async addItem(item: ContextItemDeclare | null) {
     const contextItem: ContextItemDeclareInfo = clone<ContextItemDeclareInfo>(
-      item
+      item && "ref" in item ? contextItemInfo![item!.ref] : item
     );
 
     // 要素がnullだったら区切り線
@@ -120,6 +131,13 @@ export default class Context extends Vue {
 
     // テキスト項目の追加
     if ("text" in contextItem) {
+      // 非活性の判定
+      const disabled = !(await judgeCompare(
+        contextItem.isDisabledCompare,
+        this.type,
+        this.target
+      ));
+
       const argObj = {
         type: this.type,
         docId: this.target
@@ -136,7 +154,8 @@ export default class Context extends Vue {
         type: "item",
         taskName: contextItem.taskName || "default",
         text: contextItem.text || "default",
-        arg: contextItem.taskArg
+        arg: contextItem.taskArg,
+        disabled
       });
       return;
     }
@@ -151,9 +170,11 @@ export default class Context extends Vue {
    * 項目選択
    * @param taskName
    * @param arg
+   * @param disabled
    */
   @VueEvent
-  private async emitEvent(taskName: string, arg: any) {
+  private async emitEvent(taskName: string, arg: any, disabled: boolean) {
+    if (disabled) return;
     this.hide();
     await TaskManager.instance.ignition<any, never>({
       type: taskName,

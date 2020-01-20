@@ -12,6 +12,7 @@ export type ContextTextItem<T> = {
   text: string;
   taskArg: T;
   isViewCompare?: CompareInfo;
+  isDisabledCompare?: CompareInfo;
   children?: ContextItemDeclareInfo[];
 };
 
@@ -20,11 +21,23 @@ export type ContextHrItem = {
   isViewCompare: CompareInfo;
 };
 
+export type Reference = {
+  ref: string;
+};
+
+export type ContextItemDeclareBlock = {
+  [type in string]: ContextItemDeclareInfo;
+};
+
 export type ContextItemDeclareInfo =
   | ContextTextItem<any>
   | ContextHrItem
   | null;
 
-export type ContextDeclareInfo = {
-  [type in string]: ContextItemDeclareInfo[];
+export type ContextItemDeclare = ContextItemDeclareInfo | Reference;
+
+export type ContextDeclareInfo = ContextItemDeclare[] | Reference;
+
+export type ContextDeclare = {
+  [type in string]: ContextDeclareInfo;
 };

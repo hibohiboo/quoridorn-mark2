@@ -13,9 +13,39 @@ button:
   copy: Copy
   next: Next
   execution: Execution
-  close: 閉じる
-  logout: ログアウト
-  exit-room: 退室
+  close: Close
+  logout: Logout
+  exit-room: Exit
+  edit: 編集
+
+type:
+  map-mask: Map mask
+  map-marker: Map marker
+  dice-symbol: Dice symbol
+  chit: Chit
+  character: Character
+  map: Map
+  floor-tile: Floor tile
+  stand-image: Stand image
+  stand-image-diff: Standing image difference
+  user: ユーザー
+  actor-group: アクターグループ
+
+context:
+  bgm-setting: BGM Setting
+  add-map-mask: Add Map mask
+  add-chit: Add Chit
+  modify: Modify
+  copy: Copy
+  delete: Delete
+  fix: Fix
+  un-fix: Release
+  view-border: Show border
+  hide-border: Hide border
+  view-highlight: Show highlights
+  hide-highlight: Hide highlight
+  edit-area-map: エリアマップ編集
+  chmod: 権限変更
 
 label:
   terms-of-use: Terms of Use
@@ -31,27 +61,86 @@ label:
   password-placeholder: (no password if empty)
   user-type: User type
   nameless: Nameless
-  authority: Authority
+  permission: Authority
   player: PL
   gameMaster: GM
   visitor: Visitor
   room-name: Playroom name
-  room-name-placeholder: 部屋名(必須項目)
-  game-system: Game system(入力指定も可)
+  room-name-placeholder: Room name (required item)
+  game-system: Game system (Can be input)
   no-target: unspecified
-  participant: 参加者
-  version-info: バージョン情報
-  invite-url: 招待URL
-  room-member-num: 入室数
-  comeback-url: 復帰URL
-  default-dicebot: ダイスボット(指定なし)
-  room-no: 部屋番号
-  text: テキスト
-  background-color: 背景色
-  height: 高さ
-  width: 幅
-  alpha: 透過度
-  multi-create: 複数作成
+  participant: Participant
+  version-info: Version information
+  invite-url: invite url
+  room-member-num: Number of occupants
+  comeback-url: Comeback URL
+  default-dicebot: Dice bot(default)
+  room-no: Room no
+  text: Text
+  background-color: Background color
+  height: Height
+  width: Width
+  alpha: Transmittance
+  multi-create: Create multiple
+  tag: Tag
+  direction: Direction
+  direction-none: As it is
+  direction-horizontal: Flip horizontal
+  direction-vertical: flip Vertical
+  direction-180: 180 degree rotation
+  background-location: Arrangement
+  background-location-contain: Contain
+  background-location-cover-start: Cover(start)
+  background-location-cover-center: Cover(center)
+  background-location-cover-end: Cover(end)
+  background-location-100%: 100%
+  image-password: Image Password
+  layer: Layer
+  add-target: Add to
+  image: Image
+  other-text: Additional Text
+  image-tag: Image tag
+  client: Client
+  server: Server
+  version: Version
+  adequate-client: Adequate Client
+  adequate-server: Adequate Server
+  version-compatible: Version Compatible
+  adequate: Adequate
+  inadequate: inadequate
+  background: Background
+  main: メイン
+  margin: 余白
+  texture: テクスチャ
+  rows: 行
+  columns: 列
+  name: 名前
+  fore-color: 前景色
+  grid-line: 方眼線
+  grid-line-color: 方眼線色
+  font-color: 文字色
+  sub: サブ
+  grid-size: マス(px)
+  border-style: 罫線のスタイル
+  blur: ぼかし
+  mask: マスク
+  frame-border: 枠線
+  size: サイズ
+  decoration: 装飾
+  style: スタイル
+  map: マップ
+  none: なし
+  allow: 許可
+  deny: 否認
+  permission-type: 権限種別
+  permission-node-type: 権限対象種別
+  owner: オーナー
+  user: ユーザー
+  character: キャラクター
+  group: グループ
+  permission-view: 閲覧権限
+  permission-edit: 編集権限
+  permission-chmod: 権限変更権限
 
 message:
   copy-to-clipboard: クリップボードにコピーしました。
@@ -132,3 +221,28 @@ version-info-window:
 
 room-info-window:
   window-title: プレイルーム情報表示
+
+add-map-mask-window:
+  window-title: マップマスク追加
+
+edit-map-mask-window:
+  window-title: マップマスク編集
+
+add-chit-window:
+  window-title: チット追加
+
+edit-chit-window:
+  window-title: チット編集
+
+input-image-password-window:
+  window-title: 隠し画像用パスワード入力
+  message: パスワードを入力することで、隠し画像を表示することができます。
+
+edit-area-map-window:
+  window-title: エリアマップ編集
+
+edit-map-window:
+  window-title: マップ編集
+
+chmod-window:
+  window-title: 権限変更

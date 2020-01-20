@@ -37,7 +37,7 @@
         <thead>
           <tr>
             <th v-t="'label.user-name'"></th>
-            <th v-t="'label.authority'"></th>
+            <th v-t="'label.permission'"></th>
             <th v-t="'label.room-member-num'"></th>
             <th colspan="2" v-t="'label.comeback-url'"></th>
           </tr>
@@ -121,7 +121,7 @@ export default class RoomInfoWindow extends Mixins<WindowVue<never, never>>(
 ) {
   private clientRoomInfo: ClientRoomInfo | null = null;
   private userList: StoreUseData<UserData>[] =
-    GameObjectManager.instance.playerList;
+    GameObjectManager.instance.userList;
   private systemId: string | null = null;
   private systemName: string | null = null;
 

@@ -1,6 +1,8 @@
 import { Operand, CompareInfo, SimpleCompareInfo } from "@/@types/compare";
 import { ApplicationError } from "@/app/core/error/ApplicationError";
-import SocketFacade from "@/app/core/api/app-server/SocketFacade";
+import SocketFacade, {
+  permissionCheck
+} from "@/app/core/api/app-server/SocketFacade";
 
 /**
  * オペランドの値を取得する
@@ -39,6 +41,16 @@ async function getOperandValue(
       const dataList = await cc.find(o.searchProperty, "==", o.searchValue);
       return dataList && dataList.length ? dataList[0].data[o.property] : null;
     }
+    if (o.refType === "permission-check") {
+      const cc = SocketFacade.instance.getCC(type!);
+      const data = await cc.getData(docId!);
+      return permissionCheck(data!, o.type);
+    }
+    if (o.refType === "exclusion-check") {
+      const cc = SocketFacade.instance.getCC(type!);
+      const data = await cc.getData(docId!);
+      return data && !data.exclusionOwner;
+    }
     throw new ApplicationError(`Un supported refType='${(<any>o).refType}'`);
   }
   return o;
@@ -65,7 +77,7 @@ export async function judgeCompare(
   };
 
   // MultiCompareInfo の場合
-  if ("operator" in comp && "list" in comp.list) {
+  if ("operator" in comp && "list" in comp) {
     const mComp = comp;
     const r: boolean[] = await Promise.all(mComp.list.map(c => judgement(c)));
     const trueCount: number = r.filter((r: boolean) => r).length;

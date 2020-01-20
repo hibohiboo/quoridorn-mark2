@@ -12,28 +12,54 @@ import {
 import { Matrix, Point, Rectangle } from "@/@types/address";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import { getCssPxNum } from "@/app/core/Css";
+import CssManager from "@/app/core/css/CssManager";
 
 type Coordinates = {
   angle: number; // 角度
   planeLocateScreen: Point; // マップ回転前のスクリーンベースの座標
   planeLocateCanvas: Point; // マップ回転前のキャンバスベースの座標
-  planeLocateTable: Point; // マップ回転前のテーブルベースの座標
 };
 
 @Mixin
 export default class AddressCalcMixin extends Vue {
   @Getter("mapColumns") protected mapColumns: any;
   @Getter("mapRows") protected mapRows: any;
-  @Getter("mapGridSize") protected mapGridSize: any;
   @Getter("mapBorderWidth") protected mapBorderWidth: any;
-  @Getter("mapMarginGridSize") protected mapMarginGridSize: any;
   @Getter("mapWheel") protected mapWheel: any;
 
-  protected get canvasSize(): any {
-    return {
-      w: this.mapColumns * this.mapGridSize,
-      h: this.mapRows * this.mapGridSize
-    };
+  protected static getMapGridSize(): number {
+    return getCssPxNum("--gridSize", document.getElementById("gameTable")!);
+  }
+
+  protected static getMapRow(): number {
+    return parseInt(
+      CssManager.getCss("--totalRow", document.getElementById("gameTable")!),
+      10
+    );
+  }
+
+  protected static getMapColumn(): number {
+    return parseInt(
+      CssManager.getCss("--totalColumn", document.getElementById("gameTable")!),
+      10
+    );
+  }
+
+  protected static getMapMarginRow(): number {
+    return parseInt(
+      CssManager.getCss("--margin-row", document.getElementById("gameTable")!),
+      10
+    );
+  }
+
+  protected static getMapMarginColumn(): number {
+    return parseInt(
+      CssManager.getCss(
+        "--margin-column",
+        document.getElementById("gameTable")!
+      ),
+      10
+    );
   }
 
   /**
@@ -65,19 +91,17 @@ export default class AddressCalcMixin extends Vue {
       x: planeLocateScreen.x - canvasCenter.x,
       y: planeLocateScreen.y - canvasCenter.y
     };
+    const gridSize = AddressCalcMixin.getMapGridSize();
+    const mapColumn = AddressCalcMixin.getMapColumn();
+    const mapRow = AddressCalcMixin.getMapRow();
     const planeLocateCanvas: Point = {
-      x: planeLocateCenter.x + (this.mapColumns / 2) * this.mapGridSize,
-      y: planeLocateCenter.y + (this.mapRows / 2) * this.mapGridSize
-    };
-    const planeLocateTable: Point = {
-      x: planeLocateCanvas.x + this.mapMarginGridSize * this.mapGridSize,
-      y: planeLocateCanvas.y + this.mapMarginGridSize * this.mapGridSize
+      x: planeLocateCenter.x + (mapColumn / 2) * gridSize,
+      y: planeLocateCenter.y + (mapRow / 2) * gridSize
     };
     return {
       angle, // 角度
       planeLocateScreen, // マップ回転前のスクリーンベースの座標
-      planeLocateCanvas, // マップ回転前のキャンバスベースの座標
-      planeLocateTable // マップ回転前のテーブルベースの座標
+      planeLocateCanvas // マップ回転前のキャンバスベースの座標
     };
   }
 
@@ -105,7 +129,6 @@ export default class AddressCalcMixin extends Vue {
 
     return {
       locateOnScreen: coordinateObj.planeLocateScreen,
-      locateOnTable: coordinateObj.planeLocateTable,
       locateOnCanvas: coordinateObj.planeLocateCanvas,
       grid: addressObj
     };
@@ -132,13 +155,14 @@ export default class AddressCalcMixin extends Vue {
       oldAngle
     ).planeLocateCanvas;
 
+    const gridSize = AddressCalcMixin.getMapGridSize();
     // ドロップ先のマス座標を算出
-    let column: number = Math.ceil(planeLocateCanvas.x / this.mapGridSize);
-    let row: number = Math.ceil(planeLocateCanvas.y / this.mapGridSize);
+    let column: number = Math.ceil(planeLocateCanvas.x / gridSize);
+    let row: number = Math.ceil(planeLocateCanvas.y / gridSize);
 
     // 掴んだときの対象の相対位置を考慮
-    let offsetGridX: number = offsetX / this.mapGridSize;
-    let offsetGridY: number = offsetY / this.mapGridSize;
+    let offsetGridX: number = offsetX / gridSize;
+    let offsetGridY: number = offsetY / gridSize;
 
     column -= (offsetGridX > 0 ? Math.floor : Math.ceil)(offsetGridX);
     row -= (offsetGridY > 0 ? Math.floor : Math.ceil)(offsetGridY);

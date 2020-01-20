@@ -3,7 +3,7 @@
     v-model="localValue"
     :optionInfoList="optionInfoList"
     :id="id"
-    ref="select"
+    ref="component"
   />
 </template>
 
@@ -12,34 +12,67 @@ import SelectMixin from "./base/SelectMixin";
 
 import { Prop } from "vue-property-decorator";
 import { Component, Mixins } from "vue-mixin-decorator";
-import VueEvent from "@/app/core/decorator/VueEvent";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
+import LanguageManager from "@/LanguageManager";
+import TaskProcessor from "@/app/core/task/TaskProcessor";
+import { Task, TaskResult } from "@/@types/task";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
+
+interface MultiMixin extends SelectMixin, ComponentVue {}
 
 @Component({ components: { CtrlSelect } })
-export default class ImageTagSelect extends Mixins<SelectMixin>(SelectMixin) {
-  private imageTagList = GameObjectManager.instance.imageTagList;
-
-  @Prop({ type: String, default: "画像タグ" })
+export default class ImageTagSelect extends Mixins<MultiMixin>(
+  SelectMixin,
+  ComponentVue
+) {
+  @Prop({ type: String, default: "label.image-tag" })
   protected defaultLabel!: string;
 
-  @VueEvent
-  private get optionInfoList(): any[] {
-    const resultList = this.imageTagList.map(tagObj => ({
-      key: tagObj.id,
-      value: tagObj.data,
-      text: tagObj.data,
-      disabled: false
-    }));
+  private optionInfoList: any[] = [];
+
+  @LifeCycle
+  private created() {
+    this.createOptionInfoList();
+  }
+
+  @TaskProcessor("language-change-finished")
+  private async languageChangeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    this.createOptionInfoList();
+    task.resolve();
+  }
+
+  private createOptionInfoList() {
+    const getText = LanguageManager.instance.getText.bind(
+      LanguageManager.instance
+    );
+    this.optionInfoList = GameObjectManager.instance.imageTagList.map(
+      tagObj => ({
+        key: tagObj.id,
+        value: tagObj.data,
+        text: tagObj.data,
+        disabled: false
+      })
+    );
     if (this.defaultLabel) {
-      resultList.unshift({
+      this.optionInfoList.unshift({
         key: null,
         value: "",
-        text: this.defaultLabel,
+        text:
+          this.defaultLabel === "label.image-tag"
+            ? getText(this.defaultLabel)
+            : this.defaultLabel,
         disabled: true
       });
     }
-    return resultList;
+  }
+
+  public focus() {
+    const elm = this.$refs.component as CtrlSelect;
+    elm.focus();
   }
 }
 </script>

@@ -1,13 +1,17 @@
 map:
-  - text: BGM設定
+  - text: context.edit-area-map
+    taskName: window-open
+    taskArg:
+      type: edit-area-map-window
+  - text: context.bgm-setting
     taskName: window-open
     taskArg:
       type: cut-in-setting-window
-  - text: マップマスク追加
+  - text: context.add-map-mask
     taskName: window-open
     taskArg:
       type: add-map-mask-window
-  - text: チット追加
+  - text: context.add-chit
     taskName: window-open
     taskArg:
       type: add-chit-window
@@ -20,117 +24,55 @@ map:
       - text: item02-item01
 
 map-mask:
-  - text: 変更
+  - text: context.modify
     taskName: window-open
+    isViewCompare:
+      lhs:
+        refType: permission-check
+        type: edit
+      rhs:
+        true
+    isDisabledCompare:
+      lhs:
+        refType: exclusion-check
+      rhs:
+        true
     taskArg:
       type: edit-map-mask-window
-  - text: 複製
-    taskName: copy-object
-    taskArg: ~
-  - text: 削除
-    taskName: delete-object
-    taskArg: ~
-  - ~
-  - text: 固定
-    taskName: lock-object
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isLock
-      rhs: false
-    taskArg:
-      value: true
-  - text: 固定解除
-    taskName: lock-object
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isLock
-      rhs: true
-    taskArg:
-      value: false
-  - text: 枠線を非表示
-    taskName: change-border-view
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isHideBorder
-      rhs: false
-    taskArg:
-      value: true
-  - text: 枠線を表示
-    taskName: change-border-view
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isHideBorder
-      rhs: true
-    taskArg:
-      value: false
+  - ref: object-copy
+  - ref: object-delete
+  - ref: object-chmod
+  - ref: hr-permission-check
+  - ref: object-fix
+  - ref: object-un-fix
+  - ref: object-hide-border
+  - ref: object-view-border
+  - ref: object-hide-highlight
+  - ref: object-view-highlight
 
 chit:
-  - text: 変更
+  - text: context.modify
     taskName: window-open
+    isViewCompare:
+      lhs:
+        refType: permission-check
+        type: edit
+      rhs:
+        true
+    isDisabledCompare:
+      lhs:
+        refType: exclusion-check
+      rhs:
+        true
     taskArg:
       type: edit-chit-window
-  - text: 複製
-    taskName: copy-object
-    taskArg: ~
-  - text: 削除
-    taskName: delete-object
-    taskArg: ~
-  - ~
-  - text: 固定
-    taskName: lock-object
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isLock
-      rhs: false
-    taskArg:
-      value: true
-  - text: 固定解除
-    taskName: lock-object
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isLock
-      rhs: true
-    taskArg:
-      value: false
-  - text: 枠線を非表示
-    taskName: change-border-view
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isHideBorder
-      rhs: false
-    taskArg:
-      value: true
-  - text: 枠線を表示
-    taskName: change-border-view
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isHideBorder
-      rhs: true
-    taskArg:
-      value: false
-  - text: ハイライトを非表示
-    taskName: change-highlight-view
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isHideHighlight
-      rhs: false
-    taskArg:
-      value: true
-  - text: ハイライトを表示
-    taskName: change-highlight-view
-    isViewCompare:
-      lhs:
-        refType: db-id-property
-        property: isHideHighlight
-      rhs: true
-    taskArg:
-      value: false
+  - ref: object-copy
+  - ref: object-delete
+  - ref: object-chmod
+  - ref: hr-permission-check
+  - ref: object-fix
+  - ref: object-un-fix
+  - ref: object-hide-border
+  - ref: object-view-border
+  - ref: object-hide-highlight
+  - ref: object-view-highlight

@@ -15,6 +15,11 @@
       <context />
     </template>
     <window-area />
+    <other-text-frame
+      :otherTextViewInfo="otherTextViewInfo"
+      @hide="otherTextHide"
+      v-if="otherTextViewInfo"
+    />
     <div id="wheelMarker" :class="{ hide: !isMapWheeling }"></div>
     <div id="loadingCreateRoom" v-if="isCreatingRoomMode">
       <div class="message">お部屋を作成しています！</div>
@@ -29,7 +34,6 @@
 <script lang="ts">
 import { Component, Vue, Watch } from "vue-property-decorator";
 import BaseInput from "@/app/core/component/BaseInput.vue";
-import { Getter } from "vuex-class";
 import GameTable from "@/app/basic/map/GameTable.vue";
 import Menu from "@/app/basic/menu/Menu.vue";
 import TaskManager from "@/app/core/task/TaskManager";
@@ -49,14 +53,19 @@ import LifeCycle from "@/app/core/decorator/LifeCycle";
 import {
   ClientRoomInfo,
   GetRoomListResponse,
-  RoomViewResponse
+  LoginWindowInput,
+  RoomViewResponse,
+  ServerTestResult
 } from "@/@types/socket";
 import { StoreObj, StoreUseData } from "@/@types/store";
 import QuerySnapshot from "nekostore/lib/QuerySnapshot";
 import BgmManager from "@/app/basic/music/BgmManager";
+import OtherTextFrame from "@/app/basic/other-text/OtherTextFrame.vue";
+import { OtherTextViewInfo } from "@/@types/gameObject";
 
 @Component({
   components: {
+    OtherTextFrame,
     RightPane,
     WindowArea,
     Context,
@@ -66,8 +75,6 @@ import BgmManager from "@/app/basic/music/BgmManager";
   }
 })
 export default class App extends Vue {
-  @Getter("mapBackgroundColor") private mapBackgroundColor: any;
-
   private readonly key = "App";
   private isMapWheeling: boolean = false;
   private roomInitialized: boolean = false;
@@ -77,6 +84,7 @@ export default class App extends Vue {
   private isModal: boolean = false;
 
   private roomInfo: ClientRoomInfo | null = null;
+  private otherTextViewInfo: OtherTextViewInfo | null = null;
 
   private get elm(): HTMLElement {
     return document.getElementById("app") as HTMLElement;
@@ -92,8 +100,8 @@ export default class App extends Vue {
 
   @LifeCycle
   private destroyed() {
-    SocketFacade.instance.destroy();
-    WindowManager.instance.destroy();
+    SocketFacade.instance.destroy().then();
+    WindowManager.instance.destroy().then();
   }
 
   @LifeCycle
@@ -106,22 +114,34 @@ export default class App extends Vue {
       "--background-background-image",
       "none"
     );
+
+    // // 検証用
+    // await TaskManager.instance.ignition<WindowOpenInfo<never>, never>({
+    //   type: "window-open",
+    //   owner: "Quoridorn",
+    //   value: {
+    //     type: "edit-other-text-window"
+    //   }
+    // });
+
     // ログイン画面の表示
     const serverInfo = await SocketFacade.instance.socketCommunication<
-      never,
+      string,
       GetRoomListResponse
-    >("get-room-list");
+    >("get-room-list", process.env.VUE_APP_VERSION);
     SocketFacade.instance.socketOn<RoomViewResponse[]>(
       "result-room-view",
       (err, changeList) => {
         changeList.forEach(change => {
           if (change.changeType === "removed") {
-            const index = serverInfo.roomList.findIndex(
+            const index = serverInfo.roomList!.findIndex(
               (info: StoreUseData<ClientRoomInfo>) => info.id === change.id
             );
-            serverInfo.roomList.splice(index, 1, {
+            serverInfo.roomList!.splice(index, 1, {
               order: index,
               exclusionOwner: null,
+              owner: null,
+              permission: null,
               status: null,
               createTime: new Date(),
               updateTime: null,
@@ -129,7 +149,7 @@ export default class App extends Vue {
             });
           } else {
             const index = change.data!.order;
-            serverInfo.roomList.splice(index, 1, {
+            serverInfo.roomList!.splice(index, 1, {
               ...change.data!,
               id: change.id
             });
@@ -137,15 +157,27 @@ export default class App extends Vue {
         });
       }
     );
+    let resp: ServerTestResult;
+    const url = SocketFacade.instance.appServerUrl;
+    try {
+      resp = await SocketFacade.instance.testServer(url);
+    } catch (err) {
+      window.console.warn(`${err}. url:${url}`);
+      return;
+    }
+
     await TaskManager.instance.ignition<
-      WindowOpenInfo<GetRoomListResponse>,
+      WindowOpenInfo<LoginWindowInput>,
       never
     >({
       type: "window-open",
       owner: "Quoridorn",
       value: {
         type: "login-window",
-        args: serverInfo
+        args: {
+          ...serverInfo,
+          serverTestResult: resp
+        }
       }
     });
     this.isMounted = true;
@@ -311,11 +343,6 @@ export default class App extends Vue {
     }
   }
 
-  @Watch("mapBackgroundColor", { immediate: true })
-  private onChangeMapBackgroundColor(mapBackgroundColor: string): void {
-    document.body.style.backgroundColor = mapBackgroundColor;
-  }
-
   @Watch("isMounted")
   @Watch("isModal")
   private onChangeIsModal() {
@@ -328,6 +355,18 @@ export default class App extends Vue {
   ): Promise<TaskResult<never> | void> {
     window.console.log("socket-connect-finished");
     task.resolve();
+  }
+
+  @TaskProcessor("other-text-view-finished")
+  private async otherTextView(
+    task: Task<OtherTextViewInfo, never>
+  ): Promise<TaskResult<never> | void> {
+    this.otherTextViewInfo = task.value;
+    task.resolve();
+  }
+
+  private otherTextHide() {
+    this.otherTextViewInfo = null;
   }
 
   @TaskProcessor("room-initialize-finished")
@@ -397,6 +436,7 @@ body {
   height: 100%;
   overflow: hidden;
   font-size: 14px;
+  background-color: #92a8b3;
 }
 
 table {
@@ -449,7 +489,7 @@ hr {
     width: 100%;
     height: 100%;
     filter: blur(var(--mask-blur));
-    transform: var(--background-transform);
+    transform: var(--image-direction);
   }
 }
 
@@ -468,6 +508,15 @@ hr {
 
 .public-memo-tile:hover + .public-memo-fukidashi {
   visibility: visible;
+}
+
+#window-area {
+  position: relative;
+  z-index: 10;
+}
+
+.other-text-frame {
+  z-index: 11;
 }
 
 #wheelMarker {

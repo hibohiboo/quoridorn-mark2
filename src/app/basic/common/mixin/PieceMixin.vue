@@ -10,7 +10,11 @@ import SocketFacade, {
 } from "@/app/core/api/app-server/SocketFacade";
 import { StoreUseData } from "@/@types/store";
 import NekostoreCollectionController from "@/app/core/api/app-server/NekostoreCollectionController";
-import { MapObject, VolatileMapObject } from "@/@types/gameObject";
+import {
+  MapObject,
+  OtherTextViewInfo,
+  VolatileMapObject
+} from "@/@types/gameObject";
 import { Point } from "@/@types/address";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "@/@types/task";
@@ -66,7 +70,7 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
   }
 
   @LifeCycle
-  private async mounted() {
+  protected async mounted() {
     this.storeInfo = await this.getStoreInfo();
     await this.cc!.setSnapshot(this.docId, this.docId, snapshot => {
       if (!snapshot.data) return;
@@ -121,7 +125,7 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
   @Watch("isMounted")
   @Watch("storeInfo.data.otherText")
   private onChangeOtherText() {
-    this.otherText = this.storeInfo.data.otherText;
+    this.otherText = this.storeInfo!.data!.otherText;
   }
 
   @Watch("isMounted")
@@ -171,13 +175,13 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
   @Watch("storeInfo.data.useBackGround")
   private onChangeBackground() {
     if (!this.isMounted) return;
-    const backgroundList = this.storeInfo!.data!.backgroundList;
+    const textures = this.storeInfo!.data!.textures;
     const useBackGround = this.storeInfo!.data!.useBackGround;
-    const backInfo = backgroundList[useBackGround];
-    if (backInfo.backgroundType === "color") {
+    const backInfo = textures[useBackGround];
+    if (backInfo.type === "color") {
       this.elm.style.setProperty(`--image`, ``);
       this.imageSrc = "";
-      this.elm.style.setProperty(`--image-reverse`, ``);
+      this.elm.style.setProperty(`--image-direction`, ``);
       this.elm.style.setProperty(`--back-color`, backInfo.backgroundColor);
       this.elm.style.setProperty(`--font-color`, backInfo.fontColor);
       this.elm.style.setProperty(`--text`, `"${backInfo.text}"`);
@@ -188,10 +192,10 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
       )[0];
       this.elm.style.setProperty(`--image`, `url(${imageObj.data!.data})`);
       this.imageSrc = imageObj.data!.data;
-      let reverse = "";
-      if (backInfo.reverse === "horizontal") reverse = "scale(-1, 1)";
-      if (backInfo.reverse === "vertical") reverse = "scale(1, -1)";
-      if (backInfo.reverse === "180") reverse = "rotate(180deg)";
+      let direction = "";
+      if (backInfo.direction === "horizontal") direction = "scale(-1, 1)";
+      if (backInfo.direction === "vertical") direction = "scale(1, -1)";
+      if (backInfo.direction === "180") direction = "rotate(180deg)";
       let backgroundSize = "";
       let backgroundPosition = "center";
       if (backInfo.backgroundSize === "contain") backgroundSize = "contain";
@@ -212,7 +216,7 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
         `--image-background-position`,
         backgroundPosition
       );
-      this.elm.style.setProperty(`--image-reverse`, reverse);
+      this.elm.style.setProperty(`--image-direction`, direction);
       this.elm.style.setProperty(`--back-color`, "transparent");
       this.elm.style.setProperty(`--font-color`, "transparent");
       this.elm.style.setProperty(`--text`, `""`);
@@ -405,6 +409,7 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
     if (!param || param.key !== this.docId) return;
+
     window.console.log("mouse-move-end-left-finished", param.key, param.type);
     const data = JSON.parse(JSON.stringify(this.storeInfo!.data)) as T;
     data.x += this.volatileInfo.moveDiff.x;
@@ -523,12 +528,35 @@ export default class PieceMixin<T extends MapObject> extends AddressCalcMixin {
     // }).then(() => this.windowOpen(contextProperty));
   }
 
-  protected mouseover(): void {
+  protected async mouseover(): Promise<void> {
     this.isHover = true;
+    const data = this.storeInfo!.data!;
+    if (!data.otherText) return;
+    await TaskManager.instance.ignition<OtherTextViewInfo, never>({
+      type: "other-text-view",
+      owner: "Quoridorn",
+      value: {
+        type: this.type,
+        docId: this.docId,
+        text: data.otherText,
+        point: createPoint(data.x, data.y),
+        columns: data.columns,
+        rows: data.rows
+      }
+    });
   }
 
-  protected mouseout(): void {
+  protected async mouseout(): Promise<void> {
     this.isHover = false;
+    const data = this.storeInfo!.data!;
+    if (!data.otherText) return;
+    setTimeout(async () => {
+      await TaskManager.instance.ignition<string, never>({
+        type: "other-text-hide",
+        owner: "Quoridorn",
+        value: this.docId
+      });
+    });
   }
 }
 </script>

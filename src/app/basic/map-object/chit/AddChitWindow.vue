@@ -14,12 +14,18 @@
         v-model="imageDocId"
         :windowKey="key"
         :imageTag.sync="imageTag"
-        :reverse.sync="reverse"
+        :direction.sync="direction"
       />
       <textarea
-        v-if="currentTabInfo.target === 'text'"
+        v-if="currentTabInfo.target === 'other-text'"
         v-model="otherText"
       ></textarea>
+      <div class="layer-block" v-if="currentTabInfo.target === 'layer'">
+        <label>
+          <span v-t="'label.add-target'" class="label-input"></span>
+          <map-layer-select v-model="layerId" />
+        </label>
+      </div>
     </simple-tab-component>
     <table class="info-table">
       <tr>
@@ -65,11 +71,11 @@
           <label
             :for="`${key}-background-size`"
             class="label-background-size label-input"
-            v-t="'label.background-size'"
+            v-t="'label.background-location'"
           ></label>
         </th>
         <td class="value-cell">
-          <background-size-select
+          <background-location-select
             :id="`${key}-background-size`"
             v-model="backgroundSize"
           />
@@ -91,19 +97,21 @@ import TaskProcessor from "../../../core/task/TaskProcessor";
 import { Task, TaskResult } from "@/@types/task";
 import { AddObjectInfo } from "@/@types/data";
 import ImagePickerComponent from "@/app/core/component/ImagePickerComponent.vue";
-import { BackgroundSize, Reverse } from "@/@types/room";
+import { BackgroundSize, Direction } from "@/@types/room";
 import LanguageManager from "@/LanguageManager";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 import { ChitStore } from "@/@types/gameObject";
-import BackgroundSizeSelect from "@/app/basic/common/components/select/BackgroundSizeSelect.vue";
 import SimpleTabComponent from "@/app/core/component/SimpleTabComponent.vue";
 import { TabInfo } from "@/@types/window";
+import BackgroundLocationSelect from "@/app/basic/common/components/select/BackgroundLocationSelect.vue";
+import MapLayerSelect from "@/app/basic/common/components/select/MapLayerSelect.vue";
 
 @Component({
   components: {
+    MapLayerSelect,
+    BackgroundLocationSelect,
     SimpleTabComponent,
-    BackgroundSizeSelect,
     ImagePickerComponent,
     BaseInput,
     CtrlButton
@@ -118,22 +126,42 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
   private width: number = 1;
   private imageDocId: string | null = null;
   private imageTag: string | null = null;
-  private reverse: Reverse = "none";
+  private direction: Direction = "none";
   private isMounted: boolean = false;
   private imageSrc: string = "";
   private backgroundSize: BackgroundSize = "contain";
+  private layerId: string = GameObjectManager.instance.mapLayerList.filter(
+    ml => ml.data!.type === "character"
+  )[0].id!;
 
   private tabList: TabInfo[] = [
-    {
-      text: "画像",
-      target: "image"
-    },
-    {
-      text: "その他欄",
-      target: "text"
-    }
+    { target: "image", text: "" },
+    { target: "layer", text: "" },
+    { target: "other-text", text: "" }
   ];
   private currentTabInfo: TabInfo | null = this.tabList[0];
+
+  @TaskProcessor("language-change-finished")
+  private async languageChangeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    this.createTabInfoList();
+    task.resolve();
+  }
+
+  @LifeCycle
+  private async created() {
+    this.createTabInfoList();
+  }
+
+  private createTabInfoList() {
+    const getText = LanguageManager.instance.getText.bind(
+      LanguageManager.instance
+    );
+    this.tabList.forEach(t => {
+      t.text = getText(`label.${t.target}`);
+    });
+  }
 
   @LifeCycle
   public async mounted() {
@@ -148,19 +176,19 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
 
   @Watch("isMounted")
   @Watch("imageDocId")
-  @Watch("reverse")
+  @Watch("direction")
   @Watch("backgroundSize")
   private onChangeImage() {
     if (!this.isMounted) return;
     const imageObj = this.getImageObj();
     if (!imageObj) return;
-    this.imageSrc = imageObj.data.data;
+    this.imageSrc = imageObj.data!.data;
     this.chitElm.style.setProperty("--imageSrc", `url(${this.imageSrc})`);
-    let reverse = "";
-    if (this.reverse === "horizontal") reverse = "scale(-1, 1)";
-    if (this.reverse === "vertical") reverse = "scale(1, -1)";
-    if (this.reverse === "180") reverse = "rotate(180deg)";
-    this.chitElm.style.setProperty(`--image-reverse`, reverse);
+    let direction = "";
+    if (this.direction === "horizontal") direction = "scale(-1, 1)";
+    if (this.direction === "vertical") direction = "scale(1, -1)";
+    if (this.direction === "180") direction = "rotate(180deg)";
+    this.chitElm.style.setProperty(`--image-direction`, direction);
     this.chitElm.style.setProperty(
       "--isEmpty",
       (this.imageSrc ? 0 : 1).toString()
@@ -196,13 +224,14 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
       isHideHighlight: false,
       isLock: false,
       otherText: this.otherText,
-      backgroundList: [
+      layerId: this.layerId,
+      textures: [
         {
-          backgroundType: "image",
-          imageTag: this.imageTag,
-          imageId: this.imageDocId,
-          reverse: this.reverse,
-          backgroundSize: this.backgroundSize
+          type: "image",
+          imageTag: this.imageTag!,
+          imageId: this.imageDocId!,
+          direction: this.direction,
+          backgroundSize: this.backgroundSize!
         }
       ],
       useBackGround: 0,
@@ -230,6 +259,34 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
       (this.height * ratio).toString()
     );
   }
+
+  @Watch("isMounted")
+  @Watch("backgroundSize")
+  private onChangeLocation() {
+    if (!this.isMounted) return;
+    let backgroundSize = "";
+    let backgroundPosition = "center";
+    if (this.backgroundSize === "contain") backgroundSize = "contain";
+    if (this.backgroundSize === "cover-start") {
+      backgroundSize = "cover";
+      backgroundPosition = "top left";
+    }
+    if (this.backgroundSize === "cover-center") {
+      backgroundSize = "cover";
+    }
+    if (this.backgroundSize === "cover-end") {
+      backgroundSize = "cover";
+      backgroundPosition = "bottom right";
+    }
+    if (this.backgroundSize === "100%") {
+      backgroundSize = "100% 100%";
+    }
+    this.chitElm.style.setProperty("--image-background-size", backgroundSize);
+    this.chitElm.style.setProperty(
+      "--image-background-position",
+      backgroundPosition
+    );
+  }
 }
 </script>
 
@@ -241,10 +298,10 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
   width: calc(var(--width-ratio) * 3em);
   height: calc(var(--height-ratio) * 3em);
   background-image: var(--imageSrc);
-  background-size: contain;
+  transform: var(--image-direction);
+  background-size: var(--image-background-size);
   background-repeat: no-repeat;
-  background-position: center;
-  transform: var(--image-reverse);
+  background-position: var(--image-background-position);
   border-style: solid;
   border-color: rgb(255, 255, 153);
   border-width: 3px;
@@ -268,6 +325,11 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
   }
 }
 
+.value-width,
+.value-height {
+  width: 3em;
+}
+
 .container {
   display: grid;
   grid-template-rows: 12em 1fr;
@@ -279,13 +341,18 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
     grid-row: 1 / 3;
     grid-column: 2 / 3;
 
-    .image-picker-container {
-      height: 100%;
+    > *:not(:first-child) {
+      width: 100%;
+      flex: 1;
+    }
+
+    > div:not(.image-picker-container) {
+      border: solid 1px gray;
+      box-sizing: border-box;
+      padding: 0.2rem;
     }
 
     textarea {
-      height: 100%;
-      width: 100%;
       resize: none;
       padding: 0;
       box-sizing: border-box;
@@ -303,14 +370,18 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
     grid-column: 1 / 2;
     table-layout: fixed;
 
+    th,
+    td {
+      label {
+        @include inline-flex-box(row, flex-start, center);
+      }
+    }
+
     th {
+      text-align: right;
       padding: 0;
       white-space: nowrap;
       width: 1px;
-
-      label {
-        @include flex-box(row, flex-end, center);
-      }
     }
 
     td {
@@ -319,11 +390,6 @@ export default class AddChitWindow extends Mixins<WindowVue<string, never>>(
 
       input {
         margin: 0;
-
-        &.value-width,
-        &.value-height {
-          width: 3em;
-        }
       }
     }
   }

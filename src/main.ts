@@ -3,8 +3,6 @@ import router from "./router";
 import MainVue from "./MainVue.vue";
 import store from "@/app/store/store";
 import ImageDirective from "@/app/basic/common/directive/Image";
-import TestWindow from "@/app/basic/common/window/TestWindow.vue";
-import SampleWindow from "@/app/basic/common/window/SampleWindow.vue";
 import CutInSettingWindow from "@/app/basic/music/CutInSettingWindow.vue";
 import YoutubeManager from "@/app/basic/music/YoutubeManager";
 import PlayYoutubeWindow from "@/app/basic/music/PlayYoutubeWindow.vue";
@@ -25,6 +23,12 @@ import RoomInfoWindow from "@/app/basic/login/RoomInfoWindow.vue";
 import AddMapMaskWindow from "@/app/basic/map-object/map-mask/AddMapMaskWindow.vue";
 import EditMapMaskWindow from "@/app/basic/map-object/map-mask/EditMapMaskWindow.vue";
 import AddChitWindow from "@/app/basic/map-object/chit/AddChitWindow.vue";
+import InputImagePasswordWindow from "@/app/core/component/InputImagePasswordWindow.vue";
+import EditOtherTextWindow from "@/app/basic/other-text/EditOtherTextWindow.vue";
+import EditChitWindow from "@/app/basic/map-object/chit/EditChitWindow.vue";
+import EditAreaMapWindow from "@/app/basic/map/EditAreaMapWindow.vue";
+import EditMapWindow from "@/app/basic/map/EditMapWindow.vue";
+import ChmodWindow from "@/app/basic/chmod/ChmodWindow.vue";
 
 Vue.config.productionTip = false;
 Vue.use(ImageDirective);
@@ -34,8 +38,6 @@ SocketFacade.instance;
 BCDiceFacade.instance;
 YoutubeManager.instance;
 
-Vue.component("test-window", TestWindow);
-Vue.component("sample-window", SampleWindow);
 Vue.component("cut-in-setting-window", CutInSettingWindow);
 Vue.component("play-youtube-window", PlayYoutubeWindow);
 Vue.component("login-window", LoginWindow);
@@ -51,6 +53,12 @@ Vue.component("room-info-window", RoomInfoWindow);
 Vue.component("add-map-mask-window", AddMapMaskWindow);
 Vue.component("edit-map-mask-window", EditMapMaskWindow);
 Vue.component("add-chit-window", AddChitWindow);
+Vue.component("edit-chit-window", EditChitWindow);
+Vue.component("input-image-password-window", InputImagePasswordWindow);
+Vue.component("edit-other-text-window", EditOtherTextWindow);
+Vue.component("edit-area-map-window", EditAreaMapWindow);
+Vue.component("edit-map-window", EditMapWindow);
+Vue.component("chmod-window", ChmodWindow);
 
 LanguageManager.instance.init().then((i18n: any) => {
   const app = new Vue({

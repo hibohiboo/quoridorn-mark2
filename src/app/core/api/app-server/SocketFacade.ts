@@ -2,14 +2,30 @@ import * as Socket from "socket.io-client";
 import SocketDriver from "nekostore/lib/driver/socket";
 import Nekostore from "nekostore/lib/Nekostore";
 import NekostoreCollectionController from "@/app/core/api/app-server/NekostoreCollectionController";
-import { StoreObj, StoreUseData } from "@/@types/store";
+import {
+  PermissionNode,
+  PermissionRule,
+  ActorGroup,
+  StoreObj,
+  StoreUseData
+} from "@/@types/store";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
-import { ConnectInfo } from "@/@types/connect";
+import { ConnectInfo, Interoperability } from "@/@types/connect";
 import TaskManager from "@/app/core/task/TaskManager";
-import { GetVersionResponse } from "@/@types/socket";
+import {
+  DefaultServerInfo,
+  GetVersionResponse,
+  ServerTestResult
+} from "@/@types/socket";
 import { loadYaml } from "@/app/core/File";
 import { Image } from "@/@types/image";
-import { MapSetting, RoomData, UserData } from "@/@types/room";
+import {
+  MapAndLayer,
+  MapLayer,
+  Screen,
+  RoomData,
+  UserData
+} from "@/@types/room";
 import {
   CharacterStore,
   ChitStore,
@@ -23,6 +39,13 @@ import {
   TagNoteStore
 } from "@/@types/gameObject";
 import { ApplicationError } from "@/app/core/error/ApplicationError";
+import {
+  compareVersion,
+  getFileRow,
+  TargetVersion
+} from "@/app/core/api/Github";
+import yaml from "js-yaml";
+import GameObjectManager from "@/app/basic/GameObjectManager";
 
 const connectYamlPath = "/static/conf/connect.yaml";
 
@@ -41,11 +64,57 @@ export function getStoreObj<T>(
   }
 }
 
-export type DefaultServerInfo = {
-  title: string;
-  version: string;
-  url: string;
-};
+/**
+ * パーミッションチェックを行う。
+ * @param data
+ * @param type
+ * @return 許可されているならtrue
+ */
+export function permissionCheck(
+  data: StoreObj<unknown>,
+  type: "view" | "edit" | "chmod"
+): boolean {
+  // GMはどんな設定でも許可
+  if (GameObjectManager.instance.isGm) return true;
+
+  let permissionRule: PermissionRule;
+  if (type === "view") permissionRule = data!.permission!.view;
+  else if (type === "edit") permissionRule = data!.permission!.edit;
+  else permissionRule = data!.permission!.chmod;
+
+  let result = permissionRule.type !== "allow";
+  if (permissionRule.list.length) {
+    const check = (pn: PermissionNode) => {
+      if (pn.type === "group") {
+        const roleGroup = GameObjectManager.instance.actorGroupList.filter(
+          r => r.id === pn.id
+        )[0];
+        if (!roleGroup) return false;
+        return (
+          roleGroup.data!.list.findIndex(member => {
+            const targetId =
+              member.type === "user"
+                ? SocketFacade.instance.userId
+                : SocketFacade.instance.characterId;
+            return member.id === targetId;
+          }) > -1
+        );
+      }
+      if (pn.type === "user") {
+        if (pn.id === SocketFacade.instance.userId) return true;
+      }
+      if (pn.type === "character") {
+        if (pn.id === SocketFacade.instance.characterId) return true;
+      }
+      if (pn.type === "owner") {
+        if (data.owner === SocketFacade.instance.userId) return true;
+      }
+      return false;
+    };
+    if (permissionRule.list.findIndex(check) > -1) result = !result;
+  }
+  return result;
+}
 
 export default class SocketFacade {
   // シングルトン
@@ -65,7 +134,13 @@ export default class SocketFacade {
   } = {};
   private __roomCollectionPrefix: string | null = null;
   private __userId: string | null = null;
+  private __characterId: string | null = null;
   private __connectInfo: ConnectInfo | null = null;
+  private __interoperability: Interoperability[] | null = null;
+  private targetServer: TargetVersion = {
+    from: null,
+    to: null
+  };
 
   public get appServerUrl(): string {
     return this.__appServerUrl!;
@@ -77,6 +152,52 @@ export default class SocketFacade {
 
   public get appServerUrlList(): DefaultServerInfo[] {
     return this.__appServerUrlList;
+  }
+
+  // コンストラクタの隠蔽
+  private constructor() {
+    this.asyncConstructor().then();
+  }
+
+  private async asyncConstructor() {
+    this.__connectInfo = await loadYaml(connectYamlPath);
+
+    // 相互運用性チェック
+    try {
+      this.__interoperability = (yaml as any).safeLoad(
+        await getFileRow("quoridorn-server", "src/interoperability.yaml")
+      );
+    } catch (err) {
+      //
+    }
+    if (this.__interoperability) {
+      const iList = this.__interoperability;
+      const clientVersion = process.env.VUE_APP_VERSION as string;
+      if (compareVersion(iList[0].client, clientVersion) <= 0) {
+        // クライアントが最新系
+        this.targetServer.from = iList[0].server;
+      } else {
+        // クライアントは最新系ではない
+        iList.forEach((i, index) => {
+          if (!index) return;
+          if (
+            compareVersion(iList[index - 1].client, clientVersion) > 0 &&
+            compareVersion(i.client, clientVersion) <= 0
+          ) {
+            this.targetServer.from = i.server;
+            this.targetServer.to = iList[index - 1].server;
+          }
+        });
+      }
+    }
+
+    await this.setDefaultServerUrlList();
+    const serverInfo = this.appServerUrlList[0];
+    if (!serverInfo) {
+      // alert("有効なアプリケーションサーバに接続できませんでした。");
+      return;
+    }
+    await this.setAppServerUrl(serverInfo.url);
   }
 
   public async setAppServerUrl(appServerUrl: string) {
@@ -117,10 +238,7 @@ export default class SocketFacade {
 
   private async setDefaultServerUrlList() {
     if (typeof this.__connectInfo!.quoridornServer === "string") {
-      this.__appServerUrlList.push({
-        ...(await this.testServer(this.__connectInfo!.quoridornServer)),
-        url: this.__connectInfo!.quoridornServer
-      });
+      await this.addDefaultUrl(this.__connectInfo!.quoridornServer);
     } else {
       // addDefaultUrlを直列の非同期で全部実行する
       this.__connectInfo!.quoridornServer.map((url: string) => () =>
@@ -130,33 +248,17 @@ export default class SocketFacade {
   }
 
   private async addDefaultUrl(url: string): Promise<void> {
-    let resp: GetVersionResponse;
+    let resp: ServerTestResult;
     try {
       resp = await this.testServer(url);
     } catch (err) {
       window.console.warn(`${err}. url:${url}`);
       return;
     }
-    window.console.log(url, resp.title);
     this.appServerUrlList.push({
       ...resp,
       url
     });
-  }
-
-  // コンストラクタの隠蔽
-  private constructor() {
-    this.asyncConstructor().then();
-  }
-
-  private async asyncConstructor() {
-    this.__connectInfo = await loadYaml(connectYamlPath);
-    const appServerUrl =
-      typeof this.__connectInfo!.quoridornServer === "string"
-        ? this.__connectInfo!.quoridornServer
-        : this.__connectInfo!.quoridornServer[0];
-    await this.setAppServerUrl(appServerUrl);
-    await this.setDefaultServerUrlList();
   }
 
   public async destroy() {
@@ -183,6 +285,14 @@ export default class SocketFacade {
 
   public get userId(): string | null {
     return this.__userId;
+  }
+
+  public set characterId(val: string | null) {
+    this.__characterId = val;
+  }
+
+  public get characterId(): string | null {
+    return this.__characterId;
   }
 
   public async socketCommunication<T, U>(event: string, args?: T): Promise<U> {
@@ -216,8 +326,8 @@ export default class SocketFacade {
     });
   }
 
-  public async testServer(url: string): Promise<GetVersionResponse> {
-    return new Promise<GetVersionResponse>((resolve, reject) => {
+  public async testServer(url: string): Promise<ServerTestResult> {
+    return new Promise<ServerTestResult>((resolve, reject) => {
       const socket = Socket.connect(url);
       socket.on("connect", async () => {
         socket.emit("get-version");
@@ -225,6 +335,7 @@ export default class SocketFacade {
       const timeoutId = window.setTimeout(() => {
         socket.off("result-get-version");
         socket.disconnect();
+        window.console.warn("timeout");
         reject("not-quoridorn");
       }, this.__connectInfo!.socketTimeout + 100);
       socket.once(
@@ -240,17 +351,39 @@ export default class SocketFacade {
           // タイトルチェック（サーバ側で必ず値は設定してくる）
           const title: string = result.title;
           if (!title) {
+            window.console.warn("title-check");
             reject("not-quoridorn");
             return;
           }
 
-          // TODO バージョン互換性チェック
-          const version: string = result.version;
-          if (!version || !version.startsWith("Quoridorn ")) {
+          const serverVersion: string = result.version;
+          if (!serverVersion || !serverVersion.startsWith("Quoridorn ")) {
+            window.console.warn("version format");
             reject("not-quoridorn");
             return;
           }
-          resolve(result);
+          let usable: boolean = false;
+          if (this.__interoperability) {
+            if (this.targetServer.from) {
+              if (this.targetServer.to) {
+                usable =
+                  compareVersion(this.targetServer.from, serverVersion) <= 0 &&
+                  compareVersion(this.targetServer.to, serverVersion) > 0;
+              } else {
+                usable =
+                  compareVersion(this.targetServer.from, serverVersion) <= 0;
+              }
+            }
+          }
+
+          // 応答を返却
+          resolve({
+            serverVersion: result.version,
+            title: result.title,
+            targetClient: result.targetClient,
+            targetServer: this.targetServer,
+            usable
+          });
         }
       );
       socket.on("connect_error", async (err: any) => {
@@ -287,8 +420,16 @@ export default class SocketFacade {
     ));
   }
 
-  public mapListCC(): NekostoreCollectionController<MapSetting> {
-    return this.roomCollectionController<MapSetting>("map-list");
+  public screenListCC(): NekostoreCollectionController<Screen> {
+    return this.roomCollectionController<Screen>("screen-list");
+  }
+
+  public mapAndLayerCC(): NekostoreCollectionController<MapAndLayer> {
+    return this.roomCollectionController<MapAndLayer>("map-and-layer-list");
+  }
+
+  public tagNoteCC(): NekostoreCollectionController<TagNoteStore> {
+    return this.roomCollectionController<TagNoteStore>("tag-note-list");
   }
 
   public roomDataCC(): NekostoreCollectionController<RoomData> {
@@ -363,14 +504,18 @@ export default class SocketFacade {
     return this.roomCollectionController<MapMaskStore>("map-mask-list");
   }
 
-  public tagNoteCC(): NekostoreCollectionController<TagNoteStore> {
-    return this.roomCollectionController<TagNoteStore>("tag-note-list");
+  public mapLayerCC(): NekostoreCollectionController<MapLayer> {
+    return this.roomCollectionController<MapLayer>("map-layer-list");
+  }
+
+  public actorGroupCC(): NekostoreCollectionController<ActorGroup> {
+    return this.roomCollectionController<ActorGroup>("actor-group-list");
   }
 
   public getCC(type: string): NekostoreCollectionController<any> {
     switch (type) {
-      case "map-list":
-        return this.mapListCC();
+      case "screen":
+        return this.screenListCC();
       case "room-data":
         return this.roomDataCC();
       case "image-list":
@@ -403,10 +548,57 @@ export default class SocketFacade {
         return this.chitCC();
       case "map-mask":
         return this.mapMaskCC();
+      case "map-layer":
+        return this.mapLayerCC();
+      case "map-and-layer":
+        return this.mapAndLayerCC();
       case "tag-note-list":
         return this.tagNoteCC();
+      case "role-group-list":
+        return this.actorGroupCC();
       default:
         throw new ApplicationError(`Invalid type error. type=${type}`);
     }
+  }
+
+  public async addMap(
+    screen: Screen
+  ): Promise<{ mapId: string; mapAndLayerIdList: string[] }> {
+    /* --------------------------------------------------
+     * マップデータのプリセットデータ投入
+     */
+    const screenListCC = SocketFacade.instance.screenListCC();
+    const mapId = await screenListCC.add(await screenListCC.touch(), screen);
+
+    /* --------------------------------------------------
+     * マップとレイヤーの紐づきのプリセットデータ投入
+     */
+    const mapAndLayerCC = SocketFacade.instance.mapAndLayerCC();
+
+    const mapAndLayerIdList: string[] = [];
+    const addMapAndLayer = async (
+      ml: StoreUseData<MapLayer>
+    ): Promise<void> => {
+      const mapAndLayerId = await mapAndLayerCC.touch();
+      mapAndLayerIdList.push(mapAndLayerId);
+      await mapAndLayerCC.add(mapAndLayerId, {
+        mapId,
+        layerId: ml.id!,
+        entering: "normal",
+        objectList: []
+      });
+    };
+
+    // pushImageTagを直列の非同期で全部実行する
+    const mapLayerCC = SocketFacade.instance.mapLayerCC();
+    await (await mapLayerCC.getList(false))
+      .filter(ml => ml.data!.isDefault)
+      .map((ml: StoreUseData<MapLayer>) => () => addMapAndLayer(ml))
+      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+    return {
+      mapId,
+      mapAndLayerIdList
+    };
   }
 }

@@ -1,76 +1,85 @@
 <template>
-  <ctrl-select v-model="localValue" :optionInfoList="optionInfoList" />
+  <ctrl-select
+    v-model="localValue"
+    :optionInfoList="optionInfoList"
+    :multiple="multiple"
+    :disabled="disabled"
+    ref="component"
+  />
 </template>
 
 <script lang="ts">
 import SelectMixin from "./base/SelectMixin";
-import CtrlSelect from "@/components/parts/CtrlSelect.vue";
-
-import { Getter } from "vuex-class";
 import { Component, Mixins } from "vue-mixin-decorator";
 import { Prop } from "vue-property-decorator";
-import VueEvent from "@/app/core/decorator/VueEvent";
+import { Place } from "@/@types/gameObject";
+import { HtmlOptionInfo } from "@/@types/window";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
+import TaskProcessor from "@/app/core/task/TaskProcessor";
+import { Task, TaskResult } from "@/@types/task";
+import GameObjectManager from "@/app/basic/GameObjectManager";
+import LanguageManager from "@/LanguageManager";
+import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
+import ComponentVue from "@/app/core/window/ComponentVue";
+
+interface MultiMixin extends SelectMixin, ComponentVue {}
 
 @Component({
   components: { CtrlSelect }
 })
-export default class CharacterSelect extends Mixins<SelectMixin>(SelectMixin) {
-  @Getter("getMapObjectList") private getMapObjectList: any;
-
+export default class CharacterSelect extends Mixins<MultiMixin>(
+  SelectMixin,
+  ComponentVue
+) {
   @Prop({ type: Array, default: [] })
-  private placeList!: string[];
+  private placeList!: Place[];
 
-  private get useCharacterList(): any[] {
-    const resultList: any[] = [];
+  private optionInfoList: HtmlOptionInfo[] = [];
 
-    // 配置場所の絞り込み
-    if (this.placeList.length) {
-      this.placeList.forEach(place =>
-        Array.prototype.push.apply(
-          resultList,
-          this.getMapObjectList({
-            kind: "character",
-            place: place
-          })
-        )
-      );
-    } else {
-      Array.prototype.push.apply(
-        resultList,
-        this.getMapObjectList({
-          kind: "character"
-        })
-      );
-    }
-
-    return resultList;
+  @LifeCycle
+  private async created() {
+    this.createOptionInfoList();
   }
 
-  @VueEvent
-  private get optionInfoList(): any[] {
-    const resultList = this.useCharacterList.map(character => ({
-      key: character.key,
-      value: character.key,
-      text: character.name,
-      disabled: false
-    }));
+  @TaskProcessor("language-change-finished")
+  private async languageChangeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    this.createOptionInfoList();
+    task.resolve();
+  }
 
-    resultList.unshift({
+  private createOptionInfoList() {
+    const getText = LanguageManager.instance.getText.bind(
+      LanguageManager.instance
+    );
+
+    let characterList = GameObjectManager.instance.characterList;
+    if (this.placeList.length) {
+      characterList = characterList.filter(
+        c => this.placeList.findIndex(p => p === c.data!.place) > -1
+      );
+    }
+    this.optionInfoList = characterList.map(c => {
+      let text = c.data!.name;
+      return {
+        key: c.id!,
+        value: c.id!,
+        text,
+        disabled: false
+      };
+    });
+    this.optionInfoList.unshift({
       key: "",
       value: "",
-      text: "未指定",
-      disabled: false
+      text: getText("type.character"),
+      disabled: true
     });
+  }
 
-    if (this.useCharacterList.length === 0)
-      resultList.unshift({
-        key: null,
-        value: null,
-        text: "キャラクターが居ません",
-        disabled: true
-      });
-
-    return resultList;
+  public focus() {
+    const elm = this.$refs.component as CtrlSelect;
+    elm.focus();
   }
 }
 </script>
