@@ -1,19 +1,23 @@
 <template>
-  <div class="seek-bar-area" @contextmenu.prevent ref="elm">
+  <label class="seek-bar-area" @contextmenu.prevent ref="elm">
     <input
-      class="seek-bar"
+      class="seek-bar input"
       type="range"
       min="0"
       :max="Math.round(duration * 100) / 100"
       step="0.01"
       v-model="useSeek"
-      @input="seekTo($event.target.value, false)"
-      @change="seekTo($event.target.value, true)"
+      @input="seekTo($event.target.valueAsNumber, false)"
+      @change="seekTo($event.target.valueAsNumber, true)"
+      @keydown.enter.stop
+      @keyup.enter.stop
+      @keydown.229.stop
+      @keyup.229.stop
     />
     <span class="seek-text">
       {{ time }}
     </span>
-  </div>
+  </label>
 </template>
 
 <script lang="ts">
@@ -24,6 +28,7 @@ import { zeroPadding } from "@/app/core/Utility";
 import CssManager from "@/app/core/css/CssManager";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
+import { CutInDeclareInfo } from "@/@types/room";
 
 @Component({
   components: { CtrlButton }
@@ -44,10 +49,9 @@ export default class SeekBarComponent extends Vue {
 
   private get time() {
     const isHour = this.duration >= 3600;
-    const seek = Math.round(this.seek);
-    const duration = Math.round(this.duration);
 
     const getTime = (num: number): string => {
+      num = Math.round(num);
       const hour = Math.floor(num / 3600);
       const minute = Math.floor((num % 3600) / 60);
       const second = num % 60;
@@ -55,7 +59,7 @@ export default class SeekBarComponent extends Vue {
       if (isHour) result = `${hour}:` + result;
       return result;
     };
-    return `${getTime(seek)}/${getTime(duration)}`;
+    return `${getTime(this.seek)}/${getTime(this.duration)}`;
   }
 
   @LifeCycle
@@ -73,7 +77,7 @@ export default class SeekBarComponent extends Vue {
   }
 
   @VueEvent
-  private seekTo(seek: string, allowSeekAhead: boolean) {
+  private seekTo(seek: number, allowSeekAhead: boolean) {
     this.$emit("seekTo", seek, allowSeekAhead);
     this.changePlay(true);
     this.isSeekInputting = !allowSeekAhead;
@@ -114,6 +118,7 @@ export default class SeekBarComponent extends Vue {
 
 <style scoped lang="scss">
 @import "../../../assets/common";
+
 .seek-bar-area {
   position: relative;
   @include flex-box(row, center, flex-end);
@@ -143,6 +148,7 @@ input[type="range"] {
 }
 
 input[type="range"] {
+  width: 100%; /* 調整中 */
   height: 100%;
 }
 input[type="range"]::-webkit-slider-runnable-track {

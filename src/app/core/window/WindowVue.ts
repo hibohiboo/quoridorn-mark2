@@ -4,7 +4,7 @@ import { WindowInfo } from "@/@types/window";
 import { Mixin } from "vue-mixin-decorator";
 import TaskManager from "@/app/core/task/TaskManager";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 
 // @ts-ignore
 @Mixin
@@ -19,6 +19,7 @@ export default class WindowVue<T, U> extends Vue {
   private finalized: boolean = false;
 
   public async init() {
+    this.windowFrameElm.style.visibility = "visible";
     if (this.status === "window") {
       await TaskManager.instance.ignition<string, never>({
         type: "window-active",
@@ -48,15 +49,11 @@ export default class WindowVue<T, U> extends Vue {
           : null;
       if (!windowContainerElm) return;
 
-      const elmList = Array.prototype.slice.call(
-        windowContainerElm.querySelectorAll("input, select")
+      const inputElmList = Array.prototype.slice.call(
+        windowContainerElm.getElementsByClassName("input")
       );
-
-      for (const elm of elmList) {
-        if (elm.tagName === "INPUT" && elm.value) continue;
-        elm.focus();
-        break;
-      }
+      const idx = inputElmList.findIndex(elm => !elm.disabled);
+      if (idx >= 0) inputElmList[idx].focus();
     });
   }
 
@@ -68,11 +65,14 @@ export default class WindowVue<T, U> extends Vue {
     return this.windowInfo.key;
   }
 
+  public get windowFrameElm(): HTMLElement {
+    return document.getElementById(this.windowKey) as HTMLElement;
+  }
+
   @TaskProcessor("window-close-closing")
   private async windowCloseClosing(
     task: Task<string, never>
   ): Promise<TaskResult<never> | void> {
-    // TODO
     if (task.value !== this.windowInfo.key) return;
     if (this.windowInfo.declare.isInputWindow) {
       await this.finally(undefined, true);

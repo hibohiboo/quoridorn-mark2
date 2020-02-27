@@ -1,5 +1,5 @@
 <template>
-  <div class="table-container" ref="tableContainer">
+  <div class="simple-table-container" ref="tableContainer">
     <table
       ref="table"
       :class="{
@@ -52,8 +52,8 @@
           />
         </tr>
       </thead>
-      <tbody @scroll="onWheelBody()" @keydown.enter="enter()" tabindex="0">
-        <template v-if="!isColWidthMoving">
+      <tbody @scroll="onWheelBody()" @keydown.enter="enter()">
+        <template v-if="!isColWidthMoving || true">
           <!-- 余白 -->
           <tr class="table-padding-top">
             <td
@@ -65,36 +65,36 @@
             ></td>
           </tr>
           <!-- コンテンツ -->
-          <template v-for="row in rowList">
-            <tr
-              :key="row.data[keyProp]"
-              :class="getRowClass(row)"
-              @mousedown.left="selectTr(row.data[keyProp])"
-              @touchstart="selectTr(row.data[keyProp])"
-              @dblclick="doubleClick(row)"
+          <tr
+            v-for="(row, idx) in rowList"
+            :key="row.data[keyProp]"
+            :class="getRowClass(row, idx)"
+            @mousedown.left="selectTr(row.data[keyProp])"
+            @touchstart="selectTr(row.data[keyProp])"
+            @dblclick="doubleClick(row)"
+            :ref="`row-${idx}`"
+          >
+            <!-- セル -->
+            <td
+              v-for="(colDec, index) in tableDeclareInfo.columnList"
+              :style="colStyle(index)"
+              :key="`body-${index}`"
+              class="selectable"
+              :colspan="getColspan(index)"
+              :class="colClass(colDec, index)"
             >
-              <!-- セル -->
-              <td
-                v-for="(colDec, index) in tableDeclareInfo.columnList"
-                :style="colStyle(index)"
-                :key="`body-${index}`"
-                class="selectable"
-                :colspan="getColspan(index)"
-                :class="colClass(colDec, index)"
-              >
-                <keep-alive>
-                  <slot
-                    name="contents"
-                    :colDec="colDec"
-                    :data="row.data"
-                    :index="index"
-                  >
-                    <span>{{ row.data[colDec.target] }}</span>
-                  </slot>
-                </keep-alive>
-              </td>
-            </tr>
-          </template>
+              <keep-alive>
+                <slot
+                  name="contents"
+                  :colDec="colDec"
+                  :data="row.data"
+                  :index="index"
+                >
+                  <span>{{ row.data[colDec.target] }}</span>
+                </slot>
+              </keep-alive>
+            </td>
+          </tr>
 
           <!-- 余白 -->
           <tr
@@ -144,8 +144,8 @@ import {
 } from "@/@types/window";
 import TaskManager, { MouseMoveParam } from "@/app/core/task/TaskManager";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
-import { Point } from "@/@types/address";
+import { Task, TaskResult } from "task";
+import { Point } from "address";
 import {
   calcStrWidth,
   createPoint,
@@ -154,6 +154,7 @@ import {
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import { getCssPxNum } from "@/app/core/Css";
+import { RowSelectInfo } from "task-info";
 
 type RowInfo<T> = {
   isSelected: boolean;
@@ -186,7 +187,10 @@ export default class SimpleTableComponent extends Vue {
   @Prop({ type: String, required: false, default: "key" })
   private keyProp!: string;
   @Prop({ type: Function, required: false, default: () => [] })
-  private rowClassGetter!: (data: any) => string[];
+  private rowClassGetter!: (
+    data: any,
+    elm: HTMLTableRowElement | null
+  ) => string[];
   @Prop({ type: Boolean, required: false, default: false })
   private selectLock!: boolean;
   @Prop({ required: true })
@@ -309,7 +313,6 @@ export default class SimpleTableComponent extends Vue {
 
   @Watch("isMounted")
   @Watch("viewRowFirstIndex")
-  @Watch("tabInfo")
   @Watch("viewRowLastIndex")
   @Watch("dataList")
   private onChangeDataList() {
@@ -321,17 +324,24 @@ export default class SimpleTableComponent extends Vue {
         data
       };
     });
-    if (this.tabInfo) {
-      if (typeof this.tabInfo.target === "string") {
-        const targetProp = this.tableDeclareInfo.classificationProp;
-        const target = this.tabInfo.target;
-        rowList = rowList.filter((row: any) => row[targetProp] === target);
-      } else {
-        const from = this.tabInfo.target.from;
-        const to = this.tabInfo.target.to;
-        rowList = rowList.filter((row, index) => from <= index && index <= to);
-      }
-    }
+    // if (this.tabInfo) {
+    //   if (typeof this.tabInfo.target === "string") {
+    //     const targetProp = this.tableDeclareInfo.classificationProp;
+    //     const propList = targetProp.split(".");
+    //     const getTargetValue = (data: any, propList: string[]): any => {
+    //       const value: any = data[propList.shift()!];
+    //       return propList.length ? getTargetValue(value, propList) : value;
+    //     };
+    //     const target = this.tabInfo.target;
+    //     rowList = rowList.filter(
+    //       (row: any) => getTargetValue(row.data, propList.concat()) === target
+    //     );
+    //   } else {
+    //     const from = this.tabInfo.target.from;
+    //     const to = this.tabInfo.target.to;
+    //     rowList = rowList.filter((row, index) => from <= index && index <= to);
+    //   }
+    // }
     if (this.isMounted) {
       // this.elm.style.setProperty(
       //   "--table-padding-bottom-rows",
@@ -395,18 +405,20 @@ export default class SimpleTableComponent extends Vue {
   ): Promise<TaskResult<never> | void> {
     if (!param || param.key !== this.key) return;
 
-    const leftIndex = parseInt(param.type!.replace("div-", ""), 10) - 1;
-    const point = task.value!;
-    const diffX = point.x - this.dragFrom.x;
+    if (param.type) {
+      const leftIndex = parseInt(param.type.replace("div-", ""), 10) - 1;
+      const point = task.value!;
+      const diffX = point.x - this.dragFrom.x;
 
-    this.adjust(
-      leftIndex + (this.status !== "right-pane" ? 0 : 1),
-      leftIndex + (this.status !== "right-pane" ? 1 : 0),
-      this.fromLeftWidth + diffX * (this.status !== "right-pane" ? 1 : -1),
-      this.fromRightWidth,
-      this.fromLastWidth,
-      diffX
-    );
+      this.adjust(
+        leftIndex + (this.status !== "right-pane" ? 0 : 1),
+        leftIndex + (this.status !== "right-pane" ? 1 : 0),
+        this.fromLeftWidth + diffX * (this.status !== "right-pane" ? 1 : -1),
+        this.fromRightWidth,
+        this.fromLastWidth,
+        diffX
+      );
+    }
 
     task.resolve();
   }
@@ -453,8 +465,11 @@ export default class SimpleTableComponent extends Vue {
   }
 
   @VueEvent
-  private getRowClass(row: RowInfo<any>): string[] {
-    const rowClass = this.rowClassGetter(row.data);
+  private getRowClass(row: RowInfo<any>, idx: number): string[] {
+    if (!this.isMounted) return [];
+    const rowElmList = this.$refs[`row-${idx}`] as HTMLTableRowElement[];
+    const rowElm = rowElmList ? rowElmList[0] : null;
+    const rowClass = this.rowClassGetter(row.data, rowElm);
     if (row.isSelected) rowClass.push("isSelected");
     if (row.isDoubleClick) rowClass.push("doubleClicked");
     rowClass.push(row.dataListIndex % 2 === 0 ? "even" : "odd");
@@ -634,172 +649,138 @@ export default class SimpleTableComponent extends Vue {
   @Watch("isMounted")
   @Watch("tableDeclareInfo.height")
   private onChangeHeight() {
-    const height = this.tableDeclareInfo.height;
+    let height = this.tableDeclareInfo.height;
     this.elm.style.setProperty(
       "--tableHeight",
       height ? `calc(${height + 1} * var(--table-row-height))` : "auto"
     );
   }
+
+  @TaskProcessor("row-select-finished")
+  private async rowSelectFinished(
+    task: Task<RowSelectInfo, never>
+  ): Promise<TaskResult<never> | void> {
+    if (task.value!.windowKey !== this.windowInfo.key) return;
+    const addIndex = task.value!.addIndex;
+    this.rowSelect(addIndex);
+  }
+
+  private rowSelect(addIndex: number) {
+    let idx = this.rowList.findIndex(
+      row => row.data[this.keyProp] === this.localValue
+    );
+    if (idx === -1) {
+      idx = addIndex < 0 ? this.rowList.length - 1 : 0;
+    } else {
+      this.rowList[idx].isSelected = false;
+      idx += addIndex;
+      if (idx === -1) idx = this.rowList.length - 1;
+      if (idx >= this.rowList.length) idx = 0;
+    }
+    this.rowList[idx].isSelected = true;
+    this.localValue = this.rowList[idx].data[this.keyProp];
+    const rowElmList = this.$refs[`row-${idx}`] as HTMLTableRowElement[];
+    const rowElm = rowElmList ? rowElmList[0] : null;
+    if (rowElm) rowElm.scrollIntoView(true);
+  }
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import "../../../../assets/common";
 
-.table-container {
+.simple-table-container {
   width: 100%;
+}
 
-  table {
-    @include flex-box(column, flex-start, center);
-    box-sizing: border-box;
-    position: relative;
-    table-layout: fixed;
-    border: 1px solid gray;
-    width: 100%;
-    height: calc(var(--tableHeight) + 3px);
+table {
+  @include flex-box(column, flex-start, center);
+  box-sizing: border-box;
+  position: relative;
+  table-layout: fixed;
+  border: 1px solid gray;
+  width: 100%;
+  height: calc(var(--tableHeight) + 3px);
+}
 
-    /*
-    &.isStretchRight {
-      border-left: none;
-    }
+tr {
+  height: var(--table-row-height);
+  display: flex;
+}
 
-    &.isStretchLeft {
-      border-right: none;
-    }
-    */
+td:not(.divider),
+th {
+  overflow: hidden;
+  padding: 0;
+  box-sizing: content-box;
 
-    tr {
-      height: var(--table-row-height);
-      display: flex;
-    }
+  &.align-left {
+    @include flex-box(row, flex-start, center);
+    padding-left: var(--cell-padding);
+  }
 
-    td:not(.divider),
-    th {
-      overflow: hidden;
-      padding: 0;
-      box-sizing: content-box;
+  &.align-center {
+    @include flex-box(row, center, center);
+  }
 
-      &.align-left {
-        @include flex-box(row, flex-start, center);
-        padding-left: var(--cell-padding);
-      }
+  &.align-right {
+    @include flex-box(row, flex-end, center);
+    padding-right: var(--cell-padding);
+  }
 
-      &.align-center {
-        @include flex-box(row, center, center);
-      }
+  &.border-left {
+    border-left: 1px solid #b7babc;
+  }
 
-      &.align-right {
-        @include flex-box(row, flex-end, center);
-        padding-right: var(--cell-padding);
-      }
+  &.border-right {
+    border-right: 1px solid #b7babc;
+  }
+}
 
-      &.border-left {
-        border-left: 1px solid #b7babc;
-      }
+thead {
+  border-bottom: 1px solid gray;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding-right: var(--scroll-bar-width);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(234, 234, 234, 1) 100%
+  );
+  box-sizing: border-box;
+  border-bottom: 1px solid gray;
+}
 
-      &.border-right {
-        border-right: 1px solid #b7babc;
-      }
-    }
+tbody {
+  overflow-y: scroll;
+  position: absolute;
+  top: calc(var(--table-row-height) + 1px);
+  left: 0;
+  right: 0;
+  height: calc(var(--tableHeight) - var(--table-row-height));
+  outline: none;
+  /*scroll-snap-type: y mandatory;*/
 
-    thead {
-      border-bottom: 1px solid gray;
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      padding-right: var(--scroll-bar-width);
-      background: linear-gradient(
-        to bottom,
-        rgba(255, 255, 255, 1) 0%,
-        rgba(234, 234, 234, 1) 100%
+  tr {
+    /*scroll-snap-align: start;*/
+
+    &.table-padding-top {
+      height: calc(var(--table-padding-top-rows) * var(--table-row-height));
+
+      background-size: calc(var(--table-row-height) * 2)
+        calc(var(--table-row-height) * 2);
+      background-image: linear-gradient(
+        0deg,
+        rgb(247, 247, 247) 50%,
+        white 51%
       );
-      box-sizing: border-box;
-      border-bottom: 1px solid gray;
     }
+    &.table-padding-bottom {
+      height: calc(var(--table-padding-bottom-rows) * var(--table-row-height));
 
-    tbody {
-      overflow-y: scroll;
-      position: absolute;
-      top: calc(var(--table-row-height) + 1px);
-      left: 0;
-      right: 0;
-      height: calc(var(--tableHeight) - var(--table-row-height));
-      outline: none;
-      /*scroll-snap-type: y mandatory;*/
-
-      tr {
-        /*scroll-snap-align: start;*/
-
-        &.table-padding-top {
-          height: calc(var(--table-padding-top-rows) * var(--table-row-height));
-
-          background-size: calc(var(--table-row-height) * 2)
-            calc(var(--table-row-height) * 2);
-          background-image: linear-gradient(
-            0deg,
-            rgb(247, 247, 247) 50%,
-            white 51%
-          );
-        }
-        &.table-padding-bottom {
-          height: calc(
-            var(--table-padding-bottom-rows) * var(--table-row-height)
-          );
-
-          &.even {
-            background-size: calc(var(--table-row-height) * 2)
-              calc(var(--table-row-height) * 2);
-            background-image: linear-gradient(
-              0deg,
-              rgb(247, 247, 247) 50%,
-              white 51%
-            );
-          }
-          &.odd {
-            background-size: calc(var(--table-row-height) * 2)
-              calc(var(--table-row-height) * 2);
-            background-image: linear-gradient(
-              0deg,
-              white 50%,
-              rgb(247, 247, 247) 51%
-            );
-          }
-        }
-
-        &.even {
-          background-color: white;
-        }
-        &.odd {
-          background-color: rgb(247, 247, 247);
-        }
-
-        &.isSelected {
-          background-color: var(--uni-color-skyblue) !important;
-        }
-
-        &:not(.isSelected):hover {
-          background-color: var(--uni-color-light-skyblue) !important;
-        }
-
-        &.doubleClicked {
-          outline: 2px solid var(--uni-color-red);
-          outline-offset: -2px;
-        }
-      }
-    }
-
-    tfoot {
-      position: absolute;
-      top: calc(var(--table-row-height) + 1px);
-      left: 0;
-      right: 0;
-      bottom: 0;
-      padding-right: var(--scroll-bar-width);
-      z-index: -1;
-
-      tr {
-        height: 100%;
+      &.even {
         background-size: calc(var(--table-row-height) * 2)
           calc(var(--table-row-height) * 2);
         background-image: linear-gradient(
@@ -808,7 +789,114 @@ export default class SimpleTableComponent extends Vue {
           white 51%
         );
       }
+      &.odd {
+        background-size: calc(var(--table-row-height) * 2)
+          calc(var(--table-row-height) * 2);
+        background-image: linear-gradient(
+          0deg,
+          white 50%,
+          rgb(247, 247, 247) 51%
+        );
+      }
     }
+
+    &.even {
+      background-color: white;
+    }
+    &.odd {
+      background-color: rgb(247, 247, 247);
+    }
+
+    &.isSelected {
+      background-color: var(--uni-color-skyblue) !important;
+    }
+
+    &:not(.isSelected):hover {
+      background-color: var(--uni-color-light-skyblue) !important;
+    }
+
+    &.doubleClicked {
+      outline: 2px solid var(--uni-color-red);
+      outline-offset: -2px;
+    }
+  }
+}
+
+tfoot {
+  position: absolute;
+  top: calc(var(--table-row-height) + 1px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-right: var(--scroll-bar-width);
+  z-index: -1;
+
+  tr {
+    height: 100%;
+    background-size: calc(var(--table-row-height) * 2)
+      calc(var(--table-row-height) * 2);
+    background-image: linear-gradient(0deg, rgb(247, 247, 247) 50%, white 51%);
+  }
+}
+
+.isSelected:after {
+  outline-color: var(--uni-color-red) !important;
+}
+
+.isCreating,
+.isEditing {
+  position: relative;
+
+  &:before {
+    content: "";
+    display: inline-block;
+    position: absolute;
+    background-image: linear-gradient(
+      -45deg,
+      var(--uni-color-cream) 25%,
+      var(--uni-color-light-pink) 25%,
+      var(--uni-color-light-pink) 50%,
+      var(--uni-color-cream) 50%,
+      var(--uni-color-cream) 75%,
+      var(--uni-color-light-pink) 75%,
+      var(--uni-color-light-pink)
+    );
+    opacity: 0.3;
+    background-size: 1em 1em;
+    background-attachment: local;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 9999999998;
+  }
+
+  &:after {
+    @include inline-flex-box(row, center, center);
+    outline: 1px solid var(--uni-color-black);
+    outline-offset: -1px;
+    position: absolute;
+    left: 0.2em;
+    padding: 0.2em 0.6em;
+    top: 0;
+    bottom: 0;
+    height: 1em;
+    margin: auto;
+    background-color: var(--uni-color-white);
+    color: var(--uni-color-black);
+    z-index: 9999999999;
+  }
+}
+
+.isCreating {
+  &:after {
+    content: var(--msg-creating, "作成中");
+  }
+}
+
+.isEditing {
+  &:after {
+    content: var(--msg-locked, "ロック中");
   }
 }
 </style>

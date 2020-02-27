@@ -1,5 +1,13 @@
-import { Point } from "@/@types/address";
+import { Address, Point } from "address";
 import { Texture } from "@/@types/room";
+
+type SceneObjectType =
+  | "character"
+  | "map-mask"
+  | "map-marker"
+  | "dice-symbol"
+  | "chit"
+  | "floor-tile";
 
 type VolatileMapObject = {
   moveFrom: Point;
@@ -12,10 +20,13 @@ type VolatileMapObject = {
 };
 
 type Place = "field" | "graveyard" | "backstage";
-type MapObject = Point & {
+type SceneObjectBase = Address & {
+  type: SceneObjectType;
+  tag: string;
+  name: string;
   owner: string; // id
-  columns: number;
   rows: number;
+  columns: number;
   isHideBorder: boolean;
   isHideHighlight: boolean;
   isLock: boolean;
@@ -23,38 +34,83 @@ type MapObject = Point & {
   place: Place;
   layerId: string;
   textures: Texture[];
-  useBackGround: number;
+  textureIndex: number;
   angle: number;
 };
 
-type MapMaskStore = MapObject;
-type ChitStore = MapObject;
-type FloorTileStore = MapObject;
+type SceneObject = SceneObjectBase &
+  (
+    | MapMaskStore
+    | MapMarkerStore
+    | ChitStore
+    | FloorTileStore
+    | DiceSymbolStore
+    | CharacterStore
+  );
+
+type MapMaskStore = {
+  type: "map-mask";
+};
+type MapMarkerStore = {
+  type: "map-marker";
+};
+type ChitStore = {
+  type: "chit";
+};
+type FloorTileStore = {
+  type: "floor-tile";
+};
 type DiceSymbolStore = {
-  owner: string; // id
-  size: number;
-  isHideBorder: boolean;
-  isHideHighlight: boolean;
-  place: Place;
-  type: string;
-  pips: number;
-  faceNum: number;
+  type: "dice-symbol";
+  diceType: string; // dice-symbol
+  pips: number; // dice-symbol
+  faceNum: number; // dice-symbol
+};
+type CharacterStore = {
+  type: "character";
+  chatFontColorType: "owner" | "original"; // character
+  chatFontColor: string; // character
+  actorStatusId: string; // character(id)
+  isHide: boolean; // character
+  url: string; // character
 };
 
 type ExtraStore = {
   owner: string; // id
-  fontColorType: "owner" | "original";
-  fontColor: string;
-  status: string; // id
+  chatFontColorType: "owner" | "original";
+  chatFontColor: string;
+  actorStatusId: string; // id
 };
 
-type CharacterStore = MapObject & {
+type ActorStatusStore = {
+  parentId: string;
   name: string;
-  fontColorType: "owner" | "original";
-  fontColor: string;
-  status: string; // id
-  isHide: boolean;
-  url: string;
+  standImageInfoId: "" | string; // id
+  chatPaletteInfoId: "" | string; // id
+};
+
+// import { StandImageInfo } from "@/app/basic/stand-image/StandImage";
+type StandImageDiffInfo = Point & {
+  imageId: string;
+  imageTag: string;
+  type: number;
+  time: [number, number];
+};
+
+type StandImageInfo = {
+  parentId: string;
+  baseImageId: string;
+  baseImageTag: string;
+  autoResize: boolean;
+  animationLength: number;
+  locate: number;
+  diffList: StandImageDiffInfo[];
+};
+
+// import { ChatPaletteInfo } from "@/app/basic/chat-palette/ChatPalette";
+type ChatPaletteInfo = {
+  parentId: string;
+  list: string[];
 };
 
 type TagNoteStore = {

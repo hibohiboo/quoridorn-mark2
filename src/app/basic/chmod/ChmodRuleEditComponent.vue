@@ -36,7 +36,7 @@
         <base-input
           type="checkbox"
           :value="isUseOwner"
-          @input="isUseOwner = $event.target.value"
+          @input="isUseOwner = $event.target.checked"
           :disabled="permissionRule.type === 'none'"
         />
       </label>
@@ -59,8 +59,6 @@ import CharacterSelect from "@/app/basic/common/components/select/CharacterSelec
 import UserSelect from "@/app/basic/common/components/select/UserSelect.vue";
 import ActorGroupSelect from "@/app/basic/common/components/select/ActorGroupSelect.vue";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
-import VueEvent from "@/app/core/decorator/VueEvent";
-import LanguageManager from "@/LanguageManager";
 import { listToEmpty } from "@/app/core/Utility";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 
@@ -85,10 +83,6 @@ export default class ChmodRuleEditComponent extends Vue {
   private userListInput: string[] = [];
   private characterListInput: string[] = [];
   private isUseOwner: boolean = false;
-
-  private actorGroupList = GameObjectManager.instance.actorGroupList;
-  private userList = GameObjectManager.instance.userList;
-  private characterList = GameObjectManager.instance.characterList;
 
   public key: string = "ChmodRuleEditComponent";
 
@@ -117,7 +111,6 @@ export default class ChmodRuleEditComponent extends Vue {
     if (type === "none") {
       listToEmpty(this.permissionRule.list);
       listToEmpty(this.groupListInput);
-      listToEmpty(this.userListInput);
       listToEmpty(this.userListInput);
       this.isUseOwner = false;
     }

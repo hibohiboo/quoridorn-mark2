@@ -5,38 +5,38 @@ import NekostoreCollectionController from "@/app/core/api/app-server/NekostoreCo
 import {
   PermissionNode,
   PermissionRule,
-  ActorGroup,
   StoreObj,
   StoreUseData
 } from "@/@types/store";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
-import { ConnectInfo, Interoperability } from "@/@types/connect";
 import TaskManager from "@/app/core/task/TaskManager";
 import {
   DefaultServerInfo,
   GetVersionResponse,
+  SendDataRequest,
   ServerTestResult
 } from "@/@types/socket";
 import { loadYaml } from "@/app/core/File";
-import { Image } from "@/@types/image";
 import {
-  MapAndLayer,
-  MapLayer,
-  Screen,
+  SceneAndLayer,
+  SceneLayer,
+  Scene,
   RoomData,
-  UserData
+  UserData,
+  Image,
+  ActorGroup,
+  CutInDeclareInfo,
+  SceneAndObject,
+  SocketUserData
 } from "@/@types/room";
 import {
-  CharacterStore,
-  ChitStore,
-  DiceSymbolStore,
   ExtraStore,
-  FloorTileStore,
-  MapMaskStore,
+  SceneObject,
   PropertyFaceStore,
   PropertySelectionStore,
   PropertyStore,
-  TagNoteStore
+  TagNoteStore,
+  ActorStatusStore
 } from "@/@types/gameObject";
 import { ApplicationError } from "@/app/core/error/ApplicationError";
 import {
@@ -46,8 +46,22 @@ import {
 } from "@/app/core/api/Github";
 import yaml from "js-yaml";
 import GameObjectManager from "@/app/basic/GameObjectManager";
+import { BgmStandByInfo } from "task-info";
 
 const connectYamlPath = "/static/conf/connect.yaml";
+
+export type ConnectInfo = {
+  quoridornServer: string | string[];
+  bcdiceServer: string;
+  skywayApiKey: string;
+  skywayConnectType: string;
+  socketTimeout: number;
+};
+
+export type Interoperability = {
+  server: string;
+  client: string;
+};
 
 export function getStoreObj<T>(
   doc: DocumentSnapshot<StoreObj<T>>
@@ -74,6 +88,8 @@ export function permissionCheck(
   data: StoreObj<unknown>,
   type: "view" | "edit" | "chmod"
 ): boolean {
+  if (!data!.permission) return true;
+
   // GMはどんな設定でも許可
   if (GameObjectManager.instance.isGm) return true;
 
@@ -155,11 +171,9 @@ export default class SocketFacade {
   }
 
   // コンストラクタの隠蔽
-  private constructor() {
-    this.asyncConstructor().then();
-  }
+  private constructor() {}
 
-  private async asyncConstructor() {
+  public async init() {
     this.__connectInfo = await loadYaml(connectYamlPath);
 
     // 相互運用性チェック
@@ -194,7 +208,7 @@ export default class SocketFacade {
     await this.setDefaultServerUrlList();
     const serverInfo = this.appServerUrlList[0];
     if (!serverInfo) {
-      // alert("有効なアプリケーションサーバに接続できませんでした。");
+      // window.console.error("有効なアプリケーションサーバに接続できませんでした。");
       return;
     }
     await this.setAppServerUrl(serverInfo.url);
@@ -252,7 +266,7 @@ export default class SocketFacade {
     try {
       resp = await this.testServer(url);
     } catch (err) {
-      window.console.warn(`${err}. url:${url}`);
+      window.console.error(`${err}. url:${url}`);
       return;
     }
     this.appServerUrlList.push({
@@ -299,7 +313,7 @@ export default class SocketFacade {
     if (this.socket) {
       return this.doSocketCommunication<T, U>(event, args);
     } else {
-      return new Promise<U>((resolve, reject) => {
+      return new Promise<U>(resolve => {
         const intervalId = window.setInterval(async () => {
           if (this.socket) {
             clearInterval(intervalId);
@@ -308,6 +322,18 @@ export default class SocketFacade {
         }, 100);
       });
     }
+  }
+
+  public async sendData<T>(args: Partial<SendDataRequest<T>>) {
+    if (!args.data) args.data = null;
+    if (!args.targetList)
+      args.targetList = GameObjectManager.instance.userList.map(u => u.id!);
+    if (!args.dataType) args.dataType = "general-data";
+    if (!args.owner) args.owner = GameObjectManager.instance.mySelfId;
+    await this.socketCommunication<SendDataRequest<T>, void>(
+      "send-data",
+      args as SendDataRequest<T>
+    );
   }
 
   private async doSocketCommunication<T, U>(
@@ -386,7 +412,7 @@ export default class SocketFacade {
           });
         }
       );
-      socket.on("connect_error", async (err: any) => {
+      socket.on("connect_error", async () => {
         socket.disconnect();
         reject("no-such-server");
       });
@@ -420,12 +446,30 @@ export default class SocketFacade {
     ));
   }
 
-  public screenListCC(): NekostoreCollectionController<Screen> {
-    return this.roomCollectionController<Screen>("screen-list");
+  public sceneListCC(): NekostoreCollectionController<Scene> {
+    return this.roomCollectionController<Scene>("scene-list");
   }
 
-  public mapAndLayerCC(): NekostoreCollectionController<MapAndLayer> {
-    return this.roomCollectionController<MapAndLayer>("map-and-layer-list");
+  public sceneLayerCC(): NekostoreCollectionController<SceneLayer> {
+    return this.roomCollectionController<SceneLayer>("scene-layer-list");
+  }
+
+  public sceneObjectCC(): NekostoreCollectionController<SceneObject> {
+    return this.roomCollectionController<SceneObject>("scene-object-list");
+  }
+
+  public actorStatusCC(): NekostoreCollectionController<ActorStatusStore> {
+    return this.roomCollectionController<ActorStatusStore>("status-list");
+  }
+
+  public sceneAndLayerCC(): NekostoreCollectionController<SceneAndLayer> {
+    return this.roomCollectionController<SceneAndLayer>("scene-and-layer-list");
+  }
+
+  public sceneAndObjectCC(): NekostoreCollectionController<SceneAndObject> {
+    return this.roomCollectionController<SceneAndObject>(
+      "scene-and-object-list"
+    );
   }
 
   public tagNoteCC(): NekostoreCollectionController<TagNoteStore> {
@@ -448,18 +492,12 @@ export default class SocketFacade {
     return this.roomCollectionController<CutInDeclareInfo>("cut-in-list");
   }
 
-  public playListCC(): NekostoreCollectionController<CutInPlayingInfo> {
-    return this.roomCollectionController<CutInPlayingInfo>("play-list");
-  }
-
-  public privatePlayListCC(): NekostoreCollectionController<CutInPlayingInfo> {
-    return this.roomCollectionController<CutInPlayingInfo>(
-      `${this.userId}-play-list`
-    );
-  }
-
   public userCC(): NekostoreCollectionController<UserData> {
     return this.roomCollectionController<UserData>("user-list");
+  }
+
+  public socketUserCC(): NekostoreCollectionController<SocketUserData> {
+    return this.roomCollectionController<SocketUserData>("socket-user-list");
   }
 
   public propertyCC(): NekostoreCollectionController<PropertyStore> {
@@ -480,32 +518,8 @@ export default class SocketFacade {
     );
   }
 
-  public characterCC(): NekostoreCollectionController<CharacterStore> {
-    return this.roomCollectionController<CharacterStore>("character-list");
-  }
-
   public extraCC(): NekostoreCollectionController<ExtraStore> {
     return this.roomCollectionController<ExtraStore>("extra-list");
-  }
-
-  public diceSymbolCC(): NekostoreCollectionController<DiceSymbolStore> {
-    return this.roomCollectionController<DiceSymbolStore>("dice-symbol-list");
-  }
-
-  public floorTileCC(): NekostoreCollectionController<FloorTileStore> {
-    return this.roomCollectionController<FloorTileStore>("floor-tile-list");
-  }
-
-  public chitCC(): NekostoreCollectionController<ChitStore> {
-    return this.roomCollectionController<ChitStore>("chit-list");
-  }
-
-  public mapMaskCC(): NekostoreCollectionController<MapMaskStore> {
-    return this.roomCollectionController<MapMaskStore>("map-mask-list");
-  }
-
-  public mapLayerCC(): NekostoreCollectionController<MapLayer> {
-    return this.roomCollectionController<MapLayer>("map-layer-list");
   }
 
   public actorGroupCC(): NekostoreCollectionController<ActorGroup> {
@@ -514,20 +528,16 @@ export default class SocketFacade {
 
   public getCC(type: string): NekostoreCollectionController<any> {
     switch (type) {
-      case "screen":
-        return this.screenListCC();
+      case "scene":
+        return this.sceneListCC();
       case "room-data":
         return this.roomDataCC();
       case "image-list":
         return this.imageDataCC();
       case "image-tag-list":
         return this.imageTagCC();
-      case "cut-in-list":
+      case "cut-in":
         return this.cutInDataCC();
-      case "play-list":
-        return this.playListCC();
-      case "private-play-list":
-        return this.privatePlayListCC();
       case "user-list":
         return this.userCC();
       case "property-list":
@@ -537,21 +547,17 @@ export default class SocketFacade {
       case "property-face-list":
         return this.propertyFaceCC();
       case "character":
-        return this.characterCC();
+      case "dice-symbol":
+      case "floor-tile":
+      case "chit":
+      case "map-mask":
+        return this.sceneObjectCC();
       case "extra":
         return this.extraCC();
-      case "dice-symbol":
-        return this.diceSymbolCC();
-      case "floor-tile":
-        return this.floorTileCC();
-      case "chit":
-        return this.chitCC();
-      case "map-mask":
-        return this.mapMaskCC();
       case "map-layer":
-        return this.mapLayerCC();
+        return this.sceneLayerCC();
       case "map-and-layer":
-        return this.mapAndLayerCC();
+        return this.sceneAndLayerCC();
       case "tag-note-list":
         return this.tagNoteCC();
       case "role-group-list":
@@ -559,46 +565,5 @@ export default class SocketFacade {
       default:
         throw new ApplicationError(`Invalid type error. type=${type}`);
     }
-  }
-
-  public async addMap(
-    screen: Screen
-  ): Promise<{ mapId: string; mapAndLayerIdList: string[] }> {
-    /* --------------------------------------------------
-     * マップデータのプリセットデータ投入
-     */
-    const screenListCC = SocketFacade.instance.screenListCC();
-    const mapId = await screenListCC.add(await screenListCC.touch(), screen);
-
-    /* --------------------------------------------------
-     * マップとレイヤーの紐づきのプリセットデータ投入
-     */
-    const mapAndLayerCC = SocketFacade.instance.mapAndLayerCC();
-
-    const mapAndLayerIdList: string[] = [];
-    const addMapAndLayer = async (
-      ml: StoreUseData<MapLayer>
-    ): Promise<void> => {
-      const mapAndLayerId = await mapAndLayerCC.touch();
-      mapAndLayerIdList.push(mapAndLayerId);
-      await mapAndLayerCC.add(mapAndLayerId, {
-        mapId,
-        layerId: ml.id!,
-        entering: "normal",
-        objectList: []
-      });
-    };
-
-    // pushImageTagを直列の非同期で全部実行する
-    const mapLayerCC = SocketFacade.instance.mapLayerCC();
-    await (await mapLayerCC.getList(false))
-      .filter(ml => ml.data!.isDefault)
-      .map((ml: StoreUseData<MapLayer>) => () => addMapAndLayer(ml))
-      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
-
-    return {
-      mapId,
-      mapAndLayerIdList
-    };
   }
 }

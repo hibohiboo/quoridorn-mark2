@@ -27,15 +27,12 @@
         </div>
         <ul>
           <li v-for="(description, index) in message.descriptions" :key="index">
+            <!-- HTMLインジェクション対策済み -->
             <span v-html="toHtml(description)"></span>
           </li>
         </ul>
       </div>
     </div>
-    <label class="language-select">
-      <span class="label-input">Language</span>
-      <language-select v-model="language" />
-    </label>
     <keep-alive>
       <table-component
         :windowInfo="windowInfo"
@@ -75,6 +72,7 @@
           <template v-else-if="index === 6">{{ data | updateDate }}</template>
           <template v-else-if="index === 7">
             <ctrl-button
+              :focusable="false"
               @click.stop="deleteRoom(data.order)"
               @dblclick.stop
               :disabled="data | deleteButtonDisabled"
@@ -94,6 +92,10 @@
         />
       </template>
     </keep-alive>
+    <label class="language-select">
+      <span class="label-input">Language</span>
+      <language-select v-model="language" />
+    </label>
     <div class="button-area">
       <ctrl-button @click="createRoom()" :disabled="disabledCreate">
         <span v-t="'button.create-new'"></span>
@@ -143,18 +145,25 @@ import { ConfirmInfo } from "@/app/core/window/ConfirmWindow.vue";
 import LanguageSelect from "@/app/basic/common/components/select/LanguageSelect.vue";
 import LanguageManager from "@/LanguageManager";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import { loadYaml } from "@/app/core/File";
 import {
   convertNumber,
   getFileNameArgList,
   getUrlParam
 } from "@/app/core/Utility";
-import { Image } from "@/@types/image";
-import { MapLayer, Screen, RoomData, MapLayerType } from "@/@types/room";
+import {
+  Scene,
+  RoomData,
+  SceneLayerType,
+  Image,
+  CutInDeclareInfo
+} from "@/@types/room";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import * as Cookies from "es-cookie";
 import VersionInfoComponent from "@/app/basic/login/VersionInfoComponent.vue";
+import { ModeInfo } from "mode";
+import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
 
 @Component({
   components: {
@@ -192,7 +201,7 @@ export default class LoginWindow extends Mixins<
   private message: Message | null = null;
   private serverTestResult: ServerTestResult | null = null;
   private readonly htmlRegExp: RegExp = new RegExp(
-    "\\[([^\\]]+)]\\(([^)]+)\\)",
+    '\\[([^"<>]]+)]\\(([^)"<>]+)\\)',
     "g"
   );
   private language: string = LanguageManager.instance.defaultLanguage;
@@ -269,6 +278,14 @@ export default class LoginWindow extends Mixins<
       "--msg-creating",
       `"${LanguageManager.instance.getText("label.creating")}"`
     );
+    task.resolve();
+  }
+
+  @TaskProcessor("global-enter-finished")
+  private async globalEnterFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    await this.playRoom();
     task.resolve();
   }
 
@@ -362,6 +379,7 @@ export default class LoginWindow extends Mixins<
               this.roomList!.splice(index, 1, {
                 order: index,
                 exclusionOwner: null,
+                lastExclusionOwner: null,
                 owner: null,
                 permission: null,
                 status: null,
@@ -432,7 +450,7 @@ export default class LoginWindow extends Mixins<
   }
 
   @VueEvent
-  private async playRoom(order?: number) {
+  private async playRoom() {
     if (!this.disabledLogin) await this.login();
     if (!this.disabledCreate) await this.createRoom();
   }
@@ -447,15 +465,12 @@ export default class LoginWindow extends Mixins<
 
   @VueEvent
   private async deleteRoom(order: number) {
-    if (this.selectedRoomNo === null) {
-      alert("部屋を選択してください。");
-      return;
-    }
+    window.console.log(this.selectedRoomNo, order);
 
     this.isInputtingRoomInfo = true;
 
     // タッチ
-    if (!(await this.touchRoom(true))) {
+    if (!(await this.touchRoom(true, order))) {
       this.isInputtingRoomInfo = false;
       return;
     }
@@ -481,14 +496,14 @@ export default class LoginWindow extends Mixins<
       confirmResult = confirmResultList[0];
     } catch (err) {
       window.console.warn(err);
-      await this.releaseTouchRoom();
+      await this.releaseTouchRoom(order);
       this.isInputtingRoomInfo = false;
       return;
     }
 
     // 入力画面がキャンセルされていたらタッチ状態を解除
     if (!confirmResult) {
-      await this.releaseTouchRoom();
+      await this.releaseTouchRoom(order);
       this.isInputtingRoomInfo = false;
       return;
     }
@@ -509,7 +524,7 @@ export default class LoginWindow extends Mixins<
       deleteRoomInput = deleteRoomInputList[0];
     } catch (err) {
       window.console.warn(err);
-      await this.releaseTouchRoom();
+      await this.releaseTouchRoom(order);
       return;
     } finally {
       this.isInputtingRoomInfo = false;
@@ -517,7 +532,7 @@ export default class LoginWindow extends Mixins<
 
     // 入力画面がキャンセルされていたらタッチ状態を解除
     if (!deleteRoomInput) {
-      await this.releaseTouchRoom();
+      await this.releaseTouchRoom(order);
       return;
     }
 
@@ -528,13 +543,13 @@ export default class LoginWindow extends Mixins<
         DeleteRoomRequest,
         boolean
       >("delete-room", {
-        roomId: this.roomList![this.selectedRoomNo].id!,
-        roomNo: this.selectedRoomNo,
+        roomId: this.roomList![order].id!,
+        roomNo: order,
         ...deleteRoomInput
       });
     } catch (err) {
       window.console.warn(err);
-      await this.releaseTouchRoom();
+      await this.releaseTouchRoom(order);
       this.isInputtingRoomInfo = false;
       return;
     }
@@ -554,13 +569,16 @@ export default class LoginWindow extends Mixins<
     return classList;
   }
 
-  private async touchRoom(isModify: boolean): Promise<boolean> {
+  private async touchRoom(
+    isModify: boolean,
+    roomNo?: number | null
+  ): Promise<boolean> {
+    if (!roomNo) roomNo = this.selectedRoomNo;
+    if (roomNo === null) return false;
     try {
       await SocketFacade.instance.socketCommunication<TouchRequest, never>(
         isModify ? "touch-room-modify" : "touch-room",
-        {
-          roomNo: this.selectedRoomNo!
-        }
+        { roomNo }
       );
       return true;
     } catch (err) {
@@ -569,14 +587,13 @@ export default class LoginWindow extends Mixins<
     }
   }
 
-  private async releaseTouchRoom() {
-    if (this.selectedRoomNo === null) return;
-    if (!this.roomList![this.selectedRoomNo].exclusionOwner) return;
+  private async releaseTouchRoom(roomNo?: number | null) {
+    if (!roomNo) roomNo = this.selectedRoomNo;
+    if (roomNo === null) return;
+    if (!this.roomList![roomNo].exclusionOwner) return;
     await SocketFacade.instance.socketCommunication<ReleaseTouchRequest, never>(
       "release-touch-room",
-      {
-        roomNo: this.selectedRoomNo
-      }
+      { roomNo }
     );
   }
 
@@ -672,6 +689,7 @@ export default class LoginWindow extends Mixins<
       }
     });
 
+    window.console.log(this.selectedRoomNo);
     const roomId = this.roomList![this.selectedRoomNo].id!;
 
     /* ----------------------------------------------------------------------
@@ -1014,32 +1032,15 @@ export default class LoginWindow extends Mixins<
      * 画像タグのプリセットデータ投入
      */
     const imageTagCC = SocketFacade.instance.imageTagCC();
-
-    const pushImageTag = async (imageTag: string): Promise<void> => {
-      await imageTagCC.add(await imageTagCC.touch(), imageTag);
-    };
-
-    // pushImageTagを直列の非同期で全部実行する
-    await imageTagList
-      .map((imageTag: string) => () => pushImageTag(imageTag))
-      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+    await imageTagCC.addDirect(imageTagList);
 
     /* --------------------------------------------------
      * 画像データのプリセットデータ投入
      */
     const imageDataCC = SocketFacade.instance.imageDataCC();
+    const docIdList = await imageDataCC.addDirect(imageList);
 
-    let imageId: string | null = null;
-    const pushImage = async (image: Image): Promise<void> => {
-      const docId = await imageDataCC.touch();
-      if (!imageId) imageId = docId;
-      await imageDataCC.add(docId, image);
-    };
-
-    // pushImageを直列の非同期で全部実行する
-    await imageList
-      .map((image: Image) => () => pushImage(image))
-      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+    const imageId: string = docIdList[0];
 
     /* --------------------------------------------------
      * BGMデータのプリセットデータ投入
@@ -1047,38 +1048,12 @@ export default class LoginWindow extends Mixins<
     const bgmList: CutInDeclareInfo[] = await loadYaml("/static/conf/bgm.yaml");
     const cutInDataCC = SocketFacade.instance.cutInDataCC();
 
-    const pushBgm = async (bgm: CutInDeclareInfo): Promise<void> => {
-      const docId = await cutInDataCC.touch();
-      await cutInDataCC.add(docId, bgm);
-    };
-
-    // pushBgmを直列の非同期で全部実行する
-    await bgmList
-      .map((bgm: CutInDeclareInfo) => () => pushBgm(bgm))
-      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
-
-    /* --------------------------------------------------
-     * マップレイヤーのプリセットデータ投入
-     */
-    const mapLayerCC = SocketFacade.instance.mapLayerCC();
-    const addMapLayer = async (type: MapLayerType, defaultOrder: number) => {
-      await mapLayerCC.add(await mapLayerCC.touch(), {
-        type,
-        defaultOrder,
-        isDefault: true,
-        deletable: false
-      });
-    };
-    await addMapLayer("floor-tile", 1);
-    await addMapLayer("map-mask", 2);
-    await addMapLayer("map-marker", 3);
-    await addMapLayer("dice-symbol", 4);
-    await addMapLayer("character", 5);
+    await cutInDataCC.addDirect(bgmList);
 
     /* --------------------------------------------------
      * マップデータのプリセットデータ投入
      */
-    const screen: Screen = {
+    const scene: Scene = {
       name: "A-1",
       columns: 20,
       rows: 15,
@@ -1086,6 +1061,14 @@ export default class LoginWindow extends Mixins<
       gridColor: "#000000",
       fontColor: "#000000",
       portTileMapping: "",
+      switchBefore: {
+        priority: 1,
+        direction: "normal"
+      },
+      switchAfter: {
+        priority: 1,
+        direction: "normal"
+      },
       shapeType: "square",
       texture: {
         type: "image",
@@ -1129,7 +1112,26 @@ export default class LoginWindow extends Mixins<
       chatLinkage: 0,
       chatLinkageSearch: ""
     };
-    const addMapResult = await SocketFacade.instance.addMap(screen);
+    const addMapResult = await GameObjectManager.instance.addScene(scene);
+
+    /* --------------------------------------------------
+     * マップレイヤーのプリセットデータ投入
+     */
+    const addSceneLayer = async (
+      type: SceneLayerType,
+      defaultOrder: number
+    ) => {
+      await GameObjectManager.instance.addSceneLayer({
+        type,
+        defaultOrder,
+        isSystem: true
+      });
+    };
+    await addSceneLayer("floor-tile", 1);
+    await addSceneLayer("map-mask", 2);
+    await addSceneLayer("map-marker", 3);
+    await addSceneLayer("dice-symbol", 4);
+    await addSceneLayer("character", 5);
 
     /* --------------------------------------------------
      * 部屋データのプリセットデータ投入
@@ -1137,13 +1139,13 @@ export default class LoginWindow extends Mixins<
     const roomDataCC = SocketFacade.instance.roomDataCC();
 
     const roomData: RoomData = {
-      mapId: addMapResult.mapId,
+      sceneId: addMapResult.sceneId,
       isDrawGridLine: true,
       isDrawGridId: true,
       isFitGrid: true,
       isUseRotateMarker: true
     };
-    await roomDataCC.add(await roomDataCC.touch(), roomData);
+    await roomDataCC.addDirect([roomData]);
   }
 }
 </script>
@@ -1260,58 +1262,6 @@ export default class LoginWindow extends Mixins<
         }
       }
     }
-  }
-}
-</style>
-
-<style lang="scss">
-@import "../../../assets/common";
-.isCreating {
-  position: relative;
-  pointer-events: none;
-
-  &.isSelected:before {
-    outline: 2px solid var(--uni-color-red);
-    outline-offset: -2px;
-  }
-
-  &:before {
-    content: "";
-    display: inline-block;
-    position: absolute;
-    background-image: linear-gradient(
-      -45deg,
-      var(--uni-color-cream) 25%,
-      var(--uni-color-light-pink) 25%,
-      var(--uni-color-light-pink) 50%,
-      var(--uni-color-cream) 50%,
-      var(--uni-color-cream) 75%,
-      var(--uni-color-light-pink) 75%,
-      var(--uni-color-light-pink)
-    );
-    background-size: 1em 1em;
-    background-attachment: local;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 9999999998;
-  }
-
-  &:after {
-    content: var(--msg-creating, "さくせいちゅう");
-    @include inline-flex-box(row, center, center);
-    position: absolute;
-    left: 50%;
-    padding: 0.2em 0.6em;
-    top: 0;
-    bottom: 0;
-    height: 1em;
-    margin: auto;
-    background-color: var(--uni-color-white);
-    color: var(--uni-color-black);
-    transform: translateX(-50%);
-    z-index: 9999999999;
   }
 }
 </style>

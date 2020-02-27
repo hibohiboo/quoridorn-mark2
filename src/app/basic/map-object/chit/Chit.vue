@@ -11,16 +11,24 @@
     @mousedown.right.stop="rightDown"
     @contextmenu.prevent
     ref="component"
-  ></div>
+  >
+    <span class="tag" v-if="sceneObjectInfo">
+      {{ sceneObjectInfo.data.name }} - {{ elm.style.zIndex }} - {{ docId }}
+    </span>
+
+    <!-- HTMLインジェクション対策済み -->
+    <div class="lock-info" v-if="lockMessage">
+      <span class="lock-info-message" v-html="lockMessage"></span>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
 import PieceMixin from "@/app/basic/common/mixin/PieceMixin.vue";
 import { Component } from "vue-property-decorator";
-import { ChitStore } from "@/@types/gameObject";
 
 @Component
-export default class Chit extends PieceMixin<ChitStore> {}
+export default class Chit extends PieceMixin<"chit"> {}
 </script>
 
 <style scoped lang="scss">

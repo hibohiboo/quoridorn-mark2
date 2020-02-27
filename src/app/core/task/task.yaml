@@ -46,6 +46,12 @@
     - youtube-mute-change
     - other-text-view
     - other-text-hide
+    - change-focus-scene-object
+    - resize
+    - throw-parabola
+    - stand-by-return
+    - tab-move
+    - row-select
 
 - taskAttribute:
     isIgniteWithParam: false
@@ -78,7 +84,7 @@
     - window-close
 
 - taskAttribute:
-    isIgniteWithParam: true
+    isIgniteWithParam: false
     isLastValueCapture: true
     isTraceFinally: false
     isTest: false

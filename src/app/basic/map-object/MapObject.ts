@@ -1,4 +1,4 @@
-import { Point } from "@/@types/address";
+import { Point } from "address";
 
 type SetDataOrderArg = {
   key: string;
@@ -11,7 +11,7 @@ abstract class DataStore {
   abstract setData(args: SetDataOrderArg): void;
 }
 
-export interface MapObject extends SyncObj, Point {
+export interface SceneObject extends SyncObj, Point {
   text: string;
   kind: string;
   columns: number;

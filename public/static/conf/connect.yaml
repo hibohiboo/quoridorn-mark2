@@ -1,6 +1,7 @@
 ##[ Quoridornアプリケーションサーバ ]#############################################
 # ----- 変更時の選択肢を１つしか用意しない場合
 # quoridornServer: "http://localhost:8000"
+quoridornServer: "wss://quori-dev.onlinesession.app"
 
 # ----- 変更時の選択肢を複数用意する場合
 #quoridornServer:
@@ -9,7 +10,7 @@
 quoridornServer: "wss://192.168.60.79"
 
 # Quoridornサーバとの通信のタイムアウト時間（単位：ms）
-socketTimeout: 5000
+socketTimeout: 50000
 
 ##[ BCDice-API ]################################################################
 # 向き先（末尾のスラッシュはなし）

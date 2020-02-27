@@ -1,6 +1,10 @@
 <template>
   <div class="container" ref="window" v-if="permission">
-    <simple-tab-component :tabList="tabList" v-model="currentTabInfo">
+    <simple-tab-component
+      :windowKey="windowKey"
+      :tabList="tabList"
+      v-model="currentTabInfo"
+    >
       <chmod-rule-edit-component
         v-if="currentTabInfo.target === 'view'"
         :key="1"
@@ -40,7 +44,7 @@ import CtrlButton from "@/app/core/component/CtrlButton.vue";
 import WindowVue from "@/app/core/window/WindowVue";
 import SimpleTabComponent from "@/app/core/component/SimpleTabComponent.vue";
 import LanguageManager from "@/LanguageManager";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { TabInfo } from "@/@types/window";
 import PermissionTypeSelect from "@/app/basic/common/components/select/PermissionTypeSelect.vue";
@@ -112,18 +116,20 @@ export default class ChmodWindow extends Mixins<
     const data = (await this.cc!.getData(this.docId))!;
     this.permission = data.permission;
 
-    // 排他チェック
-    if (data.exclusionOwner) {
-      this.isProcessed = true;
-      await this.close();
-      return;
-    }
+    if (this.windowInfo.status === "window") {
+      // 排他チェック
+      if (data.exclusionOwner) {
+        this.isProcessed = true;
+        await this.close();
+        return;
+      }
 
-    // パーミッションチェック
-    if (!permissionCheck(data, "chmod")) {
-      this.isProcessed = true;
-      await this.close();
-      return;
+      // パーミッションチェック
+      if (!permissionCheck(data, "chmod")) {
+        this.isProcessed = true;
+        await this.close();
+        return;
+      }
     }
 
     try {
@@ -138,7 +144,9 @@ export default class ChmodWindow extends Mixins<
   @VueEvent
   private async commit() {
     const data = (await this.cc!.getData(this.docId))!;
-    await this.cc!.update(this.docId, data.data!, this.permission || undefined);
+    await this.cc!.update(this.docId, data.data!, {
+      permission: this.permission || undefined
+    });
     this.isProcessed = true;
     await this.close();
   }

@@ -1,10 +1,14 @@
 <template>
-  <simple-tab-component :tabList="tabList" v-model="currentTabInfo">
+  <simple-tab-component
+    :windowKey="windowInfo.key"
+    :tabList="tabList"
+    v-model="currentTabInfo"
+  >
     <simple-table-component
       :tableIndex="tableIndex"
       :status="status"
       :windowInfo="windowInfo"
-      :dataList="dataList"
+      :dataList="viewDataList"
       :keyProp="keyProp"
       :tabInfo="currentTabInfo"
       :rowClassGetter="rowClassGetter"
@@ -30,6 +34,8 @@ import { Emit, Prop, Vue, Watch } from "vue-property-decorator";
 import { TabInfo, WindowInfo, WindowTableDeclareInfo } from "@/@types/window";
 import SimpleTableComponent from "@/app/core/component/table/SimpleTableComponent.vue";
 import SimpleTabComponent from "@/app/core/component/SimpleTabComponent.vue";
+import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
+import { StoreUseData } from "@/@types/store";
 
 @Component({
   components: { SimpleTabComponent, SimpleTableComponent }
@@ -65,9 +71,19 @@ export default class TableComponent extends Vue {
 
   private tabList: TabInfo[] = [];
   private currentTabInfo: TabInfo | null = null;
+  private isFirst: boolean = true;
 
   private get tableDeclareInfo(): WindowTableDeclareInfo {
     return this.windowInfo.declare.tableInfoList[this.tableIndex];
+  }
+
+  @Watch("currentTabInfo")
+  private onChangeCurrentTabInfo() {
+    if (this.isFirst) {
+      this.isFirst = false;
+      return;
+    }
+    this.localValue = null;
   }
 
   @Emit("adjustWidth")
@@ -82,12 +98,44 @@ export default class TableComponent extends Vue {
   @Emit("enter")
   private enter(key: string | number | null) {}
 
-  @Watch("dataList", { deep: true, immediate: true })
-  private onChangeDataList() {
+  private get useDataList() {
+    return this.dataList.filter(d => permissionCheck(d, "view"));
+  }
+
+  private get viewDataList() {
+    if (this.currentTabInfo) {
+      if (typeof this.currentTabInfo.target === "string") {
+        const targetProp = this.tableDeclareInfo.classificationProp;
+        const propList = targetProp.split(".");
+        const getTargetValue = (data: any, propList: string[]): any => {
+          const value: any = data[propList.shift()!];
+          return propList.length ? getTargetValue(value, propList) : value;
+        };
+        const target = this.currentTabInfo.target;
+        return this.dataList.filter(
+          (row: any) =>
+            getTargetValue(row, propList.concat()) === target &&
+            permissionCheck(row, "view")
+        );
+      } else {
+        const from = this.currentTabInfo.target.from;
+        const to = this.currentTabInfo.target.to;
+        return this.dataList.filter(
+          (row, index) =>
+            from <= index && index <= to && permissionCheck(row, "view")
+        );
+      }
+    } else {
+      return this.useDataList;
+    }
+  }
+
+  @Watch("useDataList", { deep: true, immediate: true })
+  private onChangeDataList(list: StoreUseData<any>[]) {
     const tabList: TabInfo[] = [];
     if (this.tableDeclareInfo.classificationType === "range") {
       const ordinal: number = this.tableDeclareInfo.classificationOrdinal!;
-      let useChoice: number = this.dataList.length;
+      let useChoice: number = list.length;
 
       if (this.tableDeclareInfo.height !== undefined && useChoice > 50) {
         const choiceList = [];
@@ -101,30 +149,21 @@ export default class TableComponent extends Vue {
         if (choice !== 100) choiceList.push(100);
         choiceList.push(...[150, 200, 250, 300, 350, 400, 450, 500]);
 
-        for (useChoice of choiceList)
-          if (this.dataList.length / useChoice <= 10) break;
+        for (useChoice of choiceList) {
+          if (list.length / useChoice <= 10) break;
+        }
 
         let current: number = 0;
         let isFirst = true;
-        while (current < this.dataList.length) {
+        while (current < list.length) {
           const tabInfo: TabInfo = {
             text: `${current + ordinal}-`,
             target: {
               from: current,
-              to: Math.min(current + useChoice - 1, this.dataList.length - 1)
+              to: Math.min(current + useChoice - 1, list.length - 1)
             }
           };
-          if (
-            !this.currentTabInfo ||
-            (isFirst &&
-              (this.currentTabInfo.text !== tabInfo.text ||
-                (typeof this.currentTabInfo.target !== "string" &&
-                  typeof tabInfo.target !== "string" &&
-                  this.currentTabInfo.target.from !== tabInfo.target.from) ||
-                (typeof this.currentTabInfo.target !== "string" &&
-                  typeof tabInfo.target !== "string" &&
-                  this.currentTabInfo.target.to !== tabInfo.target.to)))
-          ) {
+          if (!this.currentTabInfo) {
             this.currentTabInfo = tabInfo;
           }
           tabList.push(tabInfo);
@@ -134,16 +173,24 @@ export default class TableComponent extends Vue {
       }
     } else if (this.tableDeclareInfo.classificationType === "string") {
       const prop: string = this.tableDeclareInfo.classificationProp;
+      const propList = prop.split(".");
+      const getTargetValue = (data: any, propList: string[]): any => {
+        const value: any = data[propList.shift()!];
+        return propList.length ? getTargetValue(value, propList) : value;
+      };
       const targetValueList: any[] = [];
-      this.dataList.forEach(data => {
-        if (targetValueList.indexOf(data[prop]) === -1)
-          targetValueList.push(data[prop]);
+      list.forEach(data => {
+        const propValue = getTargetValue(data, propList.concat());
+        if (targetValueList.indexOf(propValue) === -1)
+          targetValueList.push(propValue);
       });
-      targetValueList.forEach(val => {
-        tabList.push({
+      targetValueList.forEach((val, idx: number) => {
+        const tabInfo = {
           text: val.toString(),
           target: val.toString()
-        });
+        };
+        if (!idx && !this.currentTabInfo) this.currentTabInfo = tabInfo;
+        tabList.push(tabInfo);
       });
     }
     this.tabList = tabList;

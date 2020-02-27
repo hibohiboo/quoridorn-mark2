@@ -2,7 +2,7 @@
   <label class="color-picker-container" @contextmenu.prevent ref="elm">
     <input
       :id="id"
-      class="color-input"
+      class="input color-input"
       type="text"
       :value="colorCode"
       @input="colorCode = $event.target.value"
@@ -24,14 +24,14 @@
       :disabled="disabled"
     />
     <input
-      class="value-alpha"
+      class="input value-alpha"
       v-if="useAlpha"
       type="range"
       min="0"
       max="1"
       step="0.1"
       :value="alpha"
-      @input="alpha = $event.target.value"
+      @input="alpha = $event.target.valueAsNumber"
       :disabled="disabled"
       @keydown.enter.stop
       @keyup.enter.stop
@@ -42,18 +42,21 @@
 </template>
 
 <script lang="ts">
-import Vue from "vue";
 import { Component, Prop, Watch } from "vue-property-decorator";
 import { parseColor } from "../Utility";
 import LifeCycle from "../decorator/LifeCycle";
 import VueEvent from "../decorator/VueEvent";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
 
 @Component({
   components: { BaseInput, CtrlButton }
 })
-export default class ColorPickerComponent extends Vue {
+export default class ColorPickerComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: String, required: true })
   private value!: string;
 
@@ -77,6 +80,10 @@ export default class ColorPickerComponent extends Vue {
     const colorObj = parseColor(this.value);
     this.colorCode = colorObj.getColorCode();
     this.alpha = this.useAlpha ? colorObj.a : 1;
+  }
+
+  @LifeCycle
+  private mounted() {
     this.isMounted = true;
   }
 
@@ -136,6 +143,11 @@ export default class ColorPickerComponent extends Vue {
 <style scoped lang="scss">
 @import "../../../assets/common";
 
+input {
+  font-size: 1em;
+  margin: 0;
+}
+
 .color-picker-container {
   @include flex-box(row, flex-start, center, wrap);
 
@@ -153,12 +165,14 @@ export default class ColorPickerComponent extends Vue {
   .color-pick {
     width: 2em;
     height: 2em;
+    cursor: pointer;
   }
 
   .value-alpha {
     transform: rotate(180deg);
     transform-origin: center;
     width: 10em;
+    cursor: pointer;
   }
 }
 </style>

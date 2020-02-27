@@ -1,12 +1,14 @@
-import { Anchor, Point, Size } from "@/@types/address";
+import { Anchor, Point, Rectangle } from "address";
 
 export type WindowSize = {
   widthEm: number;
   widthRem: number;
   widthPx: number;
+  widthScrollBar: number;
   heightEm: number;
   heightRem: number;
   heightPx: number;
+  heightScrollBar: number;
 };
 
 export type WindowTableColumn = {
@@ -18,7 +20,7 @@ export type WindowTableColumn = {
 
 export type WindowTableDeclareInfo = {
   readonly type: "free" | "fix-on-side" | "fix-on-right";
-  readonly height?: number;
+  height?: number;
   readonly classificationProp: string;
   readonly classificationType: "string" | "range";
   readonly classificationOrdinal?: number;
@@ -61,7 +63,6 @@ export type WindowOpenInfo<T> = {
 export type WindowResizeInfo = {
   key: string;
   status: string;
-  size: Size;
 };
 
 export type WindowTableInfo = {
@@ -101,6 +102,7 @@ export interface WindowInfo<T>
   title: string;
   status: WindowStatus;
   message: string;
+  diffRect: Rectangle;
   args?: T;
   order: number;
   paneY: number;

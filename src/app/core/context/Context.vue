@@ -1,6 +1,6 @@
 <template>
   <div
-    class="context"
+    id="context"
     v-if="type"
     @mouseleave.prevent="hide"
     @contextmenu.prevent
@@ -31,8 +31,8 @@ import {
   ContextItemDeclareBlock,
   ContextItemDeclareInfo,
   ContextTaskInfo
-} from "@/@types/context";
-import { Task, TaskResult } from "@/@types/task";
+} from "context";
+import { Task, TaskResult } from "task";
 import { judgeCompare } from "../Compare";
 import TaskProcessor from "../task/TaskProcessor";
 import TaskManager from "../task/TaskManager";
@@ -40,6 +40,7 @@ import VueEvent from "@/app/core/decorator/VueEvent";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import { clone } from "@/app/core/Utility";
 import LanguageManager from "@/LanguageManager";
+import GameObjectManager from "@/app/basic/GameObjectManager";
 
 const contextInfo: ContextDeclare = require("../context.yaml");
 const contextItemInfo: ContextItemDeclareBlock = require("../context-item.yaml");
@@ -81,7 +82,16 @@ export default class Context extends Vue {
     this.x = task.value!.x - 5;
     this.y = task.value!.y - 5;
 
-    this.title = LanguageManager.instance.getText(`type.${this.type}`);
+    const list = GameObjectManager.instance.getList(this.type)!;
+    const obj: any = list ? list.filter(o => o.id === this.target)[0] : null;
+    const name =
+      obj && obj.data && "name" in obj.data
+        ? " " + obj.data.name.toString()
+        : "";
+
+    this.title = `(${LanguageManager.instance.getText(
+      `type.${this.type}`
+    )})${name}`;
 
     window.console.log(
       `【CONTEXT OPEN】 type: ${this.type} target: ${this.target}`
@@ -204,9 +214,8 @@ export default class Context extends Vue {
 </script>
 
 <style lang="scss">
-.context {
+#context {
   position: fixed;
-  z-index: 11;
   padding: 0;
   min-width: 50px;
   background-color: white;
@@ -215,6 +224,10 @@ export default class Context extends Vue {
   cursor: default;
   left: var(--x);
   top: calc(var(--y) - 1.8em);
+
+  hr {
+    cursor: default;
+  }
 
   > * {
     display: block;
@@ -237,6 +250,7 @@ export default class Context extends Vue {
 
     &.disabled {
       background-color: lightgrey;
+      cursor: default;
     }
   }
 }

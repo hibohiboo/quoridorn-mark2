@@ -1,27 +1,32 @@
 <template>
   <div id="app">
-    <div id="back-screen"></div>
-    <div id="YoutubePlayerContainer">
-      <div class="unUse"><div id="YoutubePlayer001"></div></div>
-      <div class="unUse"><div id="YoutubePlayer002"></div></div>
-      <div class="unUse"><div id="YoutubePlayer003"></div></div>
-      <div class="unUse"><div id="YoutubePlayer004"></div></div>
-    </div>
+    <!-- 最も後ろの背景 (z-index: 0) -->
+    <div id="back-scene"></div>
 
     <template v-if="roomInitialized">
+      <!-- プレイマット (z-index: 1) -->
       <game-table ref="gameTable" />
+      <!-- メニュー (z-index: 5) -->
       <Menu :roomInfo="roomInfo" />
+      <!-- 右ペイン (z-index: 2) -->
       <right-pane />
+      <!-- 右クリックメニュー (z-index: 4) -->
       <context />
     </template>
+    <!-- 小画面エリア (z-index: 3) -->
     <window-area />
+    <!-- その他欄 (z-index: 6) -->
     <other-text-frame
       :otherTextViewInfo="otherTextViewInfo"
       @hide="otherTextHide"
       v-if="otherTextViewInfo"
     />
-    <div id="wheelMarker" :class="{ hide: !isMapWheeling }"></div>
-    <div id="loadingCreateRoom" v-if="isCreatingRoomMode">
+    <!-- 放物線シミュレータ (z-index: 7) -->
+    <throw-parabola-simulator v-if="throwParabola" />
+    <!-- 放物線シミュレータ (z-index: 8) -->
+    <throw-parabola-container />
+    <!-- お部屋作成中 (z-index: 10) -->
+    <div id="loading-create-room" v-if="isCreatingRoomMode">
       <div class="message">お部屋を作成しています！</div>
       <img
         src="http://quoridorn.com/img/mascot/struggle/mascot_struggle.png"
@@ -41,13 +46,13 @@ import Context from "@/app/core/context/Context.vue";
 import EventProcessor from "@/app/core/event/EventProcessor";
 import WindowArea from "@/app/core/window/WindowArea.vue";
 import WindowManager from "@/app/core/window/WindowManager";
-import { Point } from "@/@types/address";
-import { createPoint, getEventPoint } from "@/app/core/Coordinate";
+import { Point, Size } from "address";
+import { createPoint, createSize, getEventPoint } from "@/app/core/Coordinate";
 import RightPane from "@/app/core/pane/RightPane.vue";
 import CssManager from "@/app/core/css/CssManager";
 import { WindowOpenInfo } from "@/@types/window";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import {
@@ -55,16 +60,24 @@ import {
   GetRoomListResponse,
   LoginWindowInput,
   RoomViewResponse,
+  SendDataRequest,
   ServerTestResult
 } from "@/@types/socket";
-import { StoreObj, StoreUseData } from "@/@types/store";
-import QuerySnapshot from "nekostore/lib/QuerySnapshot";
+import { StoreUseData } from "@/@types/store";
 import BgmManager from "@/app/basic/music/BgmManager";
 import OtherTextFrame from "@/app/basic/other-text/OtherTextFrame.vue";
 import { OtherTextViewInfo } from "@/@types/gameObject";
+import { ModeInfo } from "mode";
+import ThrowParabolaSimulator from "@/app/core/throwParabola/ThrowParabolaSimulator.vue";
+import ThrowParabolaContainer from "@/app/core/throwParabola/ThrowParabolaContainer.vue";
+import { BgmPlayInfo, TabMoveInfo, ThrowParabolaInfo } from "task-info";
+import GameObjectManager from "@/app/basic/GameObjectManager";
+import { CutInDeclareInfo } from "@/@types/room";
 
 @Component({
   components: {
+    ThrowParabolaContainer,
+    ThrowParabolaSimulator,
     OtherTextFrame,
     RightPane,
     WindowArea,
@@ -76,7 +89,6 @@ import { OtherTextViewInfo } from "@/@types/gameObject";
 })
 export default class App extends Vue {
   private readonly key = "App";
-  private isMapWheeling: boolean = false;
   private roomInitialized: boolean = false;
   private isCreatingRoomMode: boolean = false;
   private isMounted: boolean = false;
@@ -85,8 +97,11 @@ export default class App extends Vue {
 
   private roomInfo: ClientRoomInfo | null = null;
   private otherTextViewInfo: OtherTextViewInfo | null = null;
+  private throwParabola: boolean = false;
 
-  private get elm(): HTMLElement {
+  private cutInList = GameObjectManager.instance.cutInList;
+
+  private static get elm(): HTMLElement {
     return document.getElementById("app") as HTMLElement;
   }
 
@@ -123,6 +138,29 @@ export default class App extends Vue {
     //     type: "edit-other-text-window"
     //   }
     // });
+    SocketFacade.instance.socketOn<SendDataRequest<any>>(
+      "send-data",
+      async (err, data) => {
+        const dataType = data.dataType;
+        if (dataType === "throw-parabola") {
+          // 投射通知
+          await TaskManager.instance.ignition<ThrowParabolaInfo, never>({
+            type: "throw-parabola",
+            owner: data.owner,
+            value: data.data as ThrowParabolaInfo
+          });
+        } else if (dataType === "bgm-stand-by") {
+          // BGMスタンバイ通知
+        } else if (dataType === "bgm-play") {
+          // BGM再生通知
+          const info = data.data as BgmPlayInfo;
+          await BgmManager.instance.callBgm({
+            targetId: info.id,
+            data: null
+          });
+        }
+      }
+    );
 
     // ログイン画面の表示
     const serverInfo = await SocketFacade.instance.socketCommunication<
@@ -140,6 +178,7 @@ export default class App extends Vue {
             serverInfo.roomList!.splice(index, 1, {
               order: index,
               exclusionOwner: null,
+              lastExclusionOwner: null,
               owner: null,
               permission: null,
               status: null,
@@ -183,70 +222,45 @@ export default class App extends Vue {
     this.isMounted = true;
   }
 
-  private async cutInDbInspection() {
-    /* カットインを再生処理 */
-    const privatePlayListCC = SocketFacade.instance.privatePlayListCC();
-
-    const playCutIn = async (targetId: string) => {
-      try {
-        const data = await privatePlayListCC.getData(targetId);
-        if (!data) {
-          await privatePlayListCC.touch(targetId);
-          await privatePlayListCC.add(targetId, {
-            duration: 0
-          });
-        }
-        const cutInDataCC = SocketFacade.instance.cutInDataCC();
-        const cutInData = await cutInDataCC.getData(targetId);
-        if (BgmManager.isYoutube(cutInData!.data!)) {
-          // カットインがYoutube動画だったらYoutube動画再生する
-          await TaskManager.instance.ignition<WindowOpenInfo<string>, never>({
-            type: "window-open",
-            owner: "Quoridorn",
-            value: {
-              type: "play-youtube-window",
-              args: targetId
-            }
-          });
-        }
-      } catch (err) {
-        window.console.warn(err);
+  @Watch("cutInList", { deep: true, immediate: true })
+  private async onChangeCutInList() {
+    const openWindowFunc = async (
+      c: StoreUseData<CutInDeclareInfo>
+    ): Promise<void> => {
+      const targetId = c.id!;
+      const windowKeyList: (string | null)[] = [];
+      BgmManager.instance.standByWindowList.push({
+        targetId,
+        windowKeyList
+      });
+      for (let i = 0; i < 3; i++) {
+        windowKeyList.push(null);
+        await BgmManager.openStandByWindow(targetId);
       }
     };
 
-    (await privatePlayListCC.getList(false)).forEach(async item => {
-      await playCutIn(item.id!);
+    await this.cutInList
+      .filter(c => c.data!.isStandBy)
+      .filter(
+        c =>
+          !BgmManager.instance.standByWindowList.filter(
+            s => s.targetId === c.id
+          )[0]
+      )
+      .map((c: StoreUseData<CutInDeclareInfo>) => () => openWindowFunc(c))
+      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+  }
+
+  /**
+   * 画面サイズ変更イベント
+   */
+  @EventProcessor("resize", window)
+  private async resize() {
+    await TaskManager.instance.ignition<Size, never>({
+      type: "resize",
+      owner: "Quoridorn",
+      value: createSize(window.innerWidth, window.innerHeight)
     });
-    const playListCC = SocketFacade.instance.playListCC();
-    await playListCC.setCollectionSnapshot(
-      "App",
-      (snapshot: QuerySnapshot<StoreObj<CutInPlayingInfo>>) => {
-        snapshot.docs.forEach(async doc => {
-          const targetId = doc.ref.id;
-          if (doc.type === "modified") {
-            const status = doc.data!.status;
-            if (
-              status === "added" ||
-              status === "modified" ||
-              status === "touched-released"
-            )
-              await playCutIn(targetId);
-          }
-          if (doc.type === "removed") {
-            const privatePlayData = await privatePlayListCC.getData(targetId);
-            if (privatePlayData) {
-              try {
-                await privatePlayListCC.touchModify(targetId);
-              } catch (err) {
-                window.console.warn(err);
-                return;
-              }
-              await privatePlayListCC.delete(targetId);
-            }
-          }
-        });
-      }
-    );
   }
 
   /**
@@ -255,6 +269,38 @@ export default class App extends Vue {
    */
   @EventProcessor("keydown")
   private async keyDown(event: KeyboardEvent) {
+    if (event.metaKey || event.ctrlKey) {
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        const activeWindowInfo = WindowManager.instance.activeWindow;
+        if (activeWindowInfo) {
+          await TaskManager.instance.ignition<TabMoveInfo, never>({
+            type: "tab-move",
+            owner: "Quoridorn",
+            value: {
+              windowKey: activeWindowInfo.key,
+              addIndex: event.key === "ArrowRight" ? 1 : -1
+            }
+          });
+        }
+        return;
+      }
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        const activeWindowInfo = WindowManager.instance.activeWindow;
+        if (activeWindowInfo) {
+          await TaskManager.instance.ignition<TabMoveInfo, never>({
+            type: "row-select",
+            owner: "Quoridorn",
+            value: {
+              windowKey: activeWindowInfo.key,
+              addIndex: event.key === "ArrowDown" ? 1 : -1
+            }
+          });
+        }
+        return;
+      }
+    }
     if (event.key === "Escape") {
       // Escが押下されたとき、入力画面がアクティブ画面だったら、それを閉じる
       const activeWindowInfo = WindowManager.instance.activeWindow;
@@ -274,8 +320,37 @@ export default class App extends Vue {
         owner: "Quoridorn",
         value: null
       });
+      return;
     }
+
+    if (event.key === "Shift" && event.ctrlKey) {
+      await TaskManager.instance.ignition<ModeInfo, never>({
+        type: "mode-change",
+        owner: "Quoridorn",
+        value: {
+          type: "throw-parabola",
+          value: this.throwParabola ? "off" : "on"
+        }
+      });
+      return;
+    }
+    // window.console.log(event.key);
   }
+
+  // @EventProcessor("keyup")
+  // private async keyUp(event: KeyboardEvent) {
+  //   if (event.key === "Shift") {
+  //     await TaskManager.instance.ignition<ModeInfo, never>({
+  //       type: "mode-change",
+  //       owner: "Quoridorn",
+  //       value: {
+  //         type: "throw-parabola",
+  //         value: "off"
+  //       }
+  //     });
+  //     return;
+  //   }
+  // }
 
   /**
    * ホイールイベント
@@ -346,7 +421,7 @@ export default class App extends Vue {
   @Watch("isMounted")
   @Watch("isModal")
   private onChangeIsModal() {
-    this.elm.style.setProperty("--filter", this.isModal ? "blur(3px)" : "none");
+    App.elm.style.setProperty("--filter", this.isModal ? "blur(3px)" : "none");
   }
 
   @TaskProcessor("socket-connect-finished")
@@ -376,7 +451,6 @@ export default class App extends Vue {
     // 部屋に接続できた
     this.roomInitialized = true;
     this.roomInfo = task.value!;
-    await this.cutInDbInspection();
     task.resolve();
   }
 
@@ -386,16 +460,16 @@ export default class App extends Vue {
   ): Promise<TaskResult<never> | void> {
     const type: string = task.value!.type;
     const value: string = task.value!.value;
-    if (type === "wheel") {
-      this.isMapWheeling = value === "on";
-      task.resolve();
-    }
     if (type === "create-room") {
       this.isCreatingRoomMode = value === "on";
       task.resolve();
     }
-    if (task.value!.type === "modal") {
-      this.isModal = task.value!.value === "on";
+    if (type === "modal") {
+      this.isModal = value === "on";
+      task.resolve();
+    }
+    if (type === "throw-parabola") {
+      this.throwParabola = value === "on";
       task.resolve();
     }
   }
@@ -450,7 +524,7 @@ img {
 }
 
 div.img {
-  opacity: 0;
+  /*opacity: 0;*/
   background-size: contain;
   background: no-repeat center;
 }
@@ -460,7 +534,11 @@ hr {
 }
 
 .anime {
-  opacity: 0;
+  /*opacity: 0;*/
+}
+
+label {
+  cursor: inherit;
 }
 
 #app {
@@ -479,18 +557,6 @@ hr {
   -moz-user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
-
-  #back-screen {
-    position: absolute;
-    background-image: var(--background-image);
-    background-color: var(--background-color);
-    background-size: cover;
-    background-position: center;
-    width: 100%;
-    height: 100%;
-    filter: blur(var(--mask-blur));
-    transform: var(--image-direction);
-  }
 }
 
 .selectable {
@@ -510,50 +576,57 @@ hr {
   visibility: visible;
 }
 
+#back-scene {
+  position: absolute;
+  background-size: cover;
+  background-position: center;
+  width: 100%;
+  height: 100%;
+  filter: blur(var(--mask-blur));
+  z-index: 0;
+  /* JavaScriptで設定されるプロパティ
+  background-image
+  background-color
+  transform
+  */
+}
+
+#gameTableContainer {
+  z-index: 1;
+}
+
+#menu {
+  z-index: 5;
+}
+
+#right-pane {
+  z-index: 2;
+}
+
+#context {
+  z-index: 4;
+}
+
 #window-area {
-  position: relative;
-  z-index: 10;
-}
-
-.other-text-frame {
-  z-index: 11;
-}
-
-#wheelMarker {
-  pointer-events: none;
   position: fixed;
   left: 0;
   top: 0;
-  right: 0;
-  bottom: 0;
-  transition: all 0.3s linear;
-  z-index: 12;
-
-  &.hide {
-    opacity: 0;
-  }
-
-  &:before,
-  &:after {
-    position: absolute;
-    content: "";
-    display: block;
-  }
-  &:before {
-    top: calc(50% - 1px);
-    left: calc(50% - 15px);
-    right: calc(50% - 15px);
-    border-top: 2px rgba(0, 0, 0, 0.8) dotted;
-  }
-  &:after {
-    left: calc(50% - 1px);
-    top: calc(50% - 15px);
-    bottom: calc(50% - 15px);
-    border-left: 2px rgba(0, 0, 0, 0.8) dotted;
-  }
+  z-index: 3;
 }
 
-#loadingCreateRoom {
+.other-text-frame {
+  z-index: 6;
+}
+
+#throw-parabola-simulator {
+  z-index: 7;
+}
+
+#throw-parabola-container {
+  z-index: 8;
+}
+
+#loading-create-room {
   @include flex-box(column, center, center);
   position: fixed;
   left: 0;
@@ -561,6 +634,7 @@ hr {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.3);
+  z-index: 10;
 
   img {
     width: 200px;

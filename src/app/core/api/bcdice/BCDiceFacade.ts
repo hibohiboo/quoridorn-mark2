@@ -15,7 +15,9 @@ export default class BCDiceFacade {
   private __isReady: boolean = false;
 
   // コンストラクタの隠蔽
-  private constructor() {
+  private constructor() {}
+
+  public async init() {
     BCDiceFacade.getBcdiceSystemList().then(async list => {
       this.diceInfoList = list;
       this.__isReady = true;
@@ -106,5 +108,38 @@ export default class BCDiceFacade {
     const info = await BCDiceFacade.getBcdiceSystemInfo(system);
     window.console.log(info);
     return info.name;
+  }
+
+  /**
+   * ダイスコマンドを送信して結果を取得する
+   * @param system
+   * @param command
+   */
+  public static async sendBcdiceServer({
+    system,
+    command
+  }: {
+    system: string;
+    command: string;
+  }) {
+    return new Promise((resolve: Function, reject: Function) => {
+      const params: string = [
+        `system=${system}`,
+        `command=${encodeURIComponent(command)}`
+      ].join("&");
+      const url = `${SocketFacade.instance.connectInfo.bcdiceServer}/v1/diceroll?${params}`;
+
+      try {
+        fetch(url)
+          .then(response => response.json())
+          .then(json => {
+            resolve(json);
+          });
+        // .catch(err => { /* 無視 */ }); // reject(err)
+      } catch (error) {
+        window.console.error(error);
+        // 無視
+      }
+    });
   }
 }

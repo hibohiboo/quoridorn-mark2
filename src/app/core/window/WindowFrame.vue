@@ -1,10 +1,11 @@
 <template>
   <div
     :id="key"
+    class="window-frame"
     :class="{ minimized: windowInfo.isMinimized }"
     @mousedown.left.stop="activeWindow()"
     @touchstart.stop="activeWindow()"
-    ref="window"
+    ref="window-frame"
   >
     <!-- タイトルバー -->
     <div
@@ -22,28 +23,6 @@
           windowInfo.message
         }}</span>
       </div>
-
-      <!-- 文字サイズ変更 -->
-      <label
-        v-if="windowInfo.declare.fontSizePickable && !windowInfo.isMinimized"
-        class="fontSizeSlider"
-        @click.prevent
-      >
-        <input
-          type="range"
-          min="10"
-          max="18"
-          v-model="fontSize"
-          :tabindex="0"
-          @mousedown.stop
-          @touchstart.stop
-          @keydown.enter.stop
-          @keyup.enter.stop
-          @keydown.229.stop
-          @keyup.229.stop
-        />
-        {{ fontSize }}px
-      </label>
 
       <!-- 最小化 -->
       <title-icon
@@ -72,6 +51,30 @@
         @emit="closeWindow"
         v-if="windowInfo.declare.closable"
       />
+    </div>
+
+    <div
+      class="window-info-balloon"
+      :class="{ fontSizeChangeBan: fontSizeChangeBan }"
+    >
+      <!-- 文字サイズ変更 -->
+      <label class="fontSizeSlider" @click.prevent>
+        <input
+          type="range"
+          class="input"
+          min="10"
+          max="18"
+          v-model="fontSize"
+          :tabindex="0"
+          @mousedown.stop
+          @touchstart.stop
+          @keydown.enter.stop
+          @keyup.enter.stop
+          @keydown.229.stop
+          @keyup.229.stop
+        />
+        {{ fontSize }}px
+      </label>
     </div>
 
     <div
@@ -123,7 +126,12 @@
         @leftDown="leftDown"
         v-if="horizontalArrangeable && verticalArrangeable"
       />
-      <resize-knob side="top" @leftDown="leftDown" v-if="verticalArrangeable" />
+      <resize-knob
+        side="top"
+        @leftDown="leftDown"
+        :fontSizeChangeBan="fontSizeChangeBan"
+        v-if="verticalArrangeable"
+      />
       <resize-knob
         side="left"
         @leftDown="leftDown"
@@ -146,11 +154,11 @@
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from "vue-property-decorator";
 import { WindowInfo, WindowMoveInfo, WindowResizeInfo } from "@/@types/window";
-import { Point, Rectangle, Size } from "@/@types/address";
+import { Point, Rectangle, Size } from "address";
 import ResizeKnob from "./ResizeKnob.vue";
 import TaskManager, { MouseMoveParam } from "../task/TaskManager";
 import TaskProcessor from "../task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import {
   createPoint,
   createRectangle,
@@ -162,6 +170,7 @@ import TitleIcon from "./TitleIcon.vue";
 import WindowManager from "./WindowManager";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
+import { getCssPxNum } from "@/app/core/Css";
 
 @Component({
   components: { TitleIcon, ResizeKnob }
@@ -173,9 +182,8 @@ export default class WindowFrame extends Vue {
   private status!: string;
 
   private dragFrom: Point = createPoint(0, 0);
-  private diff: Rectangle = createRectangle(0, 0, 0, 0);
 
-  private fontSize: number = 12;
+  protected fontSize: number = 12;
   private standImageSize: string = "192*256";
   private standImageWidth: number = 192;
   private standImageHeight: number = 256;
@@ -191,11 +199,19 @@ export default class WindowFrame extends Vue {
 
   @LifeCycle
   private destroyed() {
-    window.console.log(`WindowFrame destroyed: ${this.windowInfo.key}`);
+    // window.console.log(`WindowFrame destroyed: ${this.windowInfo.key}`);
   }
 
   private get key(): string {
     return this.windowInfo.key;
+  }
+
+  private get fontSizeChangeBan(): boolean {
+    return (
+      this.isMoving ||
+      !this.windowInfo.declare.fontSizePickable ||
+      this.windowInfo.isMinimized
+    );
   }
 
   @VueEvent
@@ -207,7 +223,8 @@ export default class WindowFrame extends Vue {
       maxSize &&
       minSize.widthEm === maxSize.widthEm &&
       minSize.widthRem === maxSize.widthRem &&
-      minSize.widthPx === maxSize.widthPx
+      minSize.widthPx === maxSize.widthPx &&
+      minSize.widthScrollBar === maxSize.widthScrollBar
     );
   }
 
@@ -220,7 +237,8 @@ export default class WindowFrame extends Vue {
       maxSize &&
       minSize.heightEm === maxSize.heightEm &&
       minSize.heightRem === maxSize.heightRem &&
-      minSize.heightPx === maxSize.heightPx
+      minSize.heightPx === maxSize.heightPx &&
+      minSize.heightScrollBar === maxSize.heightScrollBar
     );
   }
 
@@ -262,15 +280,15 @@ export default class WindowFrame extends Vue {
   ): Promise<TaskResult<never> | void> {
     const point = task.value!;
 
-    this.windowInfo.x += this.diff.x;
-    this.windowInfo.y += this.diff.y;
-    this.windowInfo.widthPx += this.diff.width;
-    this.windowInfo.heightPx += this.diff.height;
+    this.windowInfo.x += this.windowInfo.diffRect.x;
+    this.windowInfo.y += this.windowInfo.diffRect.y;
+    this.windowInfo.widthPx += this.windowInfo.diffRect.width;
+    this.windowInfo.heightPx += this.windowInfo.diffRect.height;
 
-    this.diff.x = 0;
-    this.diff.y = 0;
-    this.diff.width = 0;
-    this.diff.height = 0;
+    this.windowInfo.diffRect.x = 0;
+    this.windowInfo.diffRect.y = 0;
+    this.windowInfo.diffRect.width = 0;
+    this.windowInfo.diffRect.height = 0;
 
     this.isResizing = false;
 
@@ -299,15 +317,15 @@ export default class WindowFrame extends Vue {
     task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
-    if (param.key !== this.key) return;
+    if (!param || param.key !== this.key) return;
     const point = task.value!;
 
     // 移動
     if (!param.type) {
-      this.diff.x = point.x - this.dragFrom.x;
-      this.diff.y = point.y - this.dragFrom.y;
-      this.diff.width = 0;
-      this.diff.height = 0;
+      this.windowInfo.diffRect.x = point.x - this.dragFrom.x;
+      this.windowInfo.diffRect.y = point.y - this.dragFrom.y;
+      this.windowInfo.diffRect.width = 0;
+      this.windowInfo.diffRect.height = 0;
 
       this.isMoving = true;
 
@@ -330,28 +348,31 @@ export default class WindowFrame extends Vue {
       return;
     }
 
-    this.diff.x = 0;
-    this.diff.y = 0;
-    this.diff.width = 0;
-    this.diff.height = 0;
-    if (param.type.indexOf("left") > -1) {
-      this.diff.width = this.dragFrom.x - point.x;
-      this.diff.x = -this.diff.width;
-    }
-    if (param.type.indexOf("right") > -1) {
-      this.diff.width = point.x - this.dragFrom.x;
-    }
-    if (param.type.indexOf("top") > -1) {
-      this.diff.height = this.dragFrom.y - point.y;
-      this.diff.y = -this.diff.height;
-    }
-    if (param.type.indexOf("bottom") > -1) {
-      this.diff.height = point.y - this.dragFrom.y;
+    this.windowInfo.diffRect.x = 0;
+    this.windowInfo.diffRect.y = 0;
+    this.windowInfo.diffRect.width = 0;
+    this.windowInfo.diffRect.height = 0;
+
+    if (param.type) {
+      if (param.type.indexOf("left") > -1) {
+        this.windowInfo.diffRect.width = this.dragFrom.x - point.x;
+        this.windowInfo.diffRect.x = -this.windowInfo.diffRect.width;
+      }
+      if (param.type.indexOf("right") > -1) {
+        this.windowInfo.diffRect.width = point.x - this.dragFrom.x;
+      }
+      if (param.type.indexOf("top") > -1) {
+        this.windowInfo.diffRect.height = this.dragFrom.y - point.y;
+        this.windowInfo.diffRect.y = -this.windowInfo.diffRect.height;
+      }
+      if (param.type.indexOf("bottom") > -1) {
+        this.windowInfo.diffRect.height = point.y - this.dragFrom.y;
+      }
     }
 
     const simulationSize: Size = getWindowSize(this.windowInfo, this.windowElm);
-    simulationSize.width += this.diff.width;
-    simulationSize.height += this.diff.height;
+    simulationSize.width += this.windowInfo.diffRect.width;
+    simulationSize.height += this.windowInfo.diffRect.height;
 
     const correctSize: Size = {
       width: 0,
@@ -376,16 +397,20 @@ export default class WindowFrame extends Vue {
           getWindowSize(maxSize, this.windowElm).height - simulationSize.height;
     }
 
-    if (param.type.indexOf("left") > -1) this.diff.x -= correctSize.width;
-    if (param.type.indexOf("top") > -1) this.diff.y -= correctSize.height;
-    this.diff.width += correctSize.width;
-    this.diff.height += correctSize.height;
+    if (param.type) {
+      if (param.type.indexOf("left") > -1)
+        this.windowInfo.diffRect.x -= correctSize.width;
+      if (param.type.indexOf("top") > -1)
+        this.windowInfo.diffRect.y -= correctSize.height;
+    }
+    this.windowInfo.diffRect.width += correctSize.width;
+    this.windowInfo.diffRect.height += correctSize.height;
 
     task.resolve();
   }
 
   private get windowElm(): HTMLDivElement {
-    return this.$refs.window as HTMLDivElement;
+    return this.$refs["window-frame"] as HTMLDivElement;
   }
 
   @Watch("standImageSize", { immediate: true })
@@ -515,72 +540,83 @@ export default class WindowFrame extends Vue {
     if (maxSize && this.windowInfo.widthPx > maxSize.widthPx)
       this.windowInfo.widthPx = maxSize.widthPx;
 
-    const minSize = this.windowInfo.declare.maxSize;
+    const minSize = this.windowInfo.declare.minSize;
     if (minSize && this.windowInfo.widthPx < minSize.widthPx)
       this.windowInfo.widthPx = minSize.widthPx;
   }
 
   @Watch("isMounted")
-  @Watch("diff.x")
+  @Watch("windowInfo.diffRect.x")
   @Watch("windowInfo.x")
-  private onChangeWindowX() {
+  @Watch("windowInfo.diffRect.y")
+  @Watch("windowInfo.y")
+  private onChangeWindowLocation() {
     if (!this.isMounted) return;
-    const x = this.windowInfo.x + this.diff.x;
-    this.windowElm.style.setProperty("--windowX", `${x}px`);
+    const x = this.windowInfo.x + this.windowInfo.diffRect.x;
+    // this.windowElm.style.setProperty("--windowX", `${x}px`);
+    const y = this.windowInfo.y + this.windowInfo.diffRect.y;
+    // this.windowElm.style.setProperty("--windowY", `${y}px`);
+    this.windowElm.style.transform = `translate(${x}px, ${y}px)`;
   }
 
   @Watch("isMounted")
-  @Watch("diff.y")
+  @Watch("windowInfo.diffRect.y")
   @Watch("windowInfo.y")
   private onChangeWindowY() {
     if (!this.isMounted) return;
-    const y = this.windowInfo.y + this.diff.y;
-    this.windowElm.style.setProperty("--windowY", `${y}px`);
   }
 
   @Watch("isMounted")
-  @Watch("diff.width")
+  @Watch("windowInfo.diffRect.width")
   @Watch("windowInfo.widthPx")
   private async onChangeWindowWidth() {
     if (!this.isMounted) return;
-    const widthPx = this.windowInfo.widthPx + this.diff.width;
+    const scrollBarWidth = getCssPxNum("--scroll-bar-width");
+    const widthPx = this.windowInfo.widthPx + this.windowInfo.diffRect.width;
     const widthEm = this.windowInfo.widthEm;
     const widthRem = this.windowInfo.widthRem;
-    const heightPx = this.windowInfo.heightPx + this.diff.height;
+    const widthScrollBar = this.windowInfo.widthScrollBar * scrollBarWidth;
     this.windowElm.style.setProperty("--windowWidthPx", `${widthPx}px`);
     this.windowElm.style.setProperty("--windowWidthEm", `${widthEm}em`);
     this.windowElm.style.setProperty("--windowWidthRem", `${widthRem}rem`);
+    this.windowElm.style.setProperty(
+      "--windowWidthScrollBar",
+      `${widthScrollBar}px`
+    );
     await TaskManager.instance.ignition<WindowResizeInfo, never>({
       type: "window-resize",
       owner: "Quoridorn",
       value: {
         key: this.key,
-        status: this.status,
-        size: createSize(widthPx, heightPx)
+        status: this.status
       }
     });
   }
 
   @Watch("isMounted")
-  @Watch("diff.height")
+  @Watch("windowInfo.diffRect.height")
   @Watch("windowInfo.heightPx")
   @Watch("windowInfo.heightEm")
   private async onChangeWindowHeight() {
     if (!this.isMounted) return;
-    const widthPx = this.windowInfo.widthPx + this.diff.width;
-    const heightPx = this.windowInfo.heightPx + this.diff.height;
+    const scrollBarWidth = getCssPxNum("--scroll-bar-width");
+    const heightPx = this.windowInfo.heightPx + this.windowInfo.diffRect.height;
     const heightEm = this.windowInfo.heightEm;
     const heightRem = this.windowInfo.heightRem;
+    const heightScrollBar = this.windowInfo.heightScrollBar * scrollBarWidth;
     this.windowElm.style.setProperty("--windowHeightPx", `${heightPx}px`);
     this.windowElm.style.setProperty("--windowHeightEm", `${heightEm}em`);
     this.windowElm.style.setProperty("--windowHeightRem", `${heightRem}rem`);
+    this.windowElm.style.setProperty(
+      "--windowHeightScrollBar",
+      `${heightScrollBar}px`
+    );
     await TaskManager.instance.ignition<WindowResizeInfo, never>({
       type: "window-resize",
       owner: "Quoridorn",
       value: {
         key: this.key,
-        status: this.status,
-        size: createSize(widthPx, heightPx)
+        status: this.status
       }
     });
   }
@@ -626,8 +662,9 @@ export default class WindowFrame extends Vue {
 <style scoped lang="scss">
 @import "../../../assets/common";
 
-*[id^="window-"] {
+.window-frame {
   position: fixed;
+  visibility: hidden;
   display: block;
   padding: calc(var(--window-padding) + var(--window-title-height))
     var(--window-padding) var(--window-padding) var(--window-padding);
@@ -638,22 +675,18 @@ export default class WindowFrame extends Vue {
   box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.6);
   border: solid gray 1px;
   box-sizing: border-box;
-  left: var(--windowX);
-  top: var(--windowY);
-  /*
   left: 0;
   top: 0;
   -webkit-font-smoothing: subpixel-antialiased;
-  transform: translateX(var(--windowX)) translateY(var(--windowY)) translateZ(0)
-    scale(1, 1);
-  */
   width: calc(
     var(--windowWidthPx) + var(--windowWidthEm) + var(--windowWidthRem) +
-      var(--scroll-bar-width) + var(--window-padding) * 2 + 2px
+      var(--windowWidthScrollBar) + var(--scroll-bar-width) +
+      var(--window-padding) * 2 + 2px
   );
   height: calc(
     var(--windowHeightPx) + var(--windowHeightEm) + var(--windowHeightRem) +
-      var(--window-title-height) + var(--window-padding) * 2
+      var(--windowHeightScrollBar) + var(--window-title-height) +
+      var(--window-padding) * 2
   );
   font-size: var(--windowFontSize);
   z-index: var(--windowOrder);
@@ -661,20 +694,26 @@ export default class WindowFrame extends Vue {
   &.minimized {
     width: 100px !important;
     height: var(--window-title-height) !important;
-    top: calc(100% - var(--window-title-height)) !important;
-    left: calc(
-      100% - 100px * (var(--windowMinimizeLength) - var(--windowMinimizeIndex))
-    ) !important;
-    transition-property: width, height, top, left;
+    left: 100%;
+    top: 100%;
+    transform: translateX(
+        calc(
+          0px + -100% *
+            (var(--windowMinimizeLength) - var(--windowMinimizeIndex))
+        )
+      )
+      translateY(calc(-50%)) translateZ(0) !important;
+    transition-property: all;
     transition-delay: 0ms;
+    transform-origin: right;
     transition-timing-function: linear;
-    transition-duration: 200ms;
+    transition-duration: 250ms;
 
     .window-title {
       cursor: default;
       background-color: red;
 
-      &:hover + .window-title-balloon {
+      &:hover ~ .window-title-balloon {
         visibility: visible;
       }
     }
@@ -708,6 +747,74 @@ export default class WindowFrame extends Vue {
   border-top-width: 1px;
   border-bottom: 0;
   font-size: 1rem;
+}
+
+.window-info-balloon {
+  display: block;
+  z-index: 2;
+  visibility: hidden;
+  font-size: 1rem;
+  position: absolute;
+  top: calc(var(--window-title-height) * -1 - 1px);
+  line-height: var(--window-title-height);
+  left: 0.5em;
+  padding: 0 0.5rem;
+  text-align: left;
+  background-color: white;
+  border-color: gray;
+  border-style: solid;
+  border-left-width: 1px;
+  border-right-width: 1px;
+  border-top-width: 1px;
+  border-bottom: 0;
+
+  &:hover {
+    visibility: visible;
+  }
+
+  &.fontSizeChangeBan {
+    visibility: hidden !important;
+  }
+
+  .fontSizeSlider {
+    @include flex-box(row, center, center);
+    color: #444;
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      background-image: linear-gradient(
+        to bottom,
+        rgb(160, 166, 162) 0%,
+        rgb(201, 199, 200) 100%
+      );
+      height: 0.4em;
+      width: 5rem;
+      margin: 0;
+      border-radius: 0.3em;
+      border: 1px solid rgb(167, 167, 167);
+      border-top: 1px solid rgb(105, 110, 106);
+      box-sizing: border-box;
+      cursor: pointer;
+
+      &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        position: relative;
+        width: 1em;
+        height: 1em;
+        display: block;
+        background-image: linear-gradient(
+          to bottom,
+          rgb(242, 248, 246) 0%,
+          rgb(242, 248, 246) 50%,
+          rgb(230, 240, 239) 51%,
+          rgb(230, 240, 239) 100%
+        );
+        border-radius: 50%;
+        -webkit-border-radius: 50%;
+        border: 1px solid rgb(167, 167, 167);
+      }
+    }
+  }
 }
 
 ._contents {
@@ -759,61 +866,8 @@ export default class WindowFrame extends Vue {
     margin-right: auto;
   }
 
-  .fontSizeSlider {
-    @include flex-box(row, center, center);
-    font-size: 10px;
-    color: #444;
-
-    input[type="range"] {
-      -webkit-appearance: none;
-      background-image: linear-gradient(
-        to bottom,
-        rgb(160, 166, 162) 0%,
-        rgb(201, 199, 200) 100%
-      );
-      height: 0.4em;
-      width: 5rem;
-      border-radius: 0.3em;
-      border: 1px solid rgb(167, 167, 167);
-      border-top: 1px solid rgb(105, 110, 106);
-      box-sizing: border-box;
-
-      &::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        cursor: pointer;
-        position: relative;
-        width: 1em;
-        height: 1em;
-        display: block;
-        background-image: linear-gradient(
-          to bottom,
-          rgb(242, 248, 246) 0%,
-          rgb(242, 248, 246) 50%,
-          rgb(230, 240, 239) 51%,
-          rgb(230, 240, 239) 100%
-        );
-        border-radius: 50%;
-        -webkit-border-radius: 50%;
-        border: 1px solid rgb(167, 167, 167);
-      }
-    }
-  }
-
-  .title-icon-area i {
-    display: block;
-    padding: 3px;
-    font-size: 8px;
-    border: 2px solid rgba(0, 0, 0, 0.5);
-    color: rgba(0, 0, 0, 0.5);
-    transform-origin: right;
-    transform: scale(0.8) translateX(0);
-    cursor: pointer;
-    white-space: nowrap;
-
-    &:hover {
-      border-color: black;
-      color: black;
-    }
+  &:hover + .window-info-balloon {
+    visibility: visible;
   }
 }
 

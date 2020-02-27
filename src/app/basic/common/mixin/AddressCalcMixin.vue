@@ -9,14 +9,13 @@ import {
   calcDistance,
   createPoint
 } from "@/app/core/Coordinate";
-import { Matrix, Point, Rectangle } from "@/@types/address";
+import { Matrix, Point, Rectangle } from "address";
 import VueEvent from "@/app/core/decorator/VueEvent";
-import { getCssPxNum } from "@/app/core/Css";
 import CssManager from "@/app/core/css/CssManager";
 
 type Coordinates = {
   angle: number; // 角度
-  planeLocateScreen: Point; // マップ回転前のスクリーンベースの座標
+  planeLocateScene: Point; // マップ回転前のスクリーンベースの座標
   planeLocateCanvas: Point; // マップ回転前のキャンバスベースの座標
 };
 
@@ -27,46 +26,11 @@ export default class AddressCalcMixin extends Vue {
   @Getter("mapBorderWidth") protected mapBorderWidth: any;
   @Getter("mapWheel") protected mapWheel: any;
 
-  protected static getMapGridSize(): number {
-    return getCssPxNum("--gridSize", document.getElementById("gameTable")!);
-  }
-
-  protected static getMapRow(): number {
-    return parseInt(
-      CssManager.getCss("--totalRow", document.getElementById("gameTable")!),
-      10
-    );
-  }
-
-  protected static getMapColumn(): number {
-    return parseInt(
-      CssManager.getCss("--totalColumn", document.getElementById("gameTable")!),
-      10
-    );
-  }
-
-  protected static getMapMarginRow(): number {
-    return parseInt(
-      CssManager.getCss("--margin-row", document.getElementById("gameTable")!),
-      10
-    );
-  }
-
-  protected static getMapMarginColumn(): number {
-    return parseInt(
-      CssManager.getCss(
-        "--margin-column",
-        document.getElementById("gameTable")!
-      ),
-      10
-    );
-  }
-
   /**
    * 指定されたスクリーン座標を元に、座標計算を行う
    * @param mouse
    * @param oldAngle
-   * @returns {{angle: number, planeLocateScreen: {x: *, y: *}, planeLocateCanvas: {x: *, y: *}, planeLocateTable: {x: *, y: *}}}
+   * @returns {{angle: number, planeLocateScene: {x: *, y: *}, planeLocateCanvas: {x: *, y: *}, planeLocateTable: {x: *, y: *}}}
    */
   protected calcCoordinate(mouse: Point, oldAngle: number): Coordinates {
     // canvas上のマス座標を計算する
@@ -74,7 +38,8 @@ export default class AddressCalcMixin extends Vue {
       .getElementById("map-canvas")!
       .getBoundingClientRect() as Rectangle;
 
-    const zoom = (getCssPxNum("--wheel") * -1 + 1000) / 1000;
+    const wheel = CssManager.instance.propMap.wheel;
+    const zoom = (wheel * -1 + 1000) / 1000;
     // canvasの中心点
     const canvasCenter: Point = calcCenter(canvasRectangle);
     // 中心点と指定された座標とを結ぶ線の角度を求める
@@ -83,52 +48,52 @@ export default class AddressCalcMixin extends Vue {
     const distance: number = calcDistance(mouse, canvasCenter) * zoom;
     // マップ回転前の角度を求める
     const angleBefore: number = arrangeAngle(angle - oldAngle);
-    const planeLocateScreen: Point = {
+    const planeLocateScene: Point = {
       x: canvasCenter.x + distance * Math.cos((angleBefore * Math.PI) / 180),
       y: canvasCenter.y + distance * Math.sin((angleBefore * Math.PI) / 180)
     };
     const planeLocateCenter: Point = {
-      x: planeLocateScreen.x - canvasCenter.x,
-      y: planeLocateScreen.y - canvasCenter.y
+      x: planeLocateScene.x - canvasCenter.x,
+      y: planeLocateScene.y - canvasCenter.y
     };
-    const gridSize = AddressCalcMixin.getMapGridSize();
-    const mapColumn = AddressCalcMixin.getMapColumn();
-    const mapRow = AddressCalcMixin.getMapRow();
+    const gridSize = CssManager.instance.propMap.gridSize;
+    const mapColumn = CssManager.instance.propMap.totalColumn;
+    const mapRow = CssManager.instance.propMap.totalRow;
     const planeLocateCanvas: Point = {
       x: planeLocateCenter.x + (mapColumn / 2) * gridSize,
       y: planeLocateCenter.y + (mapRow / 2) * gridSize
     };
     return {
       angle, // 角度
-      planeLocateScreen, // マップ回転前のスクリーンベースの座標
+      planeLocateScene, // マップ回転前のスクリーンベースの座標
       planeLocateCanvas // マップ回転前のキャンバスベースの座標
     };
   }
 
   @VueEvent
   protected calcCanvasAddress(
-    screenX: number,
-    screenY: number,
+    sceneX: number,
+    sceneY: number,
     oldAngle: number,
     offsetX: number = 0,
     offsetY: number = 0
   ): any {
     const coordinateObj: Coordinates = this.calcCoordinate(
-      createPoint(screenX, screenY),
+      createPoint(sceneX, sceneY),
       oldAngle
     );
 
     // マス座標
     const addressObj: Matrix = this.calcAddress(
-      screenX,
-      screenY,
+      sceneX,
+      sceneY,
       oldAngle,
       offsetX,
       offsetY
     );
 
     return {
-      locateOnScreen: coordinateObj.planeLocateScreen,
+      locateOnScene: coordinateObj.planeLocateScene,
       locateOnCanvas: coordinateObj.planeLocateCanvas,
       grid: addressObj
     };
@@ -136,26 +101,26 @@ export default class AddressCalcMixin extends Vue {
 
   /**
    * スクリーン座標と角度からマップ上の座標(column, row)を算出する
-   * @param screenX
-   * @param screenY
+   * @param sceneX
+   * @param sceneY
    * @param oldAngle
    * @param offsetX
    * @param offsetY
    */
   private calcAddress(
-    screenX: number,
-    screenY: number,
+    sceneX: number,
+    sceneY: number,
     oldAngle: number,
     offsetX: number = 0,
     offsetY: number = 0
   ): Matrix {
     // 回転やズームの前のスクリーン座標がどこになるかを計算し、そこをベースにマップ上の座標を算出する
     let planeLocateCanvas: Point = this.calcCoordinate(
-      createPoint(screenX, screenY),
+      createPoint(sceneX, sceneY),
       oldAngle
     ).planeLocateCanvas;
 
-    const gridSize = AddressCalcMixin.getMapGridSize();
+    const gridSize = CssManager.instance.propMap.gridSize;
     // ドロップ先のマス座標を算出
     let column: number = Math.ceil(planeLocateCanvas.x / gridSize);
     let row: number = Math.ceil(planeLocateCanvas.y / gridSize);

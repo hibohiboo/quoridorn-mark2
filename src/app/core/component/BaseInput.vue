@@ -1,5 +1,6 @@
 <template>
   <component
+    class="input"
     v-bind:is="'input'"
     v-bind="$attrs"
     v-on="listeners"
@@ -22,7 +23,7 @@ export default class BaseInput extends Vue {
     };
   }
 
-  private get elm(): HTMLInputElement {
+  public get elm(): HTMLInputElement {
     return this.$refs.component as HTMLInputElement;
   }
 
@@ -53,6 +54,10 @@ input {
 
   &:read-only {
     outline: none;
+  }
+
+  &:disabled {
+    background-color: lightgray;
   }
 }
 </style>

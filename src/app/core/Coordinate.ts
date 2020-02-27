@@ -1,4 +1,4 @@
-import { Anchor, Point, Rectangle, Size } from "@/@types/address";
+import { Anchor, Point, Rectangle, Size } from "address";
 import { WindowSize } from "@/@types/window";
 import WindowManager from "@/app/core/window/WindowManager";
 import { getCssPxNum } from "@/app/core/Css";
@@ -13,13 +13,22 @@ export function createSize(width: number, height: number): Size {
 }
 
 export function getWindowSize(s: WindowSize, elm?: HTMLElement): Size {
+  const scrollBarWidth = getCssPxNum("--scroll-bar-width");
   const rootFontSize = getCssPxNum("font-size");
   const elmFontSize = elm ? getCssPxNum("font-size", elm) : 12;
   const getEmSize = (n: number) => n * elmFontSize;
   const getRemSize = (n: number) => n * rootFontSize;
   return {
-    width: s.widthPx + getEmSize(s.widthEm) + getRemSize(s.widthRem),
-    height: s.heightPx + getEmSize(s.heightEm) + getRemSize(s.heightRem)
+    width:
+      s.widthPx +
+      getEmSize(s.widthEm) +
+      getRemSize(s.widthRem) +
+      scrollBarWidth * s.widthScrollBar,
+    height:
+      s.heightPx +
+      getEmSize(s.heightEm) +
+      getRemSize(s.heightRem) +
+      scrollBarWidth * s.heightScrollBar
   };
 }
 
@@ -109,7 +118,8 @@ export function getPaneHeight(windowKey: string): number {
   //   const windowContentsHeight = getCssPxNum("height", windowContents);
   //   return windowContentsHeight + windowTitleHeight + windowPadding * 2;
   // }
-  throw new ApplicationError("ありえない分岐");
+  return 0;
+  // throw new ApplicationError("ありえない分岐");
 }
 
 export function getPageSize(): Size {
@@ -145,11 +155,11 @@ export function calcWindowPosition(
   if (typeof position !== "string") return position;
 
   let point: Point = createPoint(0, 0);
-  const screenSize = getPageSize();
-  const screenCenter = calcCenter({
+  const sceneSize = getPageSize();
+  const sceneCenter = calcCenter({
     ...createPoint(0, menuHeight),
-    width: screenSize.width,
-    height: screenSize.height - menuHeight
+    width: sceneSize.width,
+    height: sceneSize.height - menuHeight
   });
   const windowCenter = calcCenter({
     ...createPoint(0, 0),
@@ -157,27 +167,27 @@ export function calcWindowPosition(
   });
 
   if (position === "center") {
-    point.x = screenCenter.x - windowCenter.x;
-    point.y = screenCenter.y - windowCenter.y;
+    point.x = sceneCenter.x - windowCenter.x;
+    point.y = sceneCenter.y - windowCenter.y;
   } else {
     const windowTitleHeight = getCssPxNum("--window-title-height");
     const windowPadding = getCssPxNum("--window-padding");
     const scrollBarWidth = getCssPxNum("--scroll-bar-width");
     const [h, v] = position.toString().split("-");
     if (h === "left") point.x = 0;
-    if (h === "center") point.x = screenCenter.x - windowCenter.x;
+    if (h === "center") point.x = sceneCenter.x - windowCenter.x;
     if (h === "right")
       point.x =
-        screenSize.width -
+        sceneSize.width -
         windowSize.width -
         windowPadding * 2 -
         scrollBarWidth -
         2;
     if (v === "top") point.y = menuHeight;
-    if (v === "center") point.y = screenCenter.y - windowCenter.y;
+    if (v === "center") point.y = sceneCenter.y - windowCenter.y;
     if (v === "bottom")
       point.y =
-        screenSize.height -
+        sceneSize.height -
         windowSize.height -
         windowPadding * 2 -
         windowTitleHeight;

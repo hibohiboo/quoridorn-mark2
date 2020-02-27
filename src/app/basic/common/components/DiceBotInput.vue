@@ -2,7 +2,8 @@
   <div class="root" ref="component">
     <div class="front">
       <input
-        class="text-input"
+        type="text"
+        class="input text-input"
         :class="{ pending: isSelectMode }"
         v-model="inputText"
         @input.prevent="onTextInput($event.target.value)"
@@ -62,14 +63,14 @@ import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
 import BCDiceFacade from "@/app/core/api/bcdice/BCDiceFacade";
 import { BcdiceSystemInfo, DiceSystem } from "@/@types/bcdice";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import LanguageManager from "@/LanguageManager";
 import ComponentVue from "@/app/core/window/ComponentVue";
 import { Component, Mixins } from "vue-mixin-decorator";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import VueEvent from "@/app/core/decorator/VueEvent";
-import { Point, Rectangle, Size } from "@/@types/address";
+import { Point, Rectangle, Size } from "address";
 import { createPoint, createRectangle } from "@/app/core/Coordinate";
 import { WindowInfo, WindowMoveInfo } from "@/@types/window";
 import DiceBotSelect from "@/app/basic/common/components/select/DiceBotSelect.vue";
@@ -170,10 +171,10 @@ export default class DiceBotInput2 extends Mixins<ComponentVue>(ComponentVue) {
 
   private updateLocation() {
     const rect = this.getRect();
-    const screenHeight = window.innerHeight;
+    const sceneHeight = window.innerHeight;
     const menuHeight = getCssPxNum("--menu-bar-height");
     const itemHeight = getCssPxNum("--select-item-height", this.elm);
-    const inputBottom = screenHeight - menuHeight - rect.y - rect.height;
+    const inputBottom = sceneHeight - menuHeight - rect.y - rect.height;
     const contentsHeight =
       Math.min(this.filteredSystemList.length, 10) * itemHeight;
     const y =

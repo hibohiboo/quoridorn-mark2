@@ -7,7 +7,7 @@
         windowInfo.status === 'window' || windowInfo.status.endsWith('-window')
       "
       :windowInfo="windowInfo"
-      :status="'window'"
+      status="window"
     />
   </div>
 </template>
@@ -15,7 +15,7 @@
 <script lang="ts">
 import { Component, Vue } from "vue-property-decorator";
 import TaskProcessor from "../task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import { WindowInfo } from "@/@types/window";
 import WindowFrame from "./WindowFrame.vue";
 import WindowManager from "./WindowManager";
@@ -77,7 +77,6 @@ export default class WindowArea extends Vue {
   }
 
   @TaskProcessor("window-normalize-finished")
-  @Logging
   private async normalizeWindow(
     task: Task<string, never>
   ): Promise<TaskResult<never> | void> {

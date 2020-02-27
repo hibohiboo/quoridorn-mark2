@@ -17,6 +17,7 @@ button:
   logout: Déconnexion
   exit-room: Quitter
   edit: 編集
+  chmod: 権限変更
 
 type:
   map-mask: Masque de carte
@@ -79,7 +80,6 @@ label:
   height: La hauteur
   width: Largeur
   alpha: Transmittance
-  multi-create: Créer plusieurs
   tag: Tag
   direction: Orientation
   direction-none: Comme c'est
@@ -139,6 +139,38 @@ label:
   permission-view: 閲覧権限
   permission-edit: 編集権限
   permission-chmod: 権限変更権限
+  map-object: マップオブジェクト
+  place: 場所
+  field: フィールド
+  graveyard: 墓地
+  backstage: 控え室
+  actor-status: 状態
+  x: X
+  y: Y
+  original-address: 独自座標
+  char: 文字
+  additional-info: 付加情報
+  repeat: リピート
+  stand-by: スタンバイ
+  force-continue: 多重再生時は既存再生を優先する
+  force-new: 強制新規再生
+  chat-linkage: チャット連動
+  chat-linkage-type: 連動方法
+  chat-linkage-type-last: 末尾
+  chat-linkage-type-regexp: 正規表現
+  chat-linkage-target: チャット連動対象
+  javascript-regexp: Javascriptの正規表現
+  last-str: 末尾の文字列
+  fade-in: フェードイン
+  fade-out: フェードアウト
+  volume: 音量
+  url: URL
+  title: タイトル
+  play-start: 再生開始
+  play-end: 再生終了
+  second: 秒
+  url-placeholder: 指定なしで「停止」の指定
+  locking: ロック中
 
 message:
   copy-to-clipboard: Copié dans le presse-papiers.
@@ -236,11 +268,23 @@ input-image-password-window:
   window-title: Entrez le mot de passe pour l'image cachée
   message: En entrant le mot de passe, vous pouvez afficher l'image cachée.
 
-edit-area-map-window:
+scene-list-window:
   window-title: エリアマップ編集
 
-edit-map-window:
-  window-title: マップ編集
+edit-scene-window:
+  window-title: シーン編集
+  message-select:
+    layer-view: レイヤーの表示・非表示を切り替えます。
+    object-order: ドラッグでオブジェクトの順番を入れ替えます。
+    object-order-mode-on: オブジェクトの順番を入れ替えるモードにします。
+    object-order-mode-off: 通常のモードに戻します。
+    original-address: 他のシーンと異なる座標を持つかの設定です。
 
 chmod-window:
   window-title: 権限変更
+
+add-bgm-window:
+  window-title: BGM追加
+
+edit-bgm-window:
+  window-title: BGM編集

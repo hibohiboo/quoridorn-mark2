@@ -1,26 +1,32 @@
-import { Point } from "@/@types/address";
-import { Permission } from "@/@types/store";
+import { Matrix, Point } from "address";
+import { Permission, StoreObj } from "@/@types/store";
 
 export type TouchRequest = {
   collection: string;
   id?: string;
+  owner?: string;
 };
 export type TouchModifyRequest = TouchRequest & {
   id: string;
 };
 export type ReleaseTouchRequest = TouchModifyRequest & {
-  continuous?: boolean;
+  option?: { continuous?: boolean };
 };
 
 export type CreateDataRequest = TouchModifyRequest & {
   data: any;
   permission: Permission;
 };
+export type AddDirectRequest = {
+  collection: string;
+  dataList: any[];
+  permission: Permission;
+  owner: string;
+};
 export type DeleteDataRequest = TouchModifyRequest;
 export type UpdateDataRequest = TouchModifyRequest & {
   data: any;
-  permission?: Permission;
-  continuous?: boolean;
+  option?: Partial<StoreObj<unknown>> & { continuous?: boolean };
 };
 
 export type DataReference = {
@@ -31,4 +37,5 @@ export type DataReference = {
 export type AddObjectInfo = {
   dropWindow: string;
   point: Point;
+  matrix: Matrix;
 };

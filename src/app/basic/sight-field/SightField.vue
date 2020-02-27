@@ -12,16 +12,10 @@
 <script lang="ts">
 import PieceMixin from "@/app/basic/common/mixin/PieceMixin.vue";
 
-import { Prop, Watch } from "vue-property-decorator";
-import { Component, Mixins } from "vue-mixin-decorator";
-import { Getter } from "vuex-class";
-import { stroke } from "@/app/core/CanvasDrawer";
-import LifeCycle from "@/app/core/decorator/LifeCycle";
-import AddressCalcMixin from "@/app/basic/common/mixin/AddressCalcMixin.vue";
-import { ChitStore } from "@/@types/gameObject";
+import { Component } from "vue-mixin-decorator";
 
 @Component
-export default class SightField extends PieceMixin<ChitStore> {
+export default class SightField extends PieceMixin<"chit"> {
   // @Getter("getAllObstacle") protected getAllObstacle: any;
   // @Getter("mapColumns") protected mapColumns: any;
   // @Getter("rows") protected rows: any;
@@ -53,7 +47,7 @@ export default class SightField extends PieceMixin<ChitStore> {
   //   this.paint();
   // }
   //
-  // private paint(this: any) {
+  // private paint() {
   //   let canvas: HTMLCanvasElement = this.$refs.canvas as HTMLCanvasElement;
   //   const ctx: CanvasRenderingContext2D = canvas.getContext(
   //     "2d"
@@ -580,7 +574,7 @@ export default class SightField extends PieceMixin<ChitStore> {
   //     transform: transform
   //   };
   // }
-  // get tableSize(this: any): any {
+  // get tableSize(): any {
   //   const marginColumn = AddressCalcMixin.getMapMarginColumn();
   //   const marginRow = AddressCalcMixin.getMapMarginRow();
   //   return {

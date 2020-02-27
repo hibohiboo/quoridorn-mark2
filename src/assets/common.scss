@@ -9,6 +9,7 @@
   justify-content: if($direction == row, $horizontal, $vertical);
   align-items: if($direction == row, $vertical, $horizontal);
   flex-wrap: $wrap;
+  align-content: flex-start;
 }
 
 @mixin inline-flex-box(
@@ -22,31 +23,77 @@
   justify-content: if($direction == row, $horizontal, $vertical);
   align-items: if($direction == row, $vertical, $horizontal);
   flex-wrap: $wrap;
+  align-content: flex-start;
 }
 
 @mixin basic-map-object() {
   @include flex-box(row, center, center);
-  position: fixed;
-  left: calc(var(--x) + var(--margin-column) * var(--gridSize) - var(--inflate-width));
-  top: calc(var(--y) + var(--margin-row) * var(--gridSize) - var(--inflate-width));
-  width: calc(var(--columns) * var(--gridSize) + var(--inflate-width) * 2);
-  height: calc(var(--rows) * var(--gridSize) + var(--inflate-width) * 2);
-  transform: rotate(var(--angle));
+  position: absolute;
+  left: 0;
+  top: 0;
   box-sizing: border-box;
   white-space: nowrap;
   font-size: 12px;
   cursor: crosshair;
-  z-index: var(--order);
-  outline-offset: calc((var(--isHideHighlight) - 1) * 6px);
-  outline: rgb(187, 187, 255) solid calc((var(--isHideHighlight) - 1) * -6px);
+  /* JavaScriptで設定されるプロパティ
+  width
+  height
+  transform
+  z-index
+  outline-offset
+  outline
+  */
 
-  &.hover {
-    z-index: 599999999;
+  .tag {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 0;
+    transform: translateY(-100%);
   }
 
-  &.hover.moving,
+  .lock-info {
+    position: absolute;
+    outline-offset: 5px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    outline: 5px dashed green;
+  }
+
+  .lock-info-message {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translateY(-100%);
+    border: 1px solid gray;
+    border-radius: 0.2rem 0.2rem 0 0;
+    background-color: white;
+    padding-left: 0.2rem;
+  }
+
+  &.other-player-last-modify {
+    transition: transform 0.3s linear;
+  }
+
+  &.transitioning {
+    pointer-events: none;
+  }
+
+  &.hover {
+    z-index: 599999999 !important;
+  }
+
+  &.moving,
   &.rolling {
-    z-index: 999999999;
+    z-index: 999999999 !important;
+  }
+
+  &.focus:after {
+    outline: dashed 5px red;
+    outline-offset: 3px;
+    animation: blink-focus 1s ease-in-out infinite alternate;
   }
 
   &:before {
@@ -77,7 +124,18 @@
     bottom: 0;
     top: 0;
     border-radius: 5px;
-    box-shadow: 0 0 0 calc((var(--isHideBorder) - 1) * -3px) var(--isLock);
+    /* JavaScriptで設定されるプロパティ
+    box-shadow
+    */
+  }
+}
+
+@keyframes blink-focus {
+  0% {
+    outline-color: red;
+  }
+  100% {
+    outline-color: transparent;
   }
 }
 

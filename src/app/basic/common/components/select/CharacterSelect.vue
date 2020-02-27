@@ -16,7 +16,7 @@ import { Place } from "@/@types/gameObject";
 import { HtmlOptionInfo } from "@/@types/window";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { Task, TaskResult } from "@/@types/task";
+import { Task, TaskResult } from "task";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import LanguageManager from "@/LanguageManager";
 import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
@@ -54,21 +54,20 @@ export default class CharacterSelect extends Mixins<MultiMixin>(
       LanguageManager.instance
     );
 
-    let characterList = GameObjectManager.instance.characterList;
-    if (this.placeList.length) {
-      characterList = characterList.filter(
-        c => this.placeList.findIndex(p => p === c.data!.place) > -1
-      );
-    }
-    this.optionInfoList = characterList.map(c => {
-      let text = c.data!.name;
-      return {
+    this.optionInfoList = GameObjectManager.instance.sceneObjectList
+      .filter(mo => {
+        if (!(mo.data!.type === "character")) return false;
+        return (
+          this.placeList.length === 0 ||
+          this.placeList.findIndex(p => p === mo.data!.place) > -1
+        );
+      })
+      .map(c => ({
         key: c.id!,
         value: c.id!,
-        text,
+        text: c.data!.name,
         disabled: false
-      };
-    });
+      }));
     this.optionInfoList.unshift({
       key: "",
       value: "",
