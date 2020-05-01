@@ -54,18 +54,20 @@
     </div>
     <!-- 部屋情報 -->
     <div class="menu-button" @click="clickRoomInfo">
-      <span>{{ roomInfo.name }}</span>
+      <span>{{ roomData.name }}</span>
       ：
       <span>{{ userList | loginNum }}</span>
       名
     </div>
     <!-- 共有メモ -->
     <div class="menu-button" @click="clickPublicMemo">
-      共有メモ
+      <span class="icon-file-text"></span>
+      <span>共有メモ</span>
     </div>
     <!-- ログアウト -->
     <div class="menu-button" @click="clickLogOut">
-      ログアウト
+      <span class="icon-switch"></span>
+      <span>ログアウト</span>
     </div>
 
     <!--------------------------------------------------
@@ -241,9 +243,8 @@
 <script lang="ts">
 import MenuBooleanItem from "./MenuBooleanItem.vue";
 
-import { Action, Getter } from "vuex-class";
-import { Component, Prop, Vue } from "vue-property-decorator";
-import { ClientRoomInfo } from "@/@types/socket";
+import { Action } from "vuex-class";
+import { Component, Vue } from "vue-property-decorator";
 import { StoreUseData } from "@/@types/store";
 import { UserData } from "@/@types/room";
 import VueEvent from "@/app/core/decorator/VueEvent";
@@ -261,9 +262,7 @@ import GameObjectManager from "@/app/basic/GameObjectManager";
   }
 })
 export default class Menu extends Vue {
-  @Prop({ type: Object, required: true })
-  private roomInfo!: ClientRoomInfo;
-
+  private roomData = GameObjectManager.instance.roomData;
   @Action("windowOpenDeprecated") private windowOpenDeprecated: any;
   @Action("setPropertyDeprecated") private setPropertyDeprecated: any;
   @Action("doResetWindowLocateDeprecated")
@@ -287,7 +286,7 @@ export default class Menu extends Vue {
     this.isSelecting = !this.isSelecting;
   }
 
-  isShow(this: any, ...props: any[]): any {
+  isShow(...props: any[]): any {
     return (
       this.isSelecting && props.filter(prop => prop === this.currentMenu)[0]
     );
@@ -614,7 +613,7 @@ export default class Menu extends Vue {
 }
 .hoverMenu {
   position: fixed;
-  top: calc(2.5em - 1px);
+  top: calc(var(--menu-bar-height) / 2 + 0.9rem - 1px);
   background: white;
   border: solid gray 1px;
   box-sizing: border-box;
@@ -651,7 +650,7 @@ export default class Menu extends Vue {
   left: 24em;
 }
 .hoverMenu8 {
-  left: calc(25em - 1px);
+  left: calc(24em - 1px);
 }
 .hoverMenu9 {
   left: 29em;

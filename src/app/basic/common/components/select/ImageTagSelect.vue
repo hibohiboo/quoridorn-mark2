@@ -46,33 +46,26 @@ export default class ImageTagSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
-    this.optionInfoList = GameObjectManager.instance.imageTagList.map(
-      tagObj => ({
-        key: tagObj.id,
-        value: tagObj.data,
-        text: tagObj.data,
+    this.optionInfoList = GameObjectManager.instance.mediaList
+      .map(image => image.data!.tag)
+      .filter((tag, idx, list) => list.indexOf(tag) === idx)
+      .map(tag => ({
+        key: tag,
+        value: tag,
+        text: tag || LanguageManager.instance.getText("label.non-tag"),
         disabled: false
-      })
-    );
+      }));
     if (this.defaultLabel) {
       this.optionInfoList.unshift({
         key: null,
-        value: "",
+        value: null,
         text:
           this.defaultLabel === "label.image-tag"
-            ? getText(this.defaultLabel)
+            ? this.$t(this.defaultLabel)!
             : this.defaultLabel,
         disabled: true
       });
     }
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

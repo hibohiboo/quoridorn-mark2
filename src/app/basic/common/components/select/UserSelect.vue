@@ -31,6 +31,9 @@ export default class UserSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
 ) {
+  @Prop({ type: Boolean, default: false })
+  private isUseAll!: boolean;
+
   private optionInfoList: HtmlOptionInfo[] = [];
 
   @LifeCycle
@@ -47,13 +50,10 @@ export default class UserSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
-
     let userList = GameObjectManager.instance.userList;
     this.optionInfoList = userList.map(u => {
-      let text = u.data!.userName;
+      const userTypeStr = this.$t(`label.${u.data!.type}`)!.toString();
+      const text = `${u.data!.name}(${userTypeStr})`;
       return {
         key: u.id!,
         value: u.id!,
@@ -61,17 +61,20 @@ export default class UserSelect extends Mixins<MultiMixin>(
         disabled: false
       };
     });
+    if (this.isUseAll) {
+      this.optionInfoList.unshift({
+        key: "",
+        value: "",
+        text: this.$t("label.all")!.toString(),
+        disabled: false
+      });
+    }
     this.optionInfoList.unshift({
-      key: "",
-      value: "",
-      text: getText("type.user"),
+      key: "label",
+      value: "label",
+      text: this.$t("type.user")!.toString(),
       disabled: true
     });
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

@@ -50,10 +50,6 @@ export default class CharacterSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
-
     this.optionInfoList = GameObjectManager.instance.sceneObjectList
       .filter(mo => {
         if (!(mo.data!.type === "character")) return false;
@@ -71,14 +67,9 @@ export default class CharacterSelect extends Mixins<MultiMixin>(
     this.optionInfoList.unshift({
       key: "",
       value: "",
-      text: getText("type.character"),
+      text: this.$t("type.character")!.toString(),
       disabled: true
     });
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

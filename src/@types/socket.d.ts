@@ -2,35 +2,45 @@ import { ChangeType } from "nekostore/lib/DocumentChange";
 import { StoreObj, StoreUseData } from "@/@types/store";
 import { TargetVersion } from "@/app/core/api/Github";
 
-/**
- * マップのデフォルト形状
- */
-type MapShape = "square" | "horizontal-hex" | "vertical-hex";
+type WindowSetting =
+  | "not-use" // 使えなくします
+  | "free" // 特に指定はありません
+  | "init-view" // 入室時に表示します
+  | "always-open"; // 常に開いています。閉じることはできません。
+
+type WindowSettings = {
+  chat: WindowSetting;
+  resource: WindowSetting;
+  initiative: WindowSetting;
+  chatPalette: WindowSetting;
+  counterRemocon: WindowSetting;
+};
 
 /**
  * 部屋の追加情報
  */
 export type RoomInfoExtend = {
-  visitable: boolean;
-  chatWindow: boolean;
-  dice: boolean;
-  initiativeWindow: boolean;
-  resourceWindow: boolean;
-  chatPaletteWindow: boolean;
-  counterRemocon: boolean;
-  standImage: boolean;
-  cutIn: boolean;
-  drawMapAddress: boolean;
-  mapShape: MapShape;
-  drawMapShape: boolean;
-  autoFitMapShape: boolean;
-  autoResizeStandImage: boolean;
+  visitable: boolean; // 見学許可
+  isFitGrid: boolean; // マップオブジェクトをセルに自動調整するか
+  isViewDice: boolean; // ダイスを表示するか
+  isViewCutIn: boolean; // カットインを表示するか
+  isDrawGridId: boolean; // マップ座標を表示するか
+  mapRotatable: boolean; // マップを回転させるか
+  isDrawGridLine: boolean; // マップ罫線を表示するか
+  isShowStandImage: boolean; // 立ち絵を表示するか,
+  isShowRotateMarker: boolean; // マップオブジェクトの回転マーカーを表示するか
+  windowSettings: WindowSettings;
+};
+
+export type PartialRoomInfoExtend = Partial<RoomInfoExtend> & {
+  windowSettings?: Partial<WindowSettings>;
 };
 
 type BaseRoomInfo = {
   name: string;
+  bcdiceServer: string;
   system: string;
-  extend?: RoomInfoExtend; // 一時的措置
+  extend: RoomInfoExtend;
 };
 
 export type RoomLoginInfo = {
@@ -43,14 +53,15 @@ export type UserType = "GM" | "PL" | "VISITOR";
 
 export type UserLoginWindowInput = {
   isSetting: boolean;
-  userNameList: string[];
-  userName: string | null;
+  visitable: boolean;
+  nameList: string[];
+  name: string | null;
 };
 
 export type UserLoginInput = {
-  userName: string;
-  userType?: UserType;
-  userPassword: string;
+  name: string;
+  type?: UserType;
+  password: string;
 };
 export type UserLoginRequest = UserLoginInput;
 
@@ -137,3 +148,10 @@ export type SendDataRequest<T> = {
   owner: string;
   data: T | null;
 };
+
+export type UploadFileInfo = {
+  name: string;
+  src: string | ArrayBuffer | null;
+};
+
+export type UploadFileRequest = UploadFileInfo[];

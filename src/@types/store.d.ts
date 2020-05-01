@@ -2,10 +2,11 @@
  * DBに格納されるデータのラッパー
  */
 export type StoreObj<T> = {
+  ownerType: string | null;
+  owner: string | null; // 部屋データに含まれるデータのオーナー。部屋データにはオーナーは存在しない
   order: number;
   exclusionOwner: string | null; // 排他制御のオーナー
   lastExclusionOwner: string | null; // 排他制御のオーナー
-  owner: string | null; // 部屋データに含まれるデータのオーナー。部屋データにはオーナーは存在しない
   data?: T;
   permission: Permission | null; // 通常はnullではない
   status:
@@ -34,7 +35,7 @@ export type StoreUseData<T> = StoreObj<T> & StoreMetaData;
 /**
  * 権限対象の種別
  */
-export type PermissionNodeType = "group" | "user" | "character" | "owner";
+export type PermissionNodeType = "group" | "actor" | "owner";
 
 /**
  * 権限対象1件の表現

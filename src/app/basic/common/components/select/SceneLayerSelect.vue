@@ -65,10 +65,6 @@ export default class SceneLayerSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
-
     this.optionInfoList = GameObjectManager.instance.sceneLayerList
       .sort((ml1, ml2) => {
         const ml1Index = this.orderList.findIndex(o => o === ml1.id);
@@ -80,7 +76,8 @@ export default class SceneLayerSelect extends Mixins<MultiMixin>(
       .map(ml => {
         const mlIndex = this.orderList.findIndex(o => o === ml.id);
         let text = ml.data!.name;
-        if (ml.data!.type !== "other") text = getText(`type.${ml.data!.type}`);
+        if (ml.data!.type !== "other")
+          text = this.$t(`type.${ml.data!.type}`)!.toString();
         return {
           key: ml.id!,
           value: ml.id!,
@@ -94,11 +91,6 @@ export default class SceneLayerSelect extends Mixins<MultiMixin>(
       text: LanguageManager.instance.getText("label.layer"),
       disabled: true
     });
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

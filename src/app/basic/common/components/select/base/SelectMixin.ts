@@ -1,11 +1,10 @@
-import { Vue, Prop, Emit } from "vue-property-decorator";
-import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
+import { Vue, Prop } from "vue-property-decorator";
 import { Component } from "vue-mixin-decorator";
 
 @Component
 export default class SelectMixin extends Vue {
   @Prop({ default: "" })
-  public value!: string | string[];
+  public value!: string | string[] | null;
 
   @Prop({ type: String, default: null })
   public id!: string | null;
@@ -17,24 +16,29 @@ export default class SelectMixin extends Vue {
   private disabled!: boolean;
 
   @Prop({ type: Boolean, default: false })
+  private readonly!: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  private isPending!: boolean;
+
+  @Prop({ type: Boolean, default: false })
   private test!: boolean;
 
-  @Emit("input")
-  public input(value: string | string[] | null) {}
-
-  public focus(): void {
-    const elm: CtrlSelect = this.$refs.select as CtrlSelect;
-    // @ts-ignore
-    elm.focus();
+  public input(value: string | string[] | null) {
+    this.$emit("input", value);
   }
 
-  protected get localValue(): string | string[] | null {
+  public focus(): void {
+    (this.$refs.component as any).focus();
+  }
+
+  public get localValue(): string | string[] | null {
     if (this.test)
       window.console.log("set '" + this.value + "'", this.constructor.name);
     return this.value || "";
   }
 
-  protected set localValue(value: string | string[] | null) {
+  public set localValue(value: string | string[] | null) {
     if (this.test)
       window.console.log("return '" + value + "'", this.constructor.name);
     this.input(value);

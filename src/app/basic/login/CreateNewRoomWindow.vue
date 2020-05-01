@@ -8,8 +8,8 @@
           type="text"
           :value="name"
           @input="name = $event.target.value"
+          :class="{ pending: !name }"
           :placeholder="$t('label.room-name-placeholder')"
-          ref="firstFocus"
         />
       </label>
       <label>
@@ -18,15 +18,17 @@
           :comp-key="`${key}-password`"
           v-model="password"
           :setting="true"
-          ref="firstFocus"
+          :isPending="!name"
         />
       </label>
       <label>
-        <span class="label-input" v-t="'label.game-system'"></span>
-        <dice-bot-input
+        <span class="label-input" v-t="'label.game-system-input'"></span>
+        <bcdice-system-input
           v-model="system"
-          ref="firstFocus"
+          :url.sync="url"
+          :isPending="!name"
           :windowInfo="windowInfo"
+          @onMouseEnterUrl="onMouseEnterUrl"
         />
       </label>
     </div>
@@ -42,29 +44,25 @@
 </template>
 
 <script lang="ts">
-import { Component } from "vue-property-decorator";
-import CtrlButton from "@/app/core/component/CtrlButton.vue";
+import { Component, Watch } from "vue-property-decorator";
 import WindowVue from "@/app/core/window/WindowVue";
-import TableComponent from "@/app/core/component/table/SimpleTableComponent.vue";
 import { Mixins } from "vue-mixin-decorator";
-import BaseInput from "@/app/core/component/BaseInput.vue";
-import DiceBotSelect from "@/app/basic/common/components/select/DiceBotSelect.vue";
 import VueEvent from "@/app/core/decorator/VueEvent";
-import { CreateRoomInput } from "@/@types/socket";
+import { CreateRoomInput, RoomInfoExtend } from "@/@types/socket";
 import LanguageManager from "@/LanguageManager";
-import InputPasswordComponent from "@/app/core/component/InputPasswordComponent.vue";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
-import DiceBotInput from "@/app/basic/common/components/DiceBotInput.vue";
-import { DiceSystem } from "@/@types/bcdice";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
+import BaseInput from "@/app/core/component/BaseInput.vue";
+import InputPasswordComponent from "@/app/core/component/InputPasswordComponent.vue";
+import BcdiceSystemInput from "@/app/basic/common/components/BcdiceSystemInput.vue";
+import CtrlButton from "@/app/core/component/CtrlButton.vue";
 
 @Component({
   components: {
-    DiceBotInput,
+    CtrlButton,
+    BcdiceSystemInput,
     InputPasswordComponent,
-    DiceBotSelect,
-    BaseInput,
-    TableComponent,
-    CtrlButton
+    BaseInput
   }
 })
 export default class CreateNewRoomWindow extends Mixins<
@@ -73,7 +71,26 @@ export default class CreateNewRoomWindow extends Mixins<
   private name: string = "";
   private password: string = "";
   /** 選択されているシステム */
-  private system: DiceSystem = { system: "DiceBot", name: "DiceBot" };
+  private system: string = "DiceBot";
+  private url: string = SocketFacade.instance.connectInfo.bcdiceServer;
+  private extendInfo: RoomInfoExtend = {
+    visitable: true,
+    isFitGrid: true,
+    isViewDice: true,
+    isViewCutIn: true,
+    isDrawGridId: true,
+    mapRotatable: true,
+    isDrawGridLine: true,
+    isShowStandImage: true,
+    isShowRotateMarker: true,
+    windowSettings: {
+      chat: "free",
+      resource: "free",
+      initiative: "free",
+      chatPalette: "free",
+      counterRemocon: "free"
+    }
+  };
 
   @LifeCycle
   public async mounted() {
@@ -82,18 +99,31 @@ export default class CreateNewRoomWindow extends Mixins<
     this.inputEnter(".base-area input:not([type='button'])", this.commit);
   }
 
+  @Watch("url")
+  private onChangeUrl() {
+    this.system = "DiceBot";
+  }
+
   @VueEvent
   private async commit() {
     await this.finally({
       name: this.name || LanguageManager.instance.getText(""),
-      system: this.system.system,
-      roomPassword: this.password
+      bcdiceServer: this.url,
+      system: this.system,
+      roomPassword: this.password,
+      extend: this.extendInfo
     });
   }
 
   @VueEvent
   private async rollback() {
     await this.finally();
+  }
+
+  private onMouseEnterUrl(isHover: boolean) {
+    this.windowInfo.message = isHover
+      ? LanguageManager.instance.getText("label.input-bcdice-url")
+      : "";
   }
 }
 </script>

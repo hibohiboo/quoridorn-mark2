@@ -11,23 +11,33 @@
 </template>
 
 <script lang="ts">
-import { Component, Watch, Vue, Prop } from "vue-property-decorator";
+import { Component, Watch, Prop } from "vue-property-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
 import OtherTextComponent from "./OtherTextComponent.vue";
-import { Point } from "address";
+import { Point, Rectangle, Size } from "address";
 import { OtherTextViewInfo } from "@/@types/gameObject";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
 import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 import { MouseMoveParam } from "@/app/core/task/TaskManager";
 import CssManager from "@/app/core/css/CssManager";
+import {
+  createPoint,
+  createRectangle,
+  createSize
+} from "@/app/core/utility/CoordinateUtility";
+import { Mixins } from "vue-mixin-decorator";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import VueEvent from "@/app/core/decorator/VueEvent";
 
 @Component({
   components: { OtherTextComponent }
 })
-export default class OtherTextFrame extends Vue {
+export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
   @Prop({ type: Object, default: null })
   private otherTextViewInfo!: OtherTextViewInfo;
+
+  private static DEFAULT_FONT_SIZE = 14;
 
   private rawText: string | null = null;
   private docId: string | null = null;
@@ -40,7 +50,9 @@ export default class OtherTextFrame extends Vue {
   private translateX = 0;
   private translateY = 0;
 
-  private key = "OtherTextFrame";
+  private maxSize: Size = createSize(0, 0);
+
+  private fontSize = OtherTextFrame.DEFAULT_FONT_SIZE;
 
   @LifeCycle
   public async mounted() {
@@ -52,6 +64,7 @@ export default class OtherTextFrame extends Vue {
   private async actionWheelFinished(
     task: Task<boolean, never>
   ): Promise<TaskResult<never> | void> {
+    if (this.otherTextViewInfo.isFix) return;
     setTimeout(() => {
       this.wheel = CssManager.instance.propMap.wheel;
       this.elm.style.transform = `translate(${this.translateX}px, ${this.translateY}px) translateZ(${this.wheel}px)`;
@@ -61,12 +74,14 @@ export default class OtherTextFrame extends Vue {
   @Watch("isMounted")
   @Watch("otherTextViewInfo", { deep: true })
   private onChangeInfo() {
+    const ws = createSize(window.innerWidth, window.innerHeight);
+
     this.rawText = this.otherTextViewInfo.text;
     if (!this.isMounted) return;
     const gridSize = CssManager.instance.propMap.gridSize;
     const info = this.otherTextViewInfo;
-    const x = info.point.x + info.columns * gridSize;
-    const y = info.point.y;
+    const x = info.rect.x;
+    const y = info.rect.y;
 
     const marginColumns = CssManager.instance.propMap.marginColumn;
     const marginRows = CssManager.instance.propMap.marginRow;
@@ -74,11 +89,73 @@ export default class OtherTextFrame extends Vue {
     const totalLeftY = CssManager.instance.propMap.totalLeftY;
     const marginBorderWidth = CssManager.instance.propMap.marginBorderWidth;
 
-    this.translateX =
-      x + marginColumns * gridSize + totalLeftX + marginBorderWidth;
-    this.translateY =
-      y + marginRows * gridSize + totalLeftY + marginBorderWidth;
-    this.elm.style.transform = `translate(${this.translateX}px, ${this.translateY}px) translateZ(${this.wheel}px)`;
+    const mapPoint = createPoint(
+      totalLeftX + marginBorderWidth,
+      totalLeftY + marginBorderWidth
+    );
+
+    const translateZ = this.otherTextViewInfo.isFix ? 0 : this.wheel;
+
+    this.translateX = x + info.rect.width;
+    this.translateY = y;
+    if (!this.otherTextViewInfo.isFix) {
+      this.translateX += marginColumns * gridSize + mapPoint.x;
+      this.translateY += marginRows * gridSize + mapPoint.y;
+    }
+    this.maxSize.width = ws.width - this.translateX;
+    this.maxSize.height = ws.height - this.translateY;
+    this.elm.style.maxWidth = `auto`;
+    this.elm.style.maxHeight = `auto`;
+    this.elm.style.transform = `translate(${this.translateX}px, ${this.translateY}px) translateZ(${translateZ}px)`;
+    this.fontSize = OtherTextFrame.DEFAULT_FONT_SIZE;
+    this.elm.style.fontSize = `${this.fontSize}px`;
+
+    setTimeout(() => {
+      const rect = this.getRectangle();
+      const ratioH = rect.height / ws.height;
+      let fontSizeH = OtherTextFrame.DEFAULT_FONT_SIZE;
+      let fontSizeW = OtherTextFrame.DEFAULT_FONT_SIZE;
+      if (ratioH > 1) {
+        fontSizeH = Math.floor(OtherTextFrame.DEFAULT_FONT_SIZE / ratioH);
+      }
+      if (rect.x + rect.width > ws.width) {
+        const useSpace = Math.max(
+          this.otherTextViewInfo.rect.x,
+          ws.width -
+            this.otherTextViewInfo.rect.x -
+            this.otherTextViewInfo.rect.width
+        );
+        this.maxSize.width = useSpace;
+        this.elm.style.maxWidth = `${this.maxSize.width}px`;
+        const ratioW = rect.width / useSpace;
+        if (ratioW > 1) {
+          fontSizeW = Math.floor(OtherTextFrame.DEFAULT_FONT_SIZE / ratioW);
+        }
+      }
+      this.fontSize = Math.min(this.fontSize, fontSizeH, fontSizeW);
+      this.elm.style.fontSize = `${this.fontSize}px`;
+
+      setTimeout(() => {
+        const rect = this.getRectangle();
+        if (rect.x + rect.width > ws.width) {
+          if (rect.x - this.otherTextViewInfo.rect.width - rect.width > 0) {
+            rect.x = rect.x - this.otherTextViewInfo.rect.width - rect.width;
+          }
+        }
+        if (rect.y + rect.height > ws.height)
+          rect.y = Math.max(ws.height - rect.height, 0);
+        this.maxSize.width = ws.width - rect.x;
+        this.maxSize.height = ws.height - rect.y;
+        this.elm.style.maxWidth = `${this.maxSize.width}px`;
+        this.elm.style.maxHeight = `${this.maxSize.height}px`;
+        this.elm.style.transform = `translate(${rect.x}px, ${rect.y}px) translateZ(${translateZ}px)`;
+      });
+    });
+  }
+
+  private getRectangle(): Rectangle {
+    const rect = this.elm.getBoundingClientRect();
+    return createRectangle(rect.x, rect.y, rect.width, rect.height);
   }
 
   @Watch("rawText")
@@ -100,22 +177,24 @@ export default class OtherTextFrame extends Vue {
     const data: any = (await cc.getData(docId))!.data;
     data.otherText = this.rawText;
     try {
-      await cc.touchModify(docId);
+      await cc.touchModify([docId]);
     } catch (err) {
       alert("他の人が操作中のオブジェクトのため、更新に失敗しました。");
       return;
     }
-    await cc.update(docId, data);
+    await cc.update([docId], [data]);
   }
 
   private get elm(): HTMLElement {
     return this.$refs.elm as HTMLElement;
   }
 
+  @VueEvent
   private onMouseOver() {
     this.isHover = true;
   }
 
+  @VueEvent
   private onMouseOut() {
     this.isHover = false;
     if (!this.isHover) this.$emit("hide");
@@ -125,8 +204,10 @@ export default class OtherTextFrame extends Vue {
   private async otherTextHide(
     task: Task<string, never>
   ): Promise<TaskResult<never> | void> {
-    if (!this.isHover && !this.isChanged) this.$emit("hide");
-    this.isChanged = false;
+    setTimeout(() => {
+      if (!this.isHover && !this.isChanged) this.$emit("hide");
+      this.isChanged = false;
+    });
     task.resolve();
   }
 
@@ -151,6 +232,7 @@ export default class OtherTextFrame extends Vue {
   left: 0;
   top: 0;
   background-color: white;
+  border: 2px solid gray;
   /* JavaScriptで設定されるプロパティ
   transform
   */

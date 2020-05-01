@@ -47,10 +47,6 @@ export default class ActorGroupSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
-
     this.optionInfoList = GameObjectManager.instance.actorGroupList.map(i => {
       let text = i.data!.name;
       return {
@@ -63,14 +59,9 @@ export default class ActorGroupSelect extends Mixins<MultiMixin>(
     this.optionInfoList.unshift({
       key: "",
       value: "",
-      text: getText("type.actor-group"),
+      text: this.$t("type.actor-group")!.toString(),
       disabled: true
     });
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

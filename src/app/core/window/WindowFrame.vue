@@ -2,7 +2,7 @@
   <div
     :id="key"
     class="window-frame"
-    :class="{ minimized: windowInfo.isMinimized }"
+    :class="[windowInfo.isMinimized ? 'minimized' : undefined, windowInfo.type]"
     @mousedown.left.stop="activeWindow()"
     @touchstart.stop="activeWindow()"
     ref="window-frame"
@@ -17,9 +17,19 @@
     >
       <!-- タイトル文言 -->
       <div class="title-message-area">
-        <span v-if="windowInfo.title">{{ windowInfo.title }}</span>
-        <span v-else v-t="`${windowInfo.type}.window-title`"></span>
-        <span class="message" v-if="windowInfo.message">{{
+        <span
+          class="window-icon"
+          :class="`icon-${windowInfo.declare.icon}`"
+        ></span>
+        <span class="window-title-text" v-if="windowInfo.title">{{
+          windowInfo.title
+        }}</span>
+        <span
+          v-else
+          class="window-title-text"
+          v-t="`${windowInfo.type}.window-title`"
+        ></span>
+        <span class="window-message" v-if="windowInfo.message">{{
           windowInfo.message
         }}</span>
       </div>
@@ -77,10 +87,7 @@
       </label>
     </div>
 
-    <div
-      class="window-title-balloon"
-      v-show="windowInfo.isMinimizeAnimationEnd"
-    >
+    <div class="window-title-balloon" v-if="windowInfo.isMinimizeAnimationEnd">
       <span v-if="windowInfo.title">{{ windowInfo.title }}</span>
       <span v-else v-t="`${windowInfo.type}.window-title`"></span>
     </div>
@@ -161,16 +168,15 @@ import TaskProcessor from "../task/TaskProcessor";
 import { Task, TaskResult } from "task";
 import {
   createPoint,
-  createRectangle,
-  createSize,
   getEventPoint,
   getWindowSize
-} from "../Coordinate";
+} from "../utility/CoordinateUtility";
 import TitleIcon from "./TitleIcon.vue";
 import WindowManager from "./WindowManager";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
-import { getCssPxNum } from "@/app/core/Css";
+import { getCssPxNum } from "@/app/core/css/Css";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
 
 @Component({
   components: { TitleIcon, ResizeKnob }
@@ -416,8 +422,8 @@ export default class WindowFrame extends Vue {
   @Watch("standImageSize", { immediate: true })
   private onChangeStandImageSize(standImageSize: string) {
     const split: string[] = standImageSize.split("*");
-    this.standImageWidth = parseInt(split[0]);
-    this.standImageHeight = parseInt(split[1]);
+    this.standImageWidth = convertNumberZero(split[0]);
+    this.standImageHeight = convertNumberZero(split[1]);
   }
 
   @VueEvent
@@ -680,8 +686,7 @@ export default class WindowFrame extends Vue {
   -webkit-font-smoothing: subpixel-antialiased;
   width: calc(
     var(--windowWidthPx) + var(--windowWidthEm) + var(--windowWidthRem) +
-      var(--windowWidthScrollBar) + var(--scroll-bar-width) +
-      var(--window-padding) * 2 + 2px
+      var(--windowWidthScrollBar) + var(--window-padding) * 2 + 2px
   );
   height: calc(
     var(--windowHeightPx) + var(--windowHeightEm) + var(--windowHeightRem) +
@@ -822,7 +827,7 @@ export default class WindowFrame extends Vue {
   height: 100%;
   z-index: 1;
   overflow-x: visible;
-  overflow-y: scroll;
+  overflow-y: visible;
 }
 
 .window-title {
@@ -849,21 +854,21 @@ export default class WindowFrame extends Vue {
     );
   }
 
-  > div {
-    > span:not(:first-child) {
-      margin-left: 0.5em;
-      padding: 0 0.5em;
-      font-style: italic;
-      text-underline: #444444;
-      border-radius: 0.3em;
-      background-color: white;
-    }
-  }
-
   .title-message-area {
     overflow-x: hidden;
     text-overflow: ellipsis;
     margin-right: auto;
+
+    > * {
+      margin-left: 0.5em;
+    }
+
+    .window-message {
+      padding: 0 0.5em;
+      font-style: italic;
+      text-underline: #444444;
+      background-color: white;
+    }
   }
 
   &:hover + .window-info-balloon {

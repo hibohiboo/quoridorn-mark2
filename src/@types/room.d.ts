@@ -1,16 +1,23 @@
-import { UserType } from "@/@types/socket";
+import {
+  PartialRoomInfoExtend,
+  RoomInfoExtend,
+  UserType
+} from "@/@types/socket";
 import { Address, Point } from "address";
+import { DiceResult } from "@/@types/bcdice";
 
 /**
  * roomDataCCのデータ定義
  * 部屋1つに関する設定情報
  */
 type RoomData = {
+  name: string;
   sceneId: string;
-  isDrawGridLine: boolean;
-  isDrawGridId: boolean;
-  isFitGrid: boolean;
-  isUseRotateMarker: boolean;
+  settings: RoomInfoExtend;
+};
+
+type PartialRoomData = Partial<RoomData> & {
+  settings?: PartialRoomInfoExtend;
 };
 
 /**
@@ -18,8 +25,8 @@ type RoomData = {
  * ユーザ1人に関する情報
  */
 type UserData = {
-  userName: string;
-  userType: UserType;
+  name: string;
+  type: UserType;
   login: number;
 };
 
@@ -61,7 +68,7 @@ type TextureColor = {
 };
 
 /**
- * マップの背景の定義の1つa
+ * マップの背景の定義の1つ
  * 画像による指定
  */
 type TextureImage = {
@@ -90,6 +97,7 @@ type SceneLayerType =
   | "map-mask"
   | "map-marker"
   | "dice-symbol"
+  | "card"
   | "character"
   | "other";
 
@@ -206,15 +214,17 @@ type StandImageInfo = Point & {
   type: "pile" | "replace";
 };
 
-/**
- * imageDataCCのデータ定義
- * 画像1件の情報
- */
-type Image = {
+type MediaInfo = {
   tag: string;
-  data: string;
-  password: string;
-  standImageInfo: StandImageInfo | null;
+  name: string;
+  url: string;
+  type: string;
+};
+
+export type ActorRef = {
+  id: string;
+  type: "user" | "other";
+  userId: string | null;
 };
 
 /**
@@ -224,11 +234,15 @@ type Image = {
 export type ActorGroup = {
   name: string;
   isSystem: boolean;
-  isChatGroup: boolean;
-  list: {
-    type: "user" | "character";
-    id: string;
-  }[];
+  list: ActorRef[];
+};
+
+export type GroupChatTabInfo = {
+  name: string;
+  isSystem: boolean;
+  actorGroupId: string;
+  isSecret: boolean;
+  outputChatTabId: string | null;
 };
 
 /**
@@ -268,4 +282,34 @@ type YoutubeMuteChangeInfo = {
   tag: string;
   windowStatus: string;
   isMute: boolean;
+};
+
+type CustomDiceBotInfo = {
+  commandName: string;
+  diceRoll: string;
+  tableTitle: string;
+  tableContents: {
+    [key in string]: string;
+  };
+  system: string; // yamlファイルには未記載。プログラムで設定する変数。
+};
+
+type ChatInfo = {
+  actorId: string;
+  statusId: string;
+  tabId: string;
+  targetId: string;
+  targetType: "group" | "actor";
+  text: string;
+  diceRollResult: string | null;
+  customDiceBotResult: string | null;
+  isSecret: boolean;
+  isSecretDice: boolean;
+  dices: DiceResult[];
+  system: string;
+};
+
+type ChatTabInfo = {
+  name: string;
+  isSystem: boolean;
 };

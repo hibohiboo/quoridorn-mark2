@@ -136,7 +136,7 @@ import {
   LoginWindowInput,
   ServerTestResult
 } from "@/@types/socket";
-import { StoreObj, StoreUseData } from "@/@types/store";
+import { PermissionNode, StoreObj, StoreUseData } from "@/@types/store";
 import TaskManager from "@/app/core/task/TaskManager";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
@@ -146,24 +146,24 @@ import LanguageSelect from "@/app/basic/common/components/select/LanguageSelect.
 import LanguageManager from "@/LanguageManager";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
-import { loadYaml } from "@/app/core/File";
-import {
-  convertNumber,
-  getFileNameArgList,
-  getUrlParam
-} from "@/app/core/Utility";
+import { extname, loadYaml } from "@/app/core/utility/FileUtility";
 import {
   Scene,
   RoomData,
   SceneLayerType,
-  Image,
-  CutInDeclareInfo
+  CutInDeclareInfo,
+  MediaInfo
 } from "@/@types/room";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import * as Cookies from "es-cookie";
 import VersionInfoComponent from "@/app/basic/login/VersionInfoComponent.vue";
 import { ModeInfo } from "mode";
-import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
+import {
+  convertNumberNull,
+  getUrlParam,
+  listToEmpty
+} from "@/app/core/utility/PrimaryDataUtility";
+import { getSrc } from "@/app/core/utility/Utility";
 
 @Component({
   components: {
@@ -201,7 +201,7 @@ export default class LoginWindow extends Mixins<
   private message: Message | null = null;
   private serverTestResult: ServerTestResult | null = null;
   private readonly htmlRegExp: RegExp = new RegExp(
-    '\\[([^"<>]]+)]\\(([^)"<>]+)\\)',
+    '\\[([^"<>\\]]+)]\\(([^)"<>]+)\\)',
     "g"
   );
   private language: string = LanguageManager.instance.defaultLanguage;
@@ -377,10 +377,11 @@ export default class LoginWindow extends Mixins<
                 info => info.id === change.id
               );
               this.roomList!.splice(index, 1, {
+                ownerType: null,
+                owner: null,
                 order: index,
                 exclusionOwner: null,
                 lastExclusionOwner: null,
-                owner: null,
                 permission: null,
                 status: null,
                 createTime: new Date(),
@@ -408,7 +409,7 @@ export default class LoginWindow extends Mixins<
       this.serverTestResult = resp;
       if (serverInfo.roomList) {
         if (!this.roomList) this.roomList = [];
-        else this.roomList!.splice(0, this.roomList!.length);
+        else listToEmpty(this.roomList!);
         serverInfo.roomList.forEach(
           (roomInfo: StoreUseData<ClientRoomInfo>) => {
             this.roomList!.push(roomInfo);
@@ -465,8 +466,6 @@ export default class LoginWindow extends Mixins<
 
   @VueEvent
   private async deleteRoom(order: number) {
-    window.console.log(this.selectedRoomNo, order);
-
     this.isInputtingRoomInfo = true;
 
     // タッチ
@@ -660,8 +659,9 @@ export default class LoginWindow extends Mixins<
           type: "user-login-window",
           args: {
             isSetting: true,
-            userNameList: [],
-            userName: ""
+            visitable: createRoomInput.extend.visitable,
+            nameList: [],
+            name: ""
           }
         }
       });
@@ -684,12 +684,15 @@ export default class LoginWindow extends Mixins<
       type: "mode-change",
       owner: "Quoridorn",
       value: {
-        type: "create-room",
-        value: "on"
+        type: "view-progress",
+        value: {
+          message: LanguageManager.instance.getText("message.creating-room"),
+          all: 0,
+          current: 0
+        }
       }
     });
 
-    window.console.log(this.selectedRoomNo);
     const roomId = this.roomList![this.selectedRoomNo].id!;
 
     /* ----------------------------------------------------------------------
@@ -711,8 +714,12 @@ export default class LoginWindow extends Mixins<
         type: "mode-change",
         owner: "Quoridorn",
         value: {
-          type: "create-room",
-          value: "off"
+          type: "view-progress",
+          value: {
+            message: "",
+            all: 0,
+            current: 0
+          }
         }
       });
       return;
@@ -731,44 +738,23 @@ export default class LoginWindow extends Mixins<
       window.console.warn(err);
       alert("ログイン失敗");
       SocketFacade.instance.roomCollectionPrefix = null;
-
-      await TaskManager.instance.ignition<ModeInfo, never>({
-        type: "mode-change",
-        owner: "Quoridorn",
-        value: {
-          type: "create-room",
-          value: "off"
-        }
-      });
       return;
     }
     SocketFacade.instance.userId = userLoginResponse.userId;
-    Cookies.set(
-      `${roomId}/${userLoginInput.userName}`,
-      userLoginResponse.token,
-      {
-        expires: 365
-      }
-    );
+    Cookies.set(`${roomId}/${userLoginInput.name}`, userLoginResponse.token, {
+      expires: 365
+    });
 
     /* ----------------------------------------------------------------------
      * 部屋の使用準備
      */
     await this.close();
 
-    await this.addPresetData();
-
-    await TaskManager.instance.ignition<ModeInfo, never>({
-      type: "mode-change",
-      owner: "Quoridorn",
-      value: {
-        type: "create-room",
-        value: "off"
-      }
-    });
+    await this.addPresetData(createRoomInput);
 
     const loginResult: ClientRoomInfo = {
       name: createRoomInput.name,
+      bcdiceServer: SocketFacade.instance.connectInfo.bcdiceServer,
       system: createRoomInput.system,
       extend: createRoomInput.extend,
       memberNum: 0,
@@ -779,7 +765,7 @@ export default class LoginWindow extends Mixins<
 
     const params = new URLSearchParams();
     params.append("no", loginResult.roomNo.toString(10));
-    params.append("player", userLoginInput.userName);
+    params.append("player", userLoginInput.name);
     window.history.replaceState("", "", `?${params.toString()}`);
 
     await TaskManager.instance.ignition<ClientRoomInfo, void>({
@@ -790,7 +776,7 @@ export default class LoginWindow extends Mixins<
   }
 
   private async procUrlParam() {
-    const no: number | null = convertNumber(getUrlParam("no"));
+    const no: number | null = convertNumberNull(getUrlParam("no"));
 
     if (this.roomList && no !== null && 0 <= no && no < this.roomList.length) {
       this.selectedRoomNo = no;
@@ -798,9 +784,9 @@ export default class LoginWindow extends Mixins<
       this.urlPlayerName = getUrlParam("player");
 
       if (this.urlPlayerName) {
-        const roomId = this.roomList.filter(r => r.order === no)[0].id;
-        const cookieToken = Cookies.get(`${roomId}/${this.urlPlayerName}`);
-        window.console.log(`token: ${cookieToken}`);
+        // const roomId = this.roomList.filter(r => r.order === no)[0].id;
+        // const cookieToken = Cookies.get(`${roomId}/${this.urlPlayerName}`);
+        // window.console.log(`token: ${cookieToken}`);
       } else {
         if (!this.disabledLogin) await this.login();
       }
@@ -903,10 +889,11 @@ export default class LoginWindow extends Mixins<
           type: "user-login-window",
           args: {
             isSetting: false,
-            userNameList: (
-              await SocketFacade.instance.userCC().getList(false)
-            ).map(userData => userData.data!.userName),
-            userName: this.urlPlayerName
+            visitable: true, // TODO 見学者可否を取得する
+            nameList: (await SocketFacade.instance.userCC().getList(true)).map(
+              userData => userData.data!.name
+            ),
+            name: this.urlPlayerName
           }
         }
       });
@@ -929,8 +916,12 @@ export default class LoginWindow extends Mixins<
       type: "mode-change",
       owner: "Quoridorn",
       value: {
-        type: "create-room",
-        value: "on"
+        type: "view-progress",
+        value: {
+          message: LanguageManager.instance.getText("message.entering-room"),
+          all: 0,
+          current: 0
+        }
       }
     });
 
@@ -950,29 +941,16 @@ export default class LoginWindow extends Mixins<
       return;
     } finally {
       this.isInputtingRoomInfo = false;
-      await TaskManager.instance.ignition<ModeInfo, never>({
-        type: "mode-change",
-        owner: "Quoridorn",
-        value: {
-          type: "create-room",
-          value: "off"
-        }
-      });
     }
     SocketFacade.instance.userId = userLoginResponse.userId;
-    Cookies.set(
-      `${roomId}/${userLoginInput.userName}`,
-      userLoginResponse.token,
-      {
-        expires: 365
-      }
-    );
+    Cookies.set(`${roomId}/${userLoginInput.name}`, userLoginResponse.token, {
+      expires: 365
+    });
 
     /* ----------------------------------------------------------------------
      * 部屋の使用準備
      */
     await this.close();
-
     const loginResult: ClientRoomInfo = this.roomList![this.selectedRoomNo]
       .data!;
     loginResult.roomNo = this.selectedRoomNo;
@@ -980,7 +958,7 @@ export default class LoginWindow extends Mixins<
 
     const params = new URLSearchParams();
     params.append("no", loginResult.roomNo.toString(10));
-    params.append("player", userLoginInput.userName);
+    params.append("player", userLoginInput.name);
     window.history.replaceState("", "", `?${params.toString()}`);
 
     await TaskManager.instance.ignition<ClientRoomInfo, void>({
@@ -990,57 +968,79 @@ export default class LoginWindow extends Mixins<
     });
   }
 
-  private async addPresetData() {
-    const imageList: Image[] = await loadYaml<Image[]>(
-      "./static/conf/image.yaml"
+  /**
+   * 部屋の初期データをDBに投入する
+   *
+   * @param createRoomInput
+   */
+  private async addPresetData(createRoomInput: CreateRoomInput) {
+    const mediaList: MediaInfo[] = await loadYaml<MediaInfo[]>(
+      "./static/conf/media.yaml"
     );
-    const imageTagList: string[] = await loadYaml<string[]>(
-      "./static/conf/imageTag.yaml"
-    );
-    imageList.forEach((image: Image) => {
-      if (!image.tag)
-        image.tag = imageTagList.length ? imageTagList[0] : "default";
-      if (image.standImageInfo) {
-        // 立ち絵パラメータの値を正しく設定
-        const si = image.standImageInfo;
-        if (!si.status) si.status = "";
-        if (si.type !== "pile" && si.type !== "replace") si.type = "pile";
-        if (
-          si.viewStart === undefined ||
-          si.viewStart < 0 ||
-          si.viewStart > 100
-        )
-          si.viewStart = 0;
-        if (si.viewEnd === undefined || si.viewEnd < 0 || si.viewEnd > 100)
-          si.viewEnd = 100;
-      } else {
-        // 立ち絵パラメータを推測＆設定
-        image.standImageInfo = getFileNameArgList(image.data) || null;
-      }
+    let firstImageIdx: number = -1;
+    mediaList.forEach((media: MediaInfo, idx: number) => {
+      if (!media.tag) media.tag = "";
+      media.url = getSrc(media.url);
 
-      const regExp = new RegExp("[ 　]+", "g");
-      const tagStrList = image.tag.split(regExp);
-      tagStrList.forEach((tagStr: string) => {
-        const imageTag: string = imageTagList.filter(
-          (imageTag: string) => imageTag === tagStr
-        )[0];
-        if (!imageTag) imageTagList.push(tagStr);
-      });
+      const ext = extname(media.url);
+
+      if (media.url.match(/^https?:\/\/www.youtube.com\/watch\?v=/)) {
+        media.type = "youtube";
+        if (!media.name) {
+          media.name = LanguageManager.instance.getText("label.no-target");
+        }
+      } else {
+        switch (ext) {
+          case "png":
+          case "gif":
+          case "jpg":
+          case "jpeg":
+            media.type = "image";
+            if (firstImageIdx === -1) firstImageIdx = idx;
+            break;
+          case "mp3":
+            media.type = "music";
+            break;
+          case "json":
+          case "yaml":
+            media.type = "setting";
+            break;
+          default:
+            media.type = "unknown";
+        }
+        if (!media.name) {
+          media.name = media.url.replace(/^https?:\/\/.+\//, "");
+        }
+      }
+      // if (image.standImageInfo) {
+      //   // 立ち絵パラメータの値を正しく設定
+      //   const si = image.standImageInfo;
+      //   if (!si.status) si.status = "";
+      //   if (si.type !== "pile" && si.type !== "replace") si.type = "pile";
+      //   if (
+      //     si.viewStart === undefined ||
+      //     si.viewStart < 0 ||
+      //     si.viewStart > 100
+      //   )
+      //     si.viewStart = 0;
+      //   if (si.viewEnd === undefined || si.viewEnd < 0 || si.viewEnd > 100)
+      //     si.viewEnd = 100;
+      // } else {
+      //   // 立ち絵パラメータを推測＆設定
+      //   image.standImageInfo = getFileNameArgList(image.data) || null;
+      // }
     });
 
     /* --------------------------------------------------
-     * 画像タグのプリセットデータ投入
+     * メディアデータのプリセットデータ投入
      */
-    const imageTagCC = SocketFacade.instance.imageTagCC();
-    await imageTagCC.addDirect(imageTagList);
+    const mediaCC = SocketFacade.instance.mediaCC();
+    const docIdList = await mediaCC.addDirect(
+      mediaList,
+      mediaList.map(() => ({ owner: null }))
+    );
 
-    /* --------------------------------------------------
-     * 画像データのプリセットデータ投入
-     */
-    const imageDataCC = SocketFacade.instance.imageDataCC();
-    const docIdList = await imageDataCC.addDirect(imageList);
-
-    const imageId: string = docIdList[0];
+    const imageId: string = docIdList[firstImageIdx];
 
     /* --------------------------------------------------
      * BGMデータのプリセットデータ投入
@@ -1072,7 +1072,7 @@ export default class LoginWindow extends Mixins<
       shapeType: "square",
       texture: {
         type: "image",
-        imageTag: imageList[0].tag,
+        imageTag: mediaList[firstImageIdx].tag,
         imageId: imageId!,
         direction: "none",
         backgroundSize: "100%"
@@ -1080,7 +1080,7 @@ export default class LoginWindow extends Mixins<
       background: {
         texture: {
           type: "image",
-          imageTag: imageList[0].tag,
+          imageTag: mediaList[firstImageIdx].tag,
           imageId: imageId!,
           direction: "none",
           backgroundSize: "100%"
@@ -1091,7 +1091,7 @@ export default class LoginWindow extends Mixins<
         useTexture: "original",
         texture: {
           type: "image",
-          imageTag: imageList[0].tag,
+          imageTag: mediaList[firstImageIdx].tag,
           imageId: imageId!,
           direction: "none",
           backgroundSize: "100%"
@@ -1131,7 +1131,8 @@ export default class LoginWindow extends Mixins<
     await addSceneLayer("map-mask", 2);
     await addSceneLayer("map-marker", 3);
     await addSceneLayer("dice-symbol", 4);
-    await addSceneLayer("character", 5);
+    await addSceneLayer("card", 5);
+    await addSceneLayer("character", 6);
 
     /* --------------------------------------------------
      * 部屋データのプリセットデータ投入
@@ -1140,12 +1141,56 @@ export default class LoginWindow extends Mixins<
 
     const roomData: RoomData = {
       sceneId: addMapResult.sceneId,
-      isDrawGridLine: true,
-      isDrawGridId: true,
-      isFitGrid: true,
-      isUseRotateMarker: true
+      settings: createRoomInput.extend,
+      name: createRoomInput.name
     };
     await roomDataCC.addDirect([roomData]);
+
+    // ActorGroupを取得する関数
+    const getActorGroup = async (name: string) =>
+      (await SocketFacade.instance
+        .actorGroupCC()
+        .find([{ property: "data.name", operand: "==", value: name }]))![0];
+
+    /* --------------------------------------------------
+     * チャットタブのプリセットデータ投入
+     */
+    const gameMastersActorGroup = await getActorGroup("GameMasters");
+    const gameMastersPermission: PermissionNode = {
+      type: "group",
+      id: gameMastersActorGroup.id!
+    };
+    await SocketFacade.instance.chatTabListCC().addDirect(
+      [
+        {
+          name: LanguageManager.instance.getText("label.main"),
+          isSystem: true
+        }
+      ],
+      [
+        {
+          permission: {
+            view: { type: "none", list: [] },
+            edit: { type: "allow", list: [gameMastersPermission] },
+            chmod: { type: "allow", list: [gameMastersPermission] }
+          }
+        }
+      ]
+    );
+
+    /* --------------------------------------------------
+     * グループチャットタブのプリセットデータ投入
+     */
+    const allActorGroup = await getActorGroup("All");
+    await SocketFacade.instance.groupChatTabListCC().addDirect([
+      {
+        name: LanguageManager.instance.getText("label.target-all"),
+        isSystem: true,
+        actorGroupId: allActorGroup.id!,
+        isSecret: false,
+        outputChatTabId: null
+      }
+    ]);
   }
 }
 </script>

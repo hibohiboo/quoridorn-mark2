@@ -3,30 +3,28 @@ import { Permission, StoreObj } from "@/@types/store";
 
 export type TouchRequest = {
   collection: string;
-  id?: string;
-  owner?: string;
+  idList?: string[];
+  optionList?: Partial<StoreObj<unknown>>[];
 };
 export type TouchModifyRequest = TouchRequest & {
-  id: string;
+  idList: string[];
 };
 export type ReleaseTouchRequest = TouchModifyRequest & {
-  option?: { continuous?: boolean };
+  optionList?: (Partial<StoreObj<unknown>> & { continuous?: boolean })[];
 };
 
 export type CreateDataRequest = TouchModifyRequest & {
-  data: any;
-  permission: Permission;
+  dataList: any[];
 };
 export type AddDirectRequest = {
   collection: string;
   dataList: any[];
-  permission: Permission;
-  owner: string;
+  optionList?: Partial<StoreObj<unknown>>[];
 };
 export type DeleteDataRequest = TouchModifyRequest;
 export type UpdateDataRequest = TouchModifyRequest & {
-  data: any;
-  option?: Partial<StoreObj<unknown>> & { continuous?: boolean };
+  dataList: any[];
+  optionList?: (Partial<StoreObj<unknown>> & { continuous?: boolean })[];
 };
 
 export type DataReference = {

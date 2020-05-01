@@ -39,7 +39,7 @@ export default class StartTimeActorStatusSelect extends Mixins<MultiMixin>(
 
   private get optionInfoContents(): HtmlOptionInfo[] {
     return this.actorStatusList
-      .filter(s => s.data!.parentId === this.parentId)
+      .filter(s => s.owner === this.parentId)
       .map(s => ({
         key: s.id!,
         value: s.id!,
@@ -48,13 +48,9 @@ export default class StartTimeActorStatusSelect extends Mixins<MultiMixin>(
       }));
   }
 
-  @Watch("optionInfoContents")
-  private onChangeOptionInfoContents() {
-    this.createOptionInfoList();
-  }
-
   @LifeCycle
-  private async created() {
+  @Watch("optionInfoContents")
+  private created() {
     this.createOptionInfoList();
   }
 
@@ -67,22 +63,13 @@ export default class StartTimeActorStatusSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
-
     this.optionInfoList = this.optionInfoContents.concat();
     this.optionInfoList.unshift({
       key: "",
       value: "",
-      text: LanguageManager.instance.getText("label.actor-status"),
+      text: this.$t("label.actor-status")!.toString(),
       disabled: true
     });
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

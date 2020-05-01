@@ -1,13 +1,24 @@
 <template>
-  <div id="app">
+  <div
+    id="app"
+    @scroll.prevent.stop
+    @drop.prevent.stop="dropFile"
+    @dragover.prevent.stop
+    @dragenter.prevent.stop="onDragEnter"
+    @dragleave.prevent.stop="onDragLeave"
+    dropzone="move"
+  >
     <!-- 最も後ろの背景 (z-index: 0) -->
     <div id="back-scene"></div>
+
+    <!-- 最も手前でドロップを受ける領域 (z-index: 100) -->
+    <drop-area :isDropping="isDropping" />
 
     <template v-if="roomInitialized">
       <!-- プレイマット (z-index: 1) -->
       <game-table ref="gameTable" />
       <!-- メニュー (z-index: 5) -->
-      <Menu :roomInfo="roomInfo" />
+      <Menu />
       <!-- 右ペイン (z-index: 2) -->
       <right-pane />
       <!-- 右クリックメニュー (z-index: 4) -->
@@ -25,13 +36,21 @@
     <throw-parabola-simulator v-if="throwParabola" />
     <!-- 放物線シミュレータ (z-index: 8) -->
     <throw-parabola-container />
+    <!-- カードデッキビルダー (z-index: 9) -->
+    <card-deck-builder v-if="cardView" :cardDeckId="cardDeckId" />
     <!-- お部屋作成中 (z-index: 10) -->
-    <div id="loading-create-room" v-if="isCreatingRoomMode">
-      <div class="message">お部屋を作成しています！</div>
+    <div id="progress-message-area" v-if="progressMessage">
+      <div class="message">{{ progressMessage }}</div>
       <img
+        draggable="false"
         src="http://quoridorn.com/img/mascot/struggle/mascot_struggle.png"
         alt=""
       />
+      <div
+        id="progress-bar"
+        :style="{ '--ratio': `${(progressCurrent * 100) / progressAll}%` }"
+        v-if="progressAll"
+      ></div>
     </div>
   </div>
 </template>
@@ -47,7 +66,11 @@ import EventProcessor from "@/app/core/event/EventProcessor";
 import WindowArea from "@/app/core/window/WindowArea.vue";
 import WindowManager from "@/app/core/window/WindowManager";
 import { Point, Size } from "address";
-import { createPoint, createSize, getEventPoint } from "@/app/core/Coordinate";
+import {
+  createPoint,
+  createSize,
+  getEventPoint
+} from "@/app/core/utility/CoordinateUtility";
 import RightPane from "@/app/core/pane/RightPane.vue";
 import CssManager from "@/app/core/css/CssManager";
 import { WindowOpenInfo } from "@/@types/window";
@@ -64,18 +87,35 @@ import {
   ServerTestResult
 } from "@/@types/socket";
 import { StoreUseData } from "@/@types/store";
-import BgmManager from "@/app/basic/music/BgmManager";
+import BgmManager from "@/app/basic/cut-in/bgm/BgmManager";
 import OtherTextFrame from "@/app/basic/other-text/OtherTextFrame.vue";
 import { OtherTextViewInfo } from "@/@types/gameObject";
 import { ModeInfo } from "mode";
 import ThrowParabolaSimulator from "@/app/core/throwParabola/ThrowParabolaSimulator.vue";
 import ThrowParabolaContainer from "@/app/core/throwParabola/ThrowParabolaContainer.vue";
-import { BgmPlayInfo, TabMoveInfo, ThrowParabolaInfo } from "task-info";
+import {
+  BgmPlayInfo,
+  DropPieceInfo,
+  TabMoveInfo,
+  ThrowParabolaInfo
+} from "task-info";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import { CutInDeclareInfo } from "@/@types/room";
+import { disableBodyScroll } from "body-scroll-lock";
+import VueEvent from "@/app/core/decorator/VueEvent";
+import CardDeckBuilder from "@/app/basic/card/builder/CardDeckBuilder.vue";
+import DropArea from "@/app/basic/media/DropArea.vue";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
+import { getDropFileList } from "@/app/core/utility/DropFileUtility";
+import { MediaUploadInfo } from "window-info";
+import LanguageManager from "@/LanguageManager";
+import YoutubeManager from "@/app/basic/cut-in/bgm/YoutubeManager";
+import BcdiceManager from "@/app/core/api/bcdice/BcdiceManager";
 
 @Component({
   components: {
+    DropArea,
+    CardDeckBuilder,
     ThrowParabolaContainer,
     ThrowParabolaSimulator,
     OtherTextFrame,
@@ -90,16 +130,21 @@ import { CutInDeclareInfo } from "@/@types/room";
 export default class App extends Vue {
   private readonly key = "App";
   private roomInitialized: boolean = false;
-  private isCreatingRoomMode: boolean = false;
+  private progressMessage: string = "";
   private isMounted: boolean = false;
 
   private isModal: boolean = false;
 
-  private roomInfo: ClientRoomInfo | null = null;
   private otherTextViewInfo: OtherTextViewInfo | null = null;
   private throwParabola: boolean = false;
+  private cardView: boolean = false;
+  private cardDeckId: string = "";
 
   private cutInList = GameObjectManager.instance.cutInList;
+  private isDropPiece: boolean = false;
+  private isDropping: boolean = false;
+  private progressAll: number = 0;
+  private progressCurrent: number = 0;
 
   private static get elm(): HTMLElement {
     return document.getElementById("app") as HTMLElement;
@@ -121,6 +166,33 @@ export default class App extends Vue {
 
   @LifeCycle
   public async mounted() {
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "view-progress",
+        value: {
+          message: LanguageManager.instance.getText(
+            "message.setting-up-quoridorn"
+          ),
+          all: 0,
+          current: 0
+        }
+      }
+    });
+    performance.mark("app-init-start");
+    await SocketFacade.instance.init();
+    const bcdiceServer = SocketFacade.instance.connectInfo.bcdiceServer;
+    await BcdiceManager.instance.init(bcdiceServer);
+    YoutubeManager.init();
+    performance.mark("app-init-end");
+    performance.measure("app-init-time", "app-init-start", "app-init-end");
+    const durationMs = performance.getEntriesByName("app-init-time")[0]
+      .duration;
+    const durationS = Math.round(durationMs / 100) / 10;
+    window.console.log(`アプリのセットアップにかかった時間：${durationS}秒`);
+
+    disableBodyScroll();
     document.documentElement.style.setProperty(
       "--background-background-color",
       "transparent"
@@ -161,6 +233,27 @@ export default class App extends Vue {
         }
       }
     );
+    SocketFacade.instance.socketOn<{ all: number; current: number }>(
+      "notify-progress",
+      async (err, { all, current }) => {
+        const flag: boolean = all > 0 && all !== current;
+        const message = flag
+          ? LanguageManager.instance.getText("message.processing")
+          : "";
+        await TaskManager.instance.ignition<ModeInfo, never>({
+          type: "mode-change",
+          owner: "Quoridorn",
+          value: {
+            type: "view-progress",
+            value: {
+              message,
+              all,
+              current
+            }
+          }
+        });
+      }
+    );
 
     // ログイン画面の表示
     const serverInfo = await SocketFacade.instance.socketCommunication<
@@ -176,10 +269,11 @@ export default class App extends Vue {
               (info: StoreUseData<ClientRoomInfo>) => info.id === change.id
             );
             serverInfo.roomList!.splice(index, 1, {
+              ownerType: null,
+              owner: null,
               order: index,
               exclusionOwner: null,
               lastExclusionOwner: null,
-              owner: null,
               permission: null,
               status: null,
               createTime: new Date(),
@@ -205,6 +299,15 @@ export default class App extends Vue {
       return;
     }
 
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "view-progress",
+        value: { message: "", all: 0, current: 0 }
+      }
+    });
+
     await TaskManager.instance.ignition<
       WindowOpenInfo<LoginWindowInput>,
       never
@@ -220,6 +323,60 @@ export default class App extends Vue {
       }
     });
     this.isMounted = true;
+  }
+
+  @VueEvent
+  private async dropFile(event: DragEvent) {
+    // コマをドロップインしている場合
+    if (this.isDropPiece) {
+      await TaskManager.instance.ignition<DropPieceInfo, never>({
+        type: "drop-piece",
+        owner: "Quoridorn",
+        value: {
+          type: event.dataTransfer!.getData("dropType"),
+          dropWindow: event.dataTransfer!.getData("dropWindow"),
+          offsetX: convertNumberZero(event.dataTransfer!.getData("offsetX")),
+          offsetY: convertNumberZero(event.dataTransfer!.getData("offsetY")),
+          pageX: event.pageX,
+          pageY: event.pageY
+        }
+      });
+      return;
+    }
+
+    // ファイルをドロップインしている場合
+    const resultList = await getDropFileList(event.dataTransfer!);
+
+    await TaskManager.instance.ignition<WindowOpenInfo<MediaUploadInfo>, never>(
+      {
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "media-upload-window",
+          args: { resultList }
+        }
+      }
+    );
+
+    this.isDropping = false;
+  }
+
+  @VueEvent
+  private onDragEnter() {
+    if (this.isDropPiece) return;
+    this.isDropping = true;
+  }
+
+  @VueEvent
+  private onDragLeave(event: DragEvent) {
+    if (this.isDropPiece) return;
+    const p = createPoint(event.pageX, event.pageY);
+    const s = createSize(window.innerWidth, window.innerHeight);
+
+    // 画面外に出た時に座標が (0, 0) になるが、ここはあえて幻想の厳密さで書こうと思う。
+    if (p.x <= 0 || s.width < p.x || p.y <= 0 || s.height < p.y) {
+      this.isDropping = false;
+    }
   }
 
   @Watch("cutInList", { deep: true, immediate: true })
@@ -323,17 +480,18 @@ export default class App extends Vue {
       return;
     }
 
-    if (event.key === "Shift" && event.ctrlKey) {
-      await TaskManager.instance.ignition<ModeInfo, never>({
-        type: "mode-change",
-        owner: "Quoridorn",
-        value: {
-          type: "throw-parabola",
-          value: this.throwParabola ? "off" : "on"
-        }
-      });
-      return;
-    }
+    // if (event.key === "Shift" && event.ctrlKey) {
+    //   // TODO ブーケトス機能
+    //   await TaskManager.instance.ignition<ModeInfo, never>({
+    //     type: "mode-change",
+    //     owner: "Quoridorn",
+    //     value: {
+    //       type: "throw-parabola",
+    //       value: (this.throwParabola ? "off" : "on") as "on" | "off"
+    //     }
+    //   });
+    //   return;
+    // }
     // window.console.log(event.key);
   }
 
@@ -440,17 +598,29 @@ export default class App extends Vue {
     task.resolve();
   }
 
+  @VueEvent
   private otherTextHide() {
     this.otherTextViewInfo = null;
   }
 
   @TaskProcessor("room-initialize-finished")
   private async roomInitializeFinished(
-    task: Task<ClientRoomInfo, never>
+    task: Task<void, never>
   ): Promise<TaskResult<never> | void> {
     // 部屋に接続できた
     this.roomInitialized = true;
-    this.roomInfo = task.value!;
+    const openSimpleWindow = async (type: string) => {
+      await TaskManager.instance.ignition<WindowOpenInfo<null>, null>({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type,
+          args: null
+        }
+      });
+    };
+    await openSimpleWindow("chat-window");
+
     task.resolve();
   }
 
@@ -458,18 +628,36 @@ export default class App extends Vue {
   private async modeChangeFinished(
     task: Task<ModeInfo, never>
   ): Promise<TaskResult<never> | void> {
-    const type: string = task.value!.type;
-    const value: string = task.value!.value;
-    if (type === "create-room") {
-      this.isCreatingRoomMode = value === "on";
-      task.resolve();
-    }
-    if (type === "modal") {
+    const taskValue = task.value!;
+    if (taskValue.type === "modal") {
+      const value: string = taskValue.value;
       this.isModal = value === "on";
       task.resolve();
     }
-    if (type === "throw-parabola") {
+    if (taskValue.type === "throw-parabola") {
+      const value: string = taskValue.value;
       this.throwParabola = value === "on";
+      task.resolve();
+    }
+    if (taskValue.type === "view-card-deck") {
+      const flag: string = taskValue.value.flag;
+      const cardDeckId: string = taskValue.value.cardDeckId;
+      this.cardView = flag === "on";
+      this.cardDeckId = cardDeckId;
+      task.resolve();
+    }
+    if (taskValue.type === "drop-piece") {
+      const value: string = taskValue.value;
+      this.isDropPiece = value === "on";
+      task.resolve();
+    }
+    if (taskValue.type === "view-progress") {
+      const all: number = taskValue.value.all;
+      const current: number = taskValue.value.current;
+      this.progressAll = all;
+      this.progressCurrent = current;
+      this.progressMessage = taskValue.value.message;
+      if (all) window.console.log(`PROGRESS: (${current} / ${all})`);
       task.resolve();
     }
   }
@@ -504,6 +692,11 @@ export default class App extends Vue {
 
 html,
 body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
   padding: 0;
   margin: 0;
   width: 100%;
@@ -529,6 +722,17 @@ div.img {
   background: no-repeat center;
 }
 
+input {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+
+  &:disabled,
+  &:read-only {
+    cursor: not-allowed !important;
+  }
+}
+
 hr {
   margin: 3px 0;
 }
@@ -545,7 +749,11 @@ label {
   font-family: "Avenir", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
   perspective: 1000px;
@@ -577,9 +785,11 @@ label {
 }
 
 #back-scene {
-  position: absolute;
   background-size: cover;
   background-position: center;
+  position: fixed;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
   filter: blur(var(--mask-blur));
@@ -589,6 +799,10 @@ label {
   background-color
   transform
   */
+}
+
+#drop-area {
+  z-index: 100;
 }
 
 #gameTableContainer {
@@ -614,7 +828,7 @@ label {
   z-index: 3;
 }
 
-.other-text-frame {
+#other-text-frame {
   z-index: 6;
 }
 
@@ -626,14 +840,17 @@ label {
   z-index: 8;
 }
 
-#loading-create-room {
+#card-deck-builder {
+  z-index: 9;
+}
+
+#progress-message-area {
   @include flex-box(column, center, center);
   position: fixed;
   left: 0;
   top: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
   z-index: 10;
 
   img {
@@ -660,6 +877,26 @@ label {
       border-style: solid;
       border-top-color: white;
     }
+  }
+}
+
+#progress-bar {
+  position: relative;
+  height: 2em;
+  width: 18em;
+  background-color: var(--uni-color-white);
+  border: 1px solid gray;
+  border-radius: 0.5em;
+
+  &:before {
+    content: "";
+    width: var(--ratio);
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 0.5em;
+    background-color: var(--uni-color-orange);
   }
 }
 </style>

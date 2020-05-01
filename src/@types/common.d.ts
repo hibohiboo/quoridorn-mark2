@@ -1,19 +1,17 @@
-declare module "skyway-js";
 declare module "jszip";
-declare module "file-saver";
 declare module "vuedraggable";
 declare module "vue-slider-component";
 declare module "mustache";
 declare module "mathjs";
 declare module "moment";
-declare module "crypto-js";
 declare module "js-yaml";
 declare module "uuid";
 declare module "escape-html";
 declare module "vue-password-strength-meter";
-declare function parseInt(s: string, radix?: number): number;
 declare module "socket.io";
 declare module "create-keyframe-animation";
+declare module "url-join";
+declare module "body-scroll-lock";
 declare var YT: any;
 
 declare module "address" {
@@ -60,10 +58,15 @@ declare module "window-info" {
         targetId: null;
         data: CutInDeclareInfo;
       };
+
+  type MediaUploadInfo = {
+    resultList: (File | string)[];
+  };
 }
 
 declare module "compare" {
   type Operand =
+    | { refType: "variable-myself" }
     | { refType: "db-id-exist" }
     | { refType: "exclusion-check" }
     | { refType: "permission-check"; type: "view" | "edit" | "chmod" }
@@ -78,6 +81,7 @@ declare module "compare" {
         searchValue: string;
       }
     | { refType: "db-id-property"; property: string }
+    | { refType: "db-id-owner-property"; level: number; property: string }
     | {
         refType: "db-search-property";
         searchProperty: string;
@@ -103,21 +107,43 @@ declare module "compare" {
 }
 
 declare module "mode" {
-  type ModeInfo = ModalModeInfo | CreateRoomModeInfo | ThrowParabolaModeInfo;
+  type ModeInfo =
+    | ModalModeInfo
+    | ThrowParabolaModeInfo
+    | ViewCardDeckInfo
+    | DropPieceModeInfo
+    | ProcessInfo;
 
   type ModalModeInfo = {
     type: "modal";
     value: "on" | "off";
   };
 
-  type CreateRoomModeInfo = {
-    type: "create-room";
-    value: "on" | "off";
-  };
-
   type ThrowParabolaModeInfo = {
     type: "throw-parabola";
     value: "on" | "off";
+  };
+
+  type ViewCardDeckInfo = {
+    type: "view-card-deck";
+    value: {
+      flag: "on" | "off";
+      cardDeckId: string;
+    };
+  };
+
+  type DropPieceModeInfo = {
+    type: "drop-piece";
+    value: "on" | "off";
+  };
+
+  type ProcessInfo = {
+    type: "view-progress";
+    value: {
+      message: string;
+      all: number;
+      current: number;
+    };
   };
 }
 
@@ -149,6 +175,15 @@ declare module "task-info" {
   type RowSelectInfo = {
     windowKey: string;
     addIndex: 1 | -1;
+  };
+
+  type DropPieceInfo = {
+    type: string;
+    dropWindow: string;
+    offsetX: number;
+    offsetY: number;
+    pageX: number;
+    pageY: number;
   };
 }
 
@@ -220,7 +255,7 @@ declare module "context" {
     taskArg: T;
     isViewCompare?: CompareInfo;
     isDisabledCompare?: CompareInfo;
-    children?: ContextItemDeclareInfo[];
+    children?: ContextItemDeclare[];
   };
 
   // 区切り線(表示条件あり)

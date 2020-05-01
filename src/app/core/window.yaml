@@ -1,4 +1,5 @@
 "play-youtube-window":
+  icon: youtube2
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -16,7 +17,8 @@
   fontSizePickable: false
   resizable: true
   tableInfoList: []
-"cut-in-setting-window":
+"cut-in-list-window":
+  icon: tv
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -81,6 +83,7 @@
           align: center
           target: fade
 "login-window":
+  icon: home3
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -152,6 +155,7 @@
           align: center
           target: ""
 "create-new-room-window":
+  icon: home3
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -185,6 +189,7 @@
   resizable: true
   tableInfoList: []
 "user-login-window":
+  icon: home3
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -218,6 +223,41 @@
   resizable: true
   tableInfoList: []
 "app-server-setting-window":
+  icon: sphere
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 350
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 8.5
+    heightRem: 0.5
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 8.5
+    heightRem: 0.5
+  maxSize:
+    widthPx: 500
+    widthEm: 0
+    widthRem: 0
+    heightPx: 26
+    heightEm: 8.5
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: false
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"bcdice-api-server-setting-window":
+  icon: sphere
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -251,6 +291,7 @@
   resizable: true
   tableInfoList: []
 "terms-of-use-window":
+  icon: warning
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -284,6 +325,7 @@
   resizable: true
   tableInfoList: []
 "delete-room-window":
+  icon: bin1
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -317,6 +359,7 @@
   resizable: true
   tableInfoList: []
 "confirm-window":
+  icon: checkmark
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -350,6 +393,7 @@
   resizable: true
   tableInfoList: []
 "login-room-window":
+  icon: home3
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -383,6 +427,7 @@
   resizable: true
   tableInfoList: []
 "version-info-window":
+  icon: notification
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -416,6 +461,7 @@
   resizable: true
   tableInfoList: []
 "room-info-window":
+  icon: home3
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -426,29 +472,30 @@
     widthEm: 0
     widthRem: 0
     heightPx: 3
-    heightEm: 8
-    heightRem: 1.1
+    heightEm: 14
+    heightRem: 1.3
   minSize:
     widthPx: 300
     widthEm: 0
     widthRem: 0
     heightPx: 3
-    heightEm: 8
-    heightRem: 1.1
+    heightEm: 14
+    heightRem: 1.3
   maxSize:
     widthPx: 700
     widthEm: 0
     widthRem: 0
     heightPx: 3
-    heightEm: 8
-    heightRem: 1.1
+    heightEm: 14
+    heightRem: 1.3
   minimizable: true
   paneContainable: true
   closable: true
   fontSizePickable: true
   resizable: true
   tableInfoList: []
-"add-map-mask-window":
+"map-mask-add-window":
+  icon: plus
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -468,7 +515,8 @@
   fontSizePickable: true
   resizable: false
   tableInfoList: []
-"edit-map-mask-window":
+"map-mask-edit-window":
+  icon: pencil
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -488,7 +536,8 @@
   fontSizePickable: true
   resizable: false
   tableInfoList: []
-"add-chit-window":
+"chit-add-window":
+  icon: plus
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -524,7 +573,8 @@
   fontSizePickable: true
   resizable: true
   tableInfoList: []
-"edit-chit-window":
+"chit-edit-window":
+  icon: pencil
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -563,40 +613,8 @@
   fontSizePickable: true
   resizable: true
   tableInfoList: []
-"input-image-password-window":
-  parentTypeList: []
-  isInputWindow: true
-  isMovingRendering: false
-  message: ""
-  position: center
-  size:
-    widthPx: 400
-    widthEm: 0
-    widthRem: 0
-    heightPx: 2
-    heightEm: 5.5
-    heightRem: 0.7
-  minSize:
-    widthPx: 400
-    widthEm: 0
-    widthRem: 0
-    heightPx: 2
-    heightEm: 5.5
-    heightRem: 0.7
-  maxSize:
-    widthPx: 600
-    widthEm: 0
-    widthRem: 0
-    heightPx: 2
-    heightEm: 5.5
-    heightRem: 0.7
-  minimizable: true
-  paneContainable: true
-  closable: true
-  fontSizePickable: true
-  resizable: true
-  tableInfoList: []
 "edit-other-text-window":
+  icon: pencil
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -630,6 +648,7 @@
   resizable: true
   tableInfoList: []
 "scene-list-window":
+  icon: display
   parentTypeList: []
   isInputWindow: false
   isMovingRendering: false
@@ -666,6 +685,7 @@
   resizable: true
   tableInfoList: []
 "edit-scene-window":
+  icon: pencil
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -700,6 +720,7 @@
   resizable: true
   tableInfoList: []
 "chmod-window":
+  icon: user-tie
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -732,7 +753,8 @@
   fontSizePickable: true
   resizable: true
   tableInfoList: []
-"add-bgm-window":
+"bgm-add-window":
+  icon: plus
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -765,7 +787,8 @@
   fontSizePickable: true
   resizable: true
   tableInfoList: []
-"edit-bgm-window":
+"bgm-edit-window":
+  icon: pencil
   parentTypeList: []
   isInputWindow: true
   isMovingRendering: false
@@ -792,6 +815,386 @@
     heightPx: 2
     heightEm: 28
     heightRem: 2
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"chat-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: false
+  isMovingRendering: false
+  message: ""
+  position: left-bottom
+  size:
+    widthPx: 600
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 20
+    heightRem: 1
+  minSize:
+    widthPx: 300
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14
+    heightRem: 1
+  maxSize:
+    widthPx: 1200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 52
+    heightRem: 1
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"chat-tab-list-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthEm: 22
+    widthScrollBar: 1
+    heightPx: 2
+    heightEm: 10
+    heightRem: 0.5
+  minSize:
+    widthEm: 18
+    widthScrollBar: 1
+    heightPx: 2
+    heightEm: 8
+    heightRem: 0.5
+  maxSize:
+    widthEm: 30
+    widthScrollBar: 1
+    heightPx: 2
+    heightEm: 20
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"chat-tab-add-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  minSize:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  maxSize:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"chat-tab-edit-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  minSize:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  maxSize:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 2
+    heightEm: 4
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"actor-add-window":
+  icon: user
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 0
+    widthEm: 21
+    widthRem: 0
+    heightPx: 2
+    heightEm: 14
+    heightRem: 0.5
+  minSize:
+    widthPx: 0
+    widthEm: 17
+    widthRem: 0
+    heightPx: 2
+    heightEm: 14
+    heightRem: 0.5
+  maxSize:
+    widthPx: 0
+    widthEm: 30
+    widthRem: 0
+    heightPx: 2
+    heightEm: 14
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"actor-edit-window":
+  icon: user
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 0
+    widthEm: 21
+    widthRem: 0
+    heightPx: 2
+    heightEm: 14
+    heightRem: 0.5
+  minSize:
+    widthPx: 0
+    widthEm: 17
+    widthRem: 0
+    heightPx: 2
+    heightEm: 14
+    heightRem: 0.5
+  maxSize:
+    widthPx: 0
+    widthEm: 30
+    widthRem: 0
+    heightPx: 2
+    heightEm: 14
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"player-box-window":
+  icon: user
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 0
+    widthEm: 35
+    widthRem: 0
+    widthScrollBar: 1
+    heightPx: 5
+    heightEm: 26
+    heightRem: 2.5
+  minSize:
+    widthPx: 0
+    widthEm: 30
+    widthRem: 0
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 16
+    heightRem: 1.5
+  maxSize:
+    widthPx: 0
+    widthEm: 60
+    widthRem: 0
+    widthScrollBar: 1
+    heightPx: 7
+    heightEm: 46
+    heightRem: 4.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"card-deck-list-window":
+  icon: stack
+  parentTypeList: []
+  isInputWindow: false
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 4
+    widthEm: 40
+    widthRem: 2.5
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 22
+    heightRem: 2
+  minSize:
+    widthPx: 4
+    widthEm: 30
+    widthRem: 2
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 12
+    heightRem: 2
+  maxSize:
+    widthPx: 4
+    widthEm: 60
+    widthRem: 3.5
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 42
+    heightRem: 3
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: false
+  resizable: true
+  tableInfoList: []
+"media-list-window":
+  icon: library
+  parentTypeList: []
+  isInputWindow: false
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 4
+    widthEm: 40
+    widthRem: 2.5
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 24
+    heightRem: 2.5
+  minSize:
+    widthPx: 4
+    widthEm: 30
+    widthRem: 2
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 14
+    heightRem: 2
+  maxSize:
+    widthPx: 4
+    widthEm: 60
+    widthRem: 3.5
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 44
+    heightRem: 3.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"media-upload-window":
+  icon: library
+  parentTypeList: []
+  isInputWindow: false
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 4
+    widthEm: 40
+    widthRem: 2.5
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 24
+    heightRem: 2.5
+  minSize:
+    widthPx: 4
+    widthEm: 30
+    widthRem: 2
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 14
+    heightRem: 2
+  maxSize:
+    widthPx: 4
+    widthEm: 60
+    widthRem: 3.5
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 44
+    heightRem: 3.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+"card-deck-small-edit-window":
+  icon: pencil
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 2
+    widthEm: 18
+    heightPx: 2
+    heightEm: 22
+    heightRem: 0.5
+  minSize:
+    widthPx: 2
+    widthEm: 15
+    heightPx: 2
+    heightEm: 22
+    heightRem: 0.5
+  maxSize:
+    widthPx: 2
+    widthEm: 28
+    heightPx: 2
+    heightEm: 22
+    heightRem: 0.5
   minimizable: true
   paneContainable: true
   closable: true

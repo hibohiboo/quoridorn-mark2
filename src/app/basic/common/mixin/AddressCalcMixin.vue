@@ -1,14 +1,13 @@
 <script lang="ts">
 import Vue from "vue";
 import { Mixin } from "vue-mixin-decorator";
-import { Getter } from "vuex-class";
 import {
   arrangeAngle,
   calcAngle,
   calcCenter,
   calcDistance,
   createPoint
-} from "@/app/core/Coordinate";
+} from "@/app/core/utility/CoordinateUtility";
 import { Matrix, Point, Rectangle } from "address";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import CssManager from "@/app/core/css/CssManager";
@@ -21,18 +20,13 @@ type Coordinates = {
 
 @Mixin
 export default class AddressCalcMixin extends Vue {
-  @Getter("mapColumns") protected mapColumns: any;
-  @Getter("mapRows") protected mapRows: any;
-  @Getter("mapBorderWidth") protected mapBorderWidth: any;
-  @Getter("mapWheel") protected mapWheel: any;
-
   /**
    * 指定されたスクリーン座標を元に、座標計算を行う
    * @param mouse
    * @param oldAngle
    * @returns {{angle: number, planeLocateScene: {x: *, y: *}, planeLocateCanvas: {x: *, y: *}, planeLocateTable: {x: *, y: *}}}
    */
-  protected calcCoordinate(mouse: Point, oldAngle: number): Coordinates {
+  public calcCoordinate(mouse: Point, oldAngle: number): Coordinates {
     // canvas上のマス座標を計算する
     const canvasRectangle: Rectangle = document
       .getElementById("map-canvas")!

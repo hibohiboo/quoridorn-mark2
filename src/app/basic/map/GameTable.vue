@@ -1,9 +1,6 @@
 <template>
   <div id="gameTableContainer">
     <div
-      @dragover.prevent
-      @drop.prevent="drop"
-      dropzone="move"
       id="gameTable"
       @keydown.enter.stop="globalEnter"
       @keyup.enter.stop
@@ -22,7 +19,7 @@
         @mousedown.right="rightDown"
         @touchstart="leftDown"
       >
-        <map-board :scene="sceneInfo" :sceneId="sceneId" />
+        <map-board :scene="sceneInfo" :sceneId="sceneId" v-if="isMounted" />
       </div>
     </div>
   </div>
@@ -32,8 +29,8 @@
 import MapBoard from "./MapBoard.vue";
 import AddressCalcMixin from "@/app/basic/common/mixin/AddressCalcMixin.vue";
 
-import MapMask from "@/app/basic/map-object/map-mask/MapMask.vue";
-import Chit from "@/app/basic/map-object/chit/Chit.vue";
+import MapMask from "@/app/basic/object/map-mask/MapMaskPieceComponent.vue";
+import Chit from "@/app/basic/object/chit/ChitPieceComponent.vue";
 
 import { Component } from "vue-mixin-decorator";
 import { Watch } from "vue-property-decorator";
@@ -41,7 +38,7 @@ import {
   arrangeAngle,
   createPoint,
   getEventPoint
-} from "@/app/core/Coordinate";
+} from "@/app/core/utility/CoordinateUtility";
 import { Matrix, Point } from "address";
 import { Task, TaskResult } from "task";
 import TaskManager, { MouseMoveParam } from "@/app/core/task/TaskManager";
@@ -56,6 +53,9 @@ import GameObjectManager from "@/app/basic/GameObjectManager";
 import { AddObjectInfo } from "@/@types/data";
 import SceneLayerComponent from "@/app/basic/map/SceneLayerComponent.vue";
 import CssManager from "@/app/core/css/CssManager";
+import { getTextureStyle } from "@/app/core/utility/Utility";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
+import { DropPieceInfo } from "task-info";
 
 @Component({
   components: {
@@ -75,17 +75,12 @@ export default class GameTable extends AddressCalcMixin {
 
   @Watch("roomData", { immediate: true, deep: true })
   private onChangeRoomData() {
-    this.sceneId = this.roomData.sceneId || null;
-  }
-
-  private get useLayerList() {
-    return this.sceneAndLayerList
-      .filter(
-        mal => mal.data && mal.data.sceneId === this.sceneId && mal.data.isUse
-      )
-      .map(mal => mal.data!.layerId)
-      .map(layerId => this.sceneLayerList.filter(ml => ml.id === layerId)[0])
-      .filter(ml => ml);
+    const sceneId = this.roomData.sceneId || null;
+    if (GameObjectManager.instance.isSceneEditing) {
+      GameObjectManager.instance.sceneEditingUpdateSceneId = sceneId;
+    } else {
+      this.sceneId = sceneId;
+    }
   }
 
   private wheel: number = 0;
@@ -132,6 +127,7 @@ export default class GameTable extends AddressCalcMixin {
     await this.updateScreen();
   }
 
+  @Watch("isMounted")
   @Watch("sceneList", { deep: true })
   private async updateScreen() {
     if (!this.isMounted) return;
@@ -141,6 +137,7 @@ export default class GameTable extends AddressCalcMixin {
       CssManager.instance.propMap.totalColumn = this.sceneInfo.columns;
       CssManager.instance.propMap.totalRow = this.sceneInfo.rows;
       CssManager.instance.propMap.gridSize = this.sceneInfo.gridSize!;
+      window.console.log("## setGridSize ##");
       CssManager.instance.propMap.marginColumn = this.sceneInfo.margin.columns;
       CssManager.instance.propMap.marginRow = this.sceneInfo.margin.rows;
       CssManager.instance.propMap.marginBorderWidth = this.sceneInfo.margin.border.width;
@@ -150,16 +147,18 @@ export default class GameTable extends AddressCalcMixin {
     const totalLeftY = Math.round(this.point.y + this.pointDiff.y);
     CssManager.instance.propMap.totalLeftX = totalLeftX;
     CssManager.instance.propMap.totalLeftY = totalLeftY;
-    await this.setCss(this.sceneInfo);
+    setTimeout(async () => {
+      await this.setCss(this.sceneInfo);
+    });
   }
 
   private async setCss(scene: Scene | null) {
     if (!this.isMounted || !scene) return;
     const margin = scene.margin;
     const background = scene.background;
-    await GameTable.setBackground(GameTable.mapCanvasBackElm, scene.texture);
-    await GameTable.setBackground(GameTable.backSceneElm, background.texture);
-    await GameTable.setBackground(GameTable.tableBackElm, margin.texture);
+    GameTable.setBackground(GameTable.mapCanvasBackElm, scene.texture);
+    GameTable.setBackground(GameTable.backSceneElm, background.texture);
+    GameTable.setBackground(GameTable.tableBackElm, margin.texture);
     GameTable.gridPaperElm.style.backgroundSize = `${scene.gridSize!}px ${scene.gridSize!}px`;
     GameTable.gridPaperElm.style.backgroundColor = margin.maskColor;
     GameTable.tableBackElm.style.filter = `blur(${margin.maskBlur}px)`;
@@ -189,34 +188,11 @@ export default class GameTable extends AddressCalcMixin {
     GameTable.gameTableElm.style.borderStyle = margin.border.style;
   }
 
-  public static changeImagePath(path: string) {
-    if (path.startsWith("/")) return `..${path}`;
-    if (path.startsWith("./")) return `.${path}`;
-    return path;
-  }
-
-  private static async setBackground(elm: HTMLElement, info: Texture) {
-    let direction: string = "";
-    let backgroundColor: string = "transparent";
-    let backgroundImage: string = "none";
-    if (info.type === "color") {
-      backgroundColor = info.backgroundColor;
-    } else {
-      const imageData = await SocketFacade.instance
-        .imageDataCC()
-        .getData(info.imageId);
-      if (imageData && imageData.data) {
-        backgroundImage = `url("${GameTable.changeImagePath(
-          imageData.data.data
-        )}")`;
-      }
-      if (info.direction === "horizontal") direction = "scale(-1, 1)";
-      if (info.direction === "vertical") direction = "scale(1, -1)";
-      if (info.direction === "180") direction = "rotate(180deg)";
-    }
-    elm.style.backgroundColor = backgroundColor;
-    elm.style.backgroundImage = backgroundImage;
-    elm.style.transform = direction;
+  private static setBackground(elm: HTMLElement, texture: Texture) {
+    const style = getTextureStyle(texture);
+    elm.style.transform = style.transform;
+    elm.style.backgroundColor = style.backgroundColor;
+    elm.style.backgroundImage = style.backgroundImage;
   }
 
   @Watch("isMounted")
@@ -296,7 +272,18 @@ export default class GameTable extends AddressCalcMixin {
   @VueEvent
   private leftDown(event: MouseEvent | TouchEvent): void {
     this.dragFrom = getEventPoint(event);
-    this.mouseDown("left");
+    this.pointDiff = createPoint(0, 0);
+    TaskManager.instance.setTaskParam<MouseMoveParam>("mouse-moving-finished", {
+      key: this.key,
+      type: `button-left`
+    });
+    TaskManager.instance.setTaskParam<MouseMoveParam>(
+      "mouse-move-end-left-finished",
+      {
+        key: this.key,
+        type: `left-click`
+      }
+    );
   }
 
   /**
@@ -304,26 +291,25 @@ export default class GameTable extends AddressCalcMixin {
    */
   @VueEvent
   private rightDown(event: MouseEvent | TouchEvent): void {
-    const mouse = getEventPoint(event);
-    const calcResult = this.calcCoordinate(mouse, this.currentAngle);
-    this.dragFrom = mouse;
-    this.rotateFrom = calcResult.angle;
-    this.mouseDown("right");
-  }
-
-  private mouseDown(button: string) {
-    this.pointDiff = createPoint(0, 0);
-    TaskManager.instance.setTaskParam<MouseMoveParam>("mouse-moving-finished", {
-      key: this.key,
-      type: `button-${button}`
-    });
+    if (this.roomData.settings.mapRotatable) {
+      const mouse = getEventPoint(event);
+      const calcResult = this.calcCoordinate(mouse, this.currentAngle);
+      this.dragFrom = mouse;
+      this.rotateFrom = calcResult.angle;
+      this.pointDiff = createPoint(0, 0);
+      TaskManager.instance.setTaskParam<MouseMoveParam>(
+        "mouse-moving-finished",
+        {
+          key: this.key,
+          type: "button-right"
+        }
+      );
+    }
     TaskManager.instance.setTaskParam<MouseMoveParam>(
-      button === "right"
-        ? "mouse-move-end-right-finished"
-        : `mouse-move-end-left-finished`,
+      "mouse-move-end-right-finished",
       {
         key: this.key,
-        type: `${button}-click`
+        type: "right-click"
       }
     );
   }
@@ -366,7 +352,7 @@ export default class GameTable extends AddressCalcMixin {
         (point.y - this.dragFrom.y) * zoom
       );
     }
-    if (button === "right") {
+    if (button === "right" && this.roomData.settings.mapRotatable) {
       this.rotateDiff = arrangeAngle(calcResult.angle - this.rotateFrom);
     }
 
@@ -428,29 +414,32 @@ export default class GameTable extends AddressCalcMixin {
     task.resolve();
   }
 
-  @VueEvent
-  private async drop(event: DragEvent): Promise<void> {
-    const type = event.dataTransfer!.getData("dropType");
-    const dropWindow = event.dataTransfer!.getData("dropWindow");
-    const offsetX = event.dataTransfer!.getData("offsetX");
-    const offsetY = event.dataTransfer!.getData("offsetY");
+  @TaskProcessor("drop-piece-finished")
+  private async dropPieceFinished(
+    task: Task<DropPieceInfo, never>
+  ): Promise<TaskResult<never> | void> {
+    const type = task.value!.type;
+    const dropWindow = task.value!.dropWindow;
+    const offsetX = task.value!.offsetX;
+    const offsetY = task.value!.offsetY;
+    const pageX = task.value!.pageX;
+    const pageY = task.value!.pageY;
     const canvasAddress = this.calcCanvasAddress(
-      event.pageX,
-      event.pageY,
+      pageX,
+      pageY,
       this.currentAngle,
-      offsetX ? parseInt(offsetX, 10) : undefined,
-      offsetY ? parseInt(offsetY, 10) : undefined
+      offsetX,
+      offsetY
     );
     const locateOnCanvas = canvasAddress.locateOnCanvas;
 
-    // TODO isGridFit
-    const isGridFit = true;
+    const isFitGrid = this.roomData.settings.isFitGrid;
     const gridSize = CssManager.instance.propMap.gridSize;
     const matrix: Matrix = {
       column: Math.floor(locateOnCanvas.x / gridSize),
       row: Math.floor(locateOnCanvas.y / gridSize)
     };
-    if (isGridFit) {
+    if (isFitGrid) {
       locateOnCanvas.x = matrix.column * gridSize;
       locateOnCanvas.y = matrix.row * gridSize;
     }
@@ -484,7 +473,6 @@ export default class GameTable extends AddressCalcMixin {
 #gameTable {
   position: fixed;
   display: block;
-  margin: auto;
   text-align: center;
   vertical-align: middle;
   cursor: crosshair;
@@ -493,6 +481,10 @@ export default class GameTable extends AddressCalcMixin {
   overflow: visible;
   border-style: var(--margin-border-style);
   border-color: var(--margin-border-color);
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: var(--grid-paper-width);
   height: var(--grid-paper-height);
   filter: var(--filter);
@@ -530,7 +522,9 @@ export default class GameTable extends AddressCalcMixin {
 }
 
 #grid-paper {
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
   width: var(--grid-paper-width);
   overflow: hidden;
   z-index: 2;

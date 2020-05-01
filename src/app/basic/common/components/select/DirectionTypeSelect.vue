@@ -50,19 +50,11 @@ export default class DirectionTypeSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
     this.optionInfoList.forEach(o => {
       const suffix = o.value ? `-${o.value}` : "";
-      o.text = getText(`label.direction${suffix}`);
+      o.text = this.$t(`label.direction${suffix}`)!.toString();
       o.key = o.value;
     });
-  }
-
-  public focus() {
-    const elm = this.$refs.component as CtrlSelect;
-    elm.focus();
   }
 }
 </script>

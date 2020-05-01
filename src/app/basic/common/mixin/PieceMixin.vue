@@ -1,18 +1,24 @@
 <script lang="ts">
 import AddressCalcMixin from "./AddressCalcMixin.vue";
 import { Prop, Watch } from "vue-property-decorator";
-import { Mixin } from "vue-mixin-decorator";
-import { createPoint, getEventPoint } from "@/app/core/Coordinate";
+import { Mixin, Mixins } from "vue-mixin-decorator";
+import {
+  createPoint,
+  createAddress,
+  copyAddress,
+  getEventPoint,
+  createRectangle
+} from "@/app/core/utility/CoordinateUtility";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import SocketFacade, {
   getStoreObj
 } from "@/app/core/api/app-server/SocketFacade";
 import { StoreObj, StoreUseData } from "@/@types/store";
 import {
+  OtherTextViewInfo,
   SceneObject,
   SceneObjectType,
-  OtherTextViewInfo,
-  VolatileMapObject
+  ObjectMoveInfo
 } from "@/@types/gameObject";
 import { Point } from "address";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
@@ -21,14 +27,17 @@ import TaskManager, { MouseMoveParam } from "@/app/core/task/TaskManager";
 import CssManager from "@/app/core/css/CssManager";
 import { ContextTaskInfo } from "context";
 import GameObjectManager from "@/app/basic/GameObjectManager";
-import { clone } from "@/app/core/Utility";
 import { SceneAndObject } from "@/@types/room";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
+import VueEvent from "@/app/core/decorator/VueEvent";
+import Unsubscribe from "nekostore/lib/Unsubscribe";
+import { clone } from "@/app/core/utility/PrimaryDataUtility";
+import { getSrc } from "@/app/core/utility/Utility";
 
 @Mixin
-export default class PieceMixin<
-  T extends SceneObjectType
-> extends AddressCalcMixin {
+export default class PieceMixin<T extends SceneObjectType> extends Mixins<
+  AddressCalcMixin
+>(AddressCalcMixin) {
   @Prop({ type: String, required: true })
   protected docId!: string;
 
@@ -41,35 +50,44 @@ export default class PieceMixin<
   protected inflateWidth: number = 0;
   protected sceneObjectCC = SocketFacade.instance.sceneObjectCC();
   protected sceneAndObjectCC = SocketFacade.instance.sceneAndObjectCC();
-  private imageList = GameObjectManager.instance.imageList;
-  private sceneAndObjectList = GameObjectManager.instance.sceneAndObjectList;
-  private socketUserList = GameObjectManager.instance.socketUserList;
-  private userList = GameObjectManager.instance.userList;
+  private mediaList = GameObjectManager.instance.mediaList;
 
   protected isMounted: boolean = false;
   protected sceneObjectInfo: StoreUseData<SceneObject> | null = null;
   protected sceneAndObjectInfo: StoreUseData<SceneAndObject> | null = null;
   private otherLockTimeoutId: number | null = null;
   private isTransitioning: boolean = false;
+  private roomData = GameObjectManager.instance.roomData;
+  private sceneAndObjectUnsubscribe: Unsubscribe | null = null;
 
-  private get lockMessage() {
+  private get sceneId() {
+    return this.roomData.sceneId;
+  }
+
+  @Watch("sceneId")
+  private async onChangeSceneId() {
+    await this.resetSceneId(this.sceneId);
+  }
+
+  @VueEvent
+  protected get lockMessage() {
     let result = "";
     if (this.sceneObjectInfo && this.sceneObjectInfo.exclusionOwner) {
-      const userName = GameObjectManager.instance.getExclusionOwnerName(
+      const name = GameObjectManager.instance.getExclusionOwnerName(
         this.sceneObjectInfo.exclusionOwner
       );
-      result = userName
-        ? `<span class="icon-lock"></span>sceneObject(${escape(userName)})`
+      result = name
+        ? `<span class="icon-lock"></span>sceneObject(${escape(name)})`
         : "";
     }
 
     let additional = "";
     if (this.sceneAndObjectInfo && this.sceneAndObjectInfo.exclusionOwner) {
-      const userName = GameObjectManager.instance.getExclusionOwnerName(
+      const name = GameObjectManager.instance.getExclusionOwnerName(
         this.sceneAndObjectInfo.exclusionOwner
       );
-      additional = userName
-        ? `<span class="icon-lock"></span>sceneAndObject(${escape(userName)})`
+      additional = name
+        ? `<span class="icon-lock"></span>sceneAndObject(${escape(name)})`
         : "";
     }
 
@@ -86,12 +104,12 @@ export default class PieceMixin<
   protected imageSrc: string = "";
   protected otherText: string = "";
 
-  private volatileInfo: VolatileMapObject = {
-    moveFrom: createPoint(0, 0),
-    moveFromPlane: createPoint(0, 0),
-    moveFromPlaneRelative: createPoint(0, 0),
-    moveGridOffset: createPoint(0, 0),
+  private volatileInfo: ObjectMoveInfo = {
+    fromPoint: createPoint(0, 0),
+    fromAbsPoint: createPoint(0, 0),
+    fromAbsRelPoint: createPoint(0, 0),
     moveDiff: createPoint(0, 0),
+    cardCenter: createPoint(0, 0),
     angleFrom: 0,
     angleDiff: 0
   };
@@ -100,17 +118,48 @@ export default class PieceMixin<
     return `${this.type}-${this.docId}`;
   }
 
+  private async resetSceneId(sceneId: string) {
+    this.sceneAndObjectInfo = (await this.sceneAndObjectCC!.find([
+      {
+        property: "data.sceneId",
+        operand: "==",
+        value: sceneId
+      },
+      {
+        property: "data.objectId",
+        operand: "==",
+        value: this.docId
+      }
+    ]))![0];
+
+    this.onChangePoint();
+
+    if (this.sceneAndObjectUnsubscribe) {
+      await this.sceneAndObjectUnsubscribe();
+    }
+    this.sceneAndObjectUnsubscribe = await this.sceneAndObjectCC!.setSnapshot(
+      this.docId,
+      this.sceneAndObjectInfo.id!,
+      (snapshot: DocumentSnapshot<StoreObj<SceneAndObject>>) => {
+        if (!snapshot.data) return;
+        const status = snapshot.data.status;
+        if (status === "modified" || status === "modify-touched") {
+          this.sceneAndObjectInfo = getStoreObj<SceneAndObject>(snapshot);
+        }
+        if (status === "modified") {
+          if (this.sceneAndObjectInfo!.data!.isOriginalAddress) {
+            this.volatileInfo.moveDiff = createPoint(0, 0);
+            this.onChangePoint();
+          }
+        }
+      }
+    );
+  }
+
   @LifeCycle
   protected async mounted() {
-    const sceneObjectInfo = (await this.sceneObjectCC!.getData(this.docId))!;
-    const sceneAndObjectInfo = (await this.sceneAndObjectCC!.find(
-      "data.objectId",
-      "==",
-      this.docId
-    ))![0];
-    this.setTransform(sceneObjectInfo);
-    this.sceneObjectInfo = sceneObjectInfo;
-    this.sceneAndObjectInfo = sceneAndObjectInfo;
+    this.sceneObjectInfo = (await this.sceneObjectCC!.getData(this.docId))!;
+
     await this.sceneObjectCC!.setSnapshot(this.docId, this.docId, snapshot => {
       if (!snapshot.data) return;
       const status = snapshot.data.status;
@@ -118,31 +167,30 @@ export default class PieceMixin<
         this.sceneObjectInfo = getStoreObj<SceneObject>(snapshot);
         if (status === "modified") {
           this.isMoving = false;
-          this.onChangePoint();
+          if (!this.sceneAndObjectInfo!.data!.isOriginalAddress) {
+            this.volatileInfo.moveDiff = createPoint(0, 0);
+            this.onChangePoint();
+          }
         }
       }
     });
-    await this.sceneAndObjectCC!.setSnapshot(
-      this.docId,
-      sceneAndObjectInfo.id!,
-      (snapshot: DocumentSnapshot<StoreObj<SceneAndObject>>) => {
-        if (!snapshot.data) return;
-        const status = snapshot.data.status;
-        if (status === "modified" || status === "modify-touched") {
-          this.sceneAndObjectInfo = getStoreObj<SceneAndObject>(snapshot);
-        }
-      }
-    );
+
+    await this.resetSceneId(this.sceneId);
+
     this.isMounted = true;
+    this.onChangePoint();
   }
 
   private get isOtherLastModify(): boolean {
     if (!this.sceneObjectInfo) return false;
-    const lastExclusionOwner = this.sceneObjectInfo.lastExclusionOwner;
+    const targetStoreObj = this.sceneAndObjectInfo!.data!.isOriginalAddress
+      ? this.sceneAndObjectInfo!
+      : this.sceneObjectInfo!;
+    const lastExclusionOwner = targetStoreObj.lastExclusionOwner;
     const lastExclusionOwnerId = GameObjectManager.instance.getExclusionOwnerId(
       lastExclusionOwner
     );
-    return lastExclusionOwnerId !== GameObjectManager.instance.mySelfId;
+    return lastExclusionOwnerId !== GameObjectManager.instance.mySelfUserId;
   }
 
   protected get basicClasses() {
@@ -163,25 +211,29 @@ export default class PieceMixin<
     return this.$refs.component as HTMLElement;
   }
 
-  protected get lockInfoElm(): HTMLElement | null {
-    return this.$refs.lockInfo ? (this.$refs.lockInfo as HTMLElement) : null;
-  }
-
   private objX: number = 0;
   private objY: number = 0;
 
-  @Watch("isMounted")
-  @Watch("volatileInfo.moveDiff")
-  @Watch("inflateWidth")
   private onChangePoint() {
     if (!this.isMounted) return;
-    this.setTransform(this.sceneObjectInfo!);
+
+    // setTransform
+    const angle = this.sceneObjectInfo!.data!.angle;
+    const address = createAddress(0, 0, 0, 0);
+    copyAddress(this.sceneObjectInfo!.data!, address);
+    if (
+      this.sceneAndObjectInfo!.data!.isOriginalAddress &&
+      this.sceneAndObjectInfo!.data!.originalAddress
+    ) {
+      copyAddress(this.sceneAndObjectInfo!.data!.originalAddress, address);
+    }
+    this.setTransform(address, angle);
   }
 
-  private setTransform(sceneObjectInfo: StoreUseData<SceneObject>) {
-    const x = sceneObjectInfo.data!.x;
+  private setTransform(point: Point, angle: number) {
+    const x = point.x;
     const useX = this.isMoving ? x + this.volatileInfo.moveDiff.x : x;
-    const y = sceneObjectInfo.data!.y;
+    const y = point.y;
     const useY = this.isMoving ? y + this.volatileInfo.moveDiff.y : y;
 
     if (this.isOtherLastModify) {
@@ -197,9 +249,7 @@ export default class PieceMixin<
 
     this.objX = useX - this.inflateWidth;
     this.objY = useY - this.inflateWidth;
-    this.elm.style.transform = `translate(${this.objX}px,${
-      this.objY
-    }px) rotate(${sceneObjectInfo.data!.angle}deg) translateZ(0)`;
+    this.elm.style.transform = `translate(${this.objX}px,${this.objY}px) rotate(${angle}deg) translateZ(0)`;
   }
 
   @Watch("isMounted")
@@ -286,11 +336,11 @@ export default class PieceMixin<
       this.elm.style.setProperty(`--font-color`, backInfo.fontColor);
       this.elm.style.setProperty(`--text`, `"${backInfo.text}"`);
     } else {
-      const imageObj = this.imageList.filter(
-        obj => obj.id === backInfo.imageId
+      const media = this.mediaList.filter(
+        media => media.id === backInfo.imageId
       )[0];
-      this.elm.style.setProperty(`--image`, `url(${imageObj.data!.data})`);
-      this.imageSrc = imageObj.data!.data;
+      this.imageSrc = getSrc(media.data!.url);
+      this.elm.style.setProperty(`--image`, `url(${this.imageSrc})`);
       let direction = "";
       if (backInfo.direction === "horizontal") direction = "scale(-1, 1)";
       if (backInfo.direction === "vertical") direction = "scale(1, -1)";
@@ -331,9 +381,10 @@ export default class PieceMixin<
     if (!this.isMoving) return;
     const point = task.value!;
     const planeLocateScene = this.getPoint(point);
-    const diffX = planeLocateScene.x - this.volatileInfo.moveFromPlane.x;
-    const diffY = planeLocateScene.y - this.volatileInfo.moveFromPlane.y;
+    const diffX = planeLocateScene.x - this.volatileInfo.fromAbsPoint.x;
+    const diffY = planeLocateScene.y - this.volatileInfo.fromAbsPoint.y;
     this.volatileInfo.moveDiff = createPoint(diffX, diffY);
+    this.onChangePoint();
   }
 
   @TaskProcessor("change-focus-scene-object-finished")
@@ -355,10 +406,10 @@ export default class PieceMixin<
       `【highlight:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
     );
     try {
-      await this.sceneObjectCC!.touchModify(this.docId);
+      await this.sceneObjectCC!.touchModify([this.docId]);
       const data = (await this.sceneObjectCC!.getData(this.docId))!;
       data.data!.isHideHighlight = task.value.value;
-      await this.sceneObjectCC!.update(this.docId, data.data!);
+      await this.sceneObjectCC!.update([this.docId], [data.data!]);
     } catch (err) {
       window.console.warn(err);
     }
@@ -375,10 +426,10 @@ export default class PieceMixin<
       `【border:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
     );
     try {
-      await this.sceneObjectCC!.touchModify(this.docId);
+      await this.sceneObjectCC!.touchModify([this.docId]);
       const data = (await this.sceneObjectCC!.getData(this.docId))!;
       data.data!.isHideBorder = task.value.value;
-      await this.sceneObjectCC!.update(this.docId, data.data!);
+      await this.sceneObjectCC!.update([this.docId], [data.data!]);
     } catch (err) {
       window.console.warn(err);
     }
@@ -395,10 +446,10 @@ export default class PieceMixin<
       `【lock:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
     );
     try {
-      await this.sceneObjectCC!.touchModify(this.docId);
+      await this.sceneObjectCC!.touchModify([this.docId]);
       const data = (await this.sceneObjectCC!.getData(this.docId))!;
       data.data!.isLock = task.value.value;
-      await this.sceneObjectCC!.update(this.docId, data.data!);
+      await this.sceneObjectCC!.update([this.docId], [data.data!]);
     } catch (err) {
       window.console.warn(err);
     }
@@ -442,27 +493,40 @@ export default class PieceMixin<
   protected async leftDown(event: MouseEvent): Promise<void> {
     if (this.sceneObjectInfo!.data!.isLock) return;
     event.stopPropagation();
-    try {
-      await this.sceneObjectCC!.touchModify(this.docId);
-    } catch (err) {
-      window.console.warn(err);
-      return;
+    if (this.sceneAndObjectInfo!.data!.isOriginalAddress) {
+      try {
+        await this.sceneAndObjectCC!.touchModify([
+          this.sceneAndObjectInfo!.id!
+        ]);
+      } catch (err) {
+        window.console.warn(err);
+        return;
+      }
+    } else {
+      try {
+        await this.sceneObjectCC!.touchModify([this.docId]);
+      } catch (err) {
+        window.console.warn(err);
+        return;
+      }
     }
     const clientRect = (event.target as any).getBoundingClientRect();
     const elmPoint = this.getPoint(createPoint(clientRect.x, clientRect.y));
     const point = getEventPoint(event);
     const planeLocateScene = this.getPoint(point);
     this.volatileInfo.moveDiff = createPoint(0, 0);
-    this.volatileInfo.moveFrom = createPoint(point.x, point.y);
-    this.volatileInfo.moveFromPlane = createPoint(
+    this.volatileInfo.fromPoint = createPoint(point.x, point.y);
+    this.volatileInfo.fromAbsPoint = createPoint(
       planeLocateScene.x,
       planeLocateScene.y
     );
-    const relativeX = planeLocateScene.x - elmPoint.x;
-    const relativeY = planeLocateScene.y - elmPoint.y;
-    this.volatileInfo.moveFromPlaneRelative = createPoint(relativeX, relativeY);
+    this.volatileInfo.fromAbsRelPoint = createPoint(
+      planeLocateScene.x - elmPoint.x,
+      planeLocateScene.y - elmPoint.y
+    );
     this.isMoving = true;
     this.inflateWidth = 2;
+    this.onChangePoint();
     this.mouseDown("left");
   }
 
@@ -498,27 +562,51 @@ export default class PieceMixin<
     if (!param || param.key !== this.docId) return;
 
     window.console.log("mouse-move-end-left-finished", param.key, param.type);
-    const data: SceneObject = clone(this.sceneObjectInfo!.data)!;
-    data.x += this.volatileInfo.moveDiff.x;
-    data.y += this.volatileInfo.moveDiff.y;
+    const address = createAddress(0, 0, 0, 0);
+
+    copyAddress(this.sceneObjectInfo!.data!, address);
+
+    if (
+      this.sceneAndObjectInfo!.data!.isOriginalAddress &&
+      this.sceneAndObjectInfo!.data!.originalAddress
+    ) {
+      copyAddress(this.sceneAndObjectInfo!.data!.originalAddress, address);
+    }
+
+    address.x += this.volatileInfo.moveDiff.x;
+    address.y += this.volatileInfo.moveDiff.y;
 
     const gridSize = CssManager.instance.propMap.gridSize;
-    const relativeX = this.volatileInfo.moveFromPlaneRelative.x;
-    const relativeY = this.volatileInfo.moveFromPlaneRelative.y;
-    data.column =
-      Math.floor((data.x + relativeX) / gridSize) -
+    const relativeX = this.volatileInfo.fromAbsRelPoint.x;
+    const relativeY = this.volatileInfo.fromAbsRelPoint.y;
+    address.column =
+      Math.floor((address.x + relativeX) / gridSize) -
       Math.floor(relativeX / gridSize) +
       1;
-    data.row =
-      Math.floor((data.y + relativeY) / gridSize) -
+    address.row =
+      Math.floor((address.y + relativeY) / gridSize) -
       Math.floor(relativeY / gridSize) +
       1;
 
-    if (GameObjectManager.instance.roomData.isFitGrid) {
-      data.x = (data.column - 1) * gridSize;
-      data.y = (data.row - 1) * gridSize;
+    if (GameObjectManager.instance.roomData.settings.isFitGrid) {
+      address.x = (address.column - 1) * gridSize;
+      address.y = (address.row - 1) * gridSize;
     }
-    await this.sceneObjectCC!.update(this.docId, data);
+
+    if (this.sceneAndObjectInfo!.data!.isOriginalAddress) {
+      const data: SceneAndObject = clone(this.sceneAndObjectInfo!.data)!;
+      if (!data.originalAddress)
+        data.originalAddress = createAddress(0, 0, 0, 0);
+      copyAddress(address, data.originalAddress);
+      await this.sceneAndObjectCC!.update(
+        [this.sceneAndObjectInfo!.id!],
+        [data]
+      );
+    } else {
+      const data: SceneObject = clone(this.sceneObjectInfo!.data)!;
+      copyAddress(address, data);
+      await this.sceneObjectCC!.update([this.docId], [data]);
+    }
     this.inflateWidth = 0;
     TaskManager.instance.setTaskParam("mouse-moving-finished", null);
     TaskManager.instance.setTaskParam("mouse-move-end-left-finished", null);
@@ -618,6 +706,7 @@ export default class PieceMixin<
     this.isHover = true;
     const data = this.sceneObjectInfo!.data!;
     if (!data.otherText) return;
+    const rect = this.elm.getBoundingClientRect();
     await TaskManager.instance.ignition<OtherTextViewInfo, never>({
       type: "other-text-view",
       owner: "Quoridorn",
@@ -625,9 +714,8 @@ export default class PieceMixin<
         type: this.type,
         docId: this.docId,
         text: data.otherText,
-        point: createPoint(data.x, data.y),
-        columns: data.columns,
-        rows: data.rows
+        rect: createRectangle(data.x, data.y, rect.width, rect.height),
+        isFix: false
       }
     });
   }
@@ -636,12 +724,10 @@ export default class PieceMixin<
     this.isHover = false;
     const data = this.sceneObjectInfo!.data!;
     if (!data.otherText) return;
-    setTimeout(async () => {
-      await TaskManager.instance.ignition<string, never>({
-        type: "other-text-hide",
-        owner: "Quoridorn",
-        value: this.docId
-      });
+    await TaskManager.instance.ignition<string, never>({
+      type: "other-text-hide",
+      owner: "Quoridorn",
+      value: this.docId
     });
   }
 }

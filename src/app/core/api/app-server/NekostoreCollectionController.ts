@@ -4,7 +4,7 @@ import Unsubscribe from "nekostore/src/Unsubscribe";
 import CollectionReference from "nekostore/src/CollectionReference";
 import DocumentReference from "nekostore/src/DocumentReference";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
-import { Permission, StoreObj, StoreUseData } from "@/@types/store";
+import { StoreObj, StoreUseData } from "@/@types/store";
 import SocketFacade, {
   getStoreObj
 } from "@/app/core/api/app-server/SocketFacade";
@@ -17,7 +17,7 @@ import {
   TouchRequest,
   UpdateDataRequest
 } from "@/@types/data";
-import GameObjectManager from "@/app/basic/GameObjectManager";
+import Query from "nekostore/lib/Query";
 
 export default class NekostoreCollectionController<T> {
   constructor(
@@ -37,9 +37,7 @@ export default class NekostoreCollectionController<T> {
     });
 
     // releaseTouchを直列の非同期で全部実行する
-    await this.touchList
-      .map((touchId: string) => () => this.releaseTouch(touchId))
-      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+    await this.releaseTouch(this.touchList);
   }
 
   private snapshotMap: { [ownerKey in string]: Unsubscribe } = {};
@@ -90,12 +88,14 @@ export default class NekostoreCollectionController<T> {
               }
             }
           });
-          if (wantSort)
+          if (wantSort) {
             argList!.sort((i1: any, i2: any) => {
               if (i1[sortColumn] < i2[sortColumn]) return -1;
               if (i1[sortColumn] > i2[sortColumn]) return 1;
               return 0;
             });
+            // window.console.log("sorted", argList!);
+          }
         });
       }
     );
@@ -110,126 +110,141 @@ export default class NekostoreCollectionController<T> {
   }
 
   public async find(
-    property: string,
-    operand: "==",
-    value: any
+    options: { property: string; operand: "=="; value: any }[]
   ): Promise<StoreUseData<T>[] | null> {
-    const c = this.getCollection();
-    const docs = (await c.where(property, operand, value).get()).docs;
+    let c: Query<StoreObj<T>> = this.getCollection();
+    options.forEach(o => {
+      c = c.where(o.property, o.operand, o.value);
+    });
+    const docs = (await c.get()).docs;
     if (!docs) return null;
     return docs
       .filter(item => item && item.exists())
       .map(item => getStoreObj(item)!);
   }
 
-  public async touch(option?: Partial<StoreUseData<any>>): Promise<string> {
-    let id: string | undefined = undefined;
-    let owner: string = GameObjectManager.instance.mySelfId;
-    if (option) {
-      id = option.id || undefined;
-      if (option.owner) owner = option.owner;
-    }
-    const docId = await SocketFacade.instance.socketCommunication<
+  public async touch(
+    idList?: string[],
+    optionList?: Partial<StoreUseData<any>>[]
+  ): Promise<string[]> {
+    const docIdList = await SocketFacade.instance.socketCommunication<
       TouchRequest,
-      string
+      string[]
     >("touch-data", {
       collection: this.collectionName,
-      id,
-      owner
+      idList,
+      optionList
     });
-    this.touchList.push(docId);
-    return docId;
+    this.touchList.push(...docIdList);
+    return docIdList;
   }
 
-  public async touchModify(id: string): Promise<string> {
-    const docId = await SocketFacade.instance.socketCommunication<
+  public async touchModify(idList: string[]): Promise<string[]> {
+    const docIdList = await SocketFacade.instance.socketCommunication<
       TouchModifyRequest,
-      never
+      string[]
     >("touch-data-modify", {
       collection: this.collectionName,
-      id
+      idList
     });
-    this.touchList.push(docId);
-    return docId;
+    this.touchList.push(...docIdList);
+    return docIdList;
   }
 
-  public async releaseTouch(id: string): Promise<void> {
-    const index = this.touchList.findIndex(listId => listId === id);
-    this.touchList.splice(index, 1);
+  public async releaseTouch(idList: string[]): Promise<void> {
+    idList.forEach(id => {
+      const index = this.touchList.findIndex(listId => listId === id);
+      this.touchList.splice(index, 1);
+    });
     await SocketFacade.instance.socketCommunication<ReleaseTouchRequest, never>(
       "release-touch-data",
       {
         collection: this.collectionName,
-        id
+        idList
       }
     );
   }
 
   public async add(
-    id: string,
-    data: T,
-    permission?: Permission
-  ): Promise<string> {
-    const index = this.touchList.findIndex(listId => listId === id);
-    this.touchList.splice(index, 1);
+    idList: string[],
+    dataList: T[],
+    optionList?: Partial<StoreObj<any>>[]
+  ): Promise<string[]> {
+    idList.forEach(id => {
+      const index = this.touchList.findIndex(listId => listId === id);
+      this.touchList.splice(index, 1);
+    });
     return await SocketFacade.instance.socketCommunication<
       CreateDataRequest,
-      string
+      string[]
     >("create-data", {
       collection: this.collectionName,
-      id,
-      data,
-      permission: permission || GameObjectManager.DEFAULT_PERMISSION
+      idList,
+      dataList,
+      optionList
     });
   }
 
   public async addDirect(
     dataList: T[],
-    option?: Partial<StoreObj<any>>
+    optionList?: Partial<StoreObj<any>>[]
   ): Promise<string[]> {
-    let permission: Permission = GameObjectManager.DEFAULT_PERMISSION;
-    let owner: string = GameObjectManager.instance.mySelfId;
-    if (option) {
-      if (option.permission) permission = option.permission;
-      if (option.owner) owner = option.owner;
-    }
     return await SocketFacade.instance.socketCommunication<
       AddDirectRequest,
       string[]
     >("add-direct", {
       collection: this.collectionName,
       dataList,
-      permission,
-      owner
+      optionList
     });
   }
 
   public async update(
-    id: string,
-    data: T,
-    option?: Partial<StoreObj<unknown>> & { continuous?: boolean }
+    idList: string[],
+    dataList: T[],
+    optionList?: (Partial<StoreObj<unknown>> & { continuous?: boolean })[]
   ) {
-    const index = this.touchList.findIndex(listId => listId === id);
-    this.touchList.splice(index, 1);
+    idList.forEach(id => {
+      const index = this.touchList.findIndex(listId => listId === id);
+      this.touchList.splice(index, 1);
+    });
     await SocketFacade.instance.socketCommunication<UpdateDataRequest, never>(
       "update-data",
       {
         collection: this.collectionName,
-        id,
-        data,
-        option
+        idList,
+        dataList,
+        optionList
       }
     );
   }
 
-  public async delete(id: string): Promise<void> {
-    const index = this.touchList.findIndex(listId => listId === id);
-    this.touchList.splice(index, 1);
+  public async updatePackage(
+    idList: string[],
+    dataList: T[],
+    optionList?: (Partial<StoreObj<unknown>> & { continuous?: boolean })[]
+  ) {
+    await SocketFacade.instance.socketCommunication<UpdateDataRequest, never>(
+      "update-data-package",
+      {
+        collection: this.collectionName,
+        idList,
+        dataList,
+        optionList
+      }
+    );
+  }
+
+  public async delete(idList: string[]): Promise<void> {
+    idList.forEach(id => {
+      const index = this.touchList.findIndex(listId => listId === id);
+      this.touchList.splice(index, 1);
+    });
     await SocketFacade.instance.socketCommunication<DeleteDataRequest, never>(
       "delete-data",
       {
         collection: this.collectionName,
-        id
+        idList
       }
     );
   }

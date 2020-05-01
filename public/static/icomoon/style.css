@@ -1,10 +1,10 @@
 @font-face {
   font-family: 'icomoon';
-  src:  url('fonts/icomoon.eot?jf7pne');
-  src:  url('fonts/icomoon.eot?jf7pne#iefix') format('embedded-opentype'),
-    url('fonts/icomoon.ttf?jf7pne') format('truetype'),
-    url('fonts/icomoon.woff?jf7pne') format('woff'),
-    url('fonts/icomoon.svg?jf7pne#icomoon') format('svg');
+  src:  url('fonts/icomoon.eot?dosuzt');
+  src:  url('fonts/icomoon.eot?dosuzt#iefix') format('embedded-opentype'),
+    url('fonts/icomoon.ttf?dosuzt') format('truetype'),
+    url('fonts/icomoon.woff?dosuzt') format('woff'),
+    url('fonts/icomoon.svg?dosuzt#icomoon') format('svg');
   font-weight: normal;
   font-style: normal;
   font-display: block;
@@ -181,15 +181,117 @@
 .icon-safari:before {
   content: "\eadd";
 }
+.icon-pencil:before {
+  content: "\e905";
+}
 .icon-price-tags:before {
   content: "\e936";
+}
+.icon-calculator:before {
+  content: "\e940";
+}
+.icon-address-book:before {
+  content: "\e944";
+}
+.icon-keyboard:before {
+  content: "\e955";
+}
+.icon-tv:before {
+  content: "\e95b";
+}
+.icon-download:before {
+  content: "\e960";
+}
+.icon-upload:before {
+  content: "\e961";
+}
+.icon-user:before {
+  content: "\e971";
+}
+.icon-users:before {
+  content: "\e972";
 }
 .icon-lock:before {
   content: "\e98f";
 }
+.icon-gift:before {
+  content: "\e99f";
+}
+.icon-briefcase:before {
+  content: "\e9ae";
+}
+.icon-switch:before {
+  content: "\e9b6";
+}
 .icon-menu:before {
   content: "\e9bd";
 }
+.icon-cloud:before {
+  content: "\e9c1";
+}
+.icon-sphere:before {
+  content: "\e9c9";
+}
+.icon-attachment:before {
+  content: "\e9cd";
+}
 .icon-arrow-left:before {
   content: "\ea38";
+}
+.icon-make-group:before {
+  content: "\ea58";
+}
+.icon-paint-format:before {
+  content: "\e90c";
+}
+.icon-library:before {
+  content: "\e921";
+}
+.icon-file-zip:before {
+  content: "\e92b";
+}
+.icon-stack:before {
+  content: "\e92e";
+}
+.icon-qrcode:before {
+  content: "\e938";
+}
+.icon-display:before {
+  content: "\e956";
+}
+.icon-user-plus:before {
+  content: "\e973";
+}
+.icon-user-tie:before {
+  content: "\e976";
+}
+.icon-key2:before {
+  content: "\e98e";
+}
+.icon-image:before {
+  content: "\e90e";
+}
+.icon-price-tag:before {
+  content: "\e935";
+}
+.icon-zoom-in:before {
+  content: "\e987";
+}
+.icon-list:before {
+  content: "\e9ba";
+}
+.icon-enter:before {
+  content: "\ea13";
+}
+.icon-exit:before {
+  content: "\ea14";
+}
+.icon-arrow-up:before {
+  content: "\ea32";
+}
+.icon-arrow-down:before {
+  content: "\ea36";
+}
+.icon-youtube:before {
+  content: "\ea9d";
 }

@@ -18,6 +18,9 @@ button:
   exit-room: 退出
   edit: 編集
   chmod: 権限変更
+  upload: アップロード
+  download: ダウンロード
+  read: 読込
 
 type:
   map-mask: 地图遮罩
@@ -30,7 +33,17 @@ type:
   stand-image: 站立图片
   stand-image-diff: 站立图片差异
   user: ユーザー
+  actor: アクター
   actor-group: アクターグループ
+  piece: コマ
+  card: カード
+  card-object: カード/山札
+  card-deck-small: 山札
+
+option:
+  chat-color-type:
+    owner: オーナーと同じ
+    original: 個別の色
 
 context:
   bgm-setting: 音乐设定
@@ -45,8 +58,20 @@ context:
   hide-border: 隐藏边框
   view-highlight: 显示突出显示
   hide-highlight: 隐藏突出显示
-  edit-area-map: エリアマップ編集
+  view-scene-list: シーン一覧表示
   chmod: 権限変更
+  shuffle: シャッフル
+  draw: ドロー
+  turn-on-all: すべて表にする
+  turn-off-all: すべて裏にする
+  turn-on: 表にする
+  turn-off: 裏にする
+  layout: レイアウト
+  layout-pile-up: 重ねる
+  layout-spread-out: 広げる
+  layout-tile: タイル
+  setting-change: 設定変更
+  placement-reset: 配置リセット
 
 label:
   terms-of-use: 使用条款
@@ -55,20 +80,23 @@ label:
   not-exist: 无
   possible: 好啦
   creating: 创造
-  terms-of-use-web-server: Web服务器条款和条件
-  terms-of-use-app-server: 应用服务器使用条款
   user-name: 用户名
   password: 密码
   password-placeholder: （如果为空，则没有密码）
   user-type: 用户类型
-  nameless: 无名
+  require-text: 必填项
   permission: 权威
-  player: PL
   gameMaster: GM
+  player: PL
   visitor: 参观者
+  GM: GM
+  PL: PL
+  VISITOR: 見学者
   room-name: 游戏室名称
   room-name-placeholder: 房间名称（必填项）
-  game-system: 游戏系统 (可以输入)
+  bcdice-api-url: BCDice-APIのURL
+  game-system-input: 游戏系统 (可以输入)
+  game-system-view: 游戏系统
   no-target: 未指定
   participant: 参加者
   version-info: 版本信息
@@ -83,6 +111,7 @@ label:
   width: 幅宽
   alpha: 透过率
   tag: 标签
+  non-tag: タグ無し
   direction: 方向
   direction-none: 照原样
   direction-horizontal: 左右翻转
@@ -111,6 +140,7 @@ label:
   background: 背景
   main: メイン
   margin: 余白
+  color: 色
   texture: テクスチャ
   rows: 行
   columns: 列
@@ -119,6 +149,7 @@ label:
   grid-line: 方眼線
   grid-line-color: 方眼線色
   font-color: 文字色
+  chat-font-color: チャット文字色
   sub: サブ
   grid-size: マス(px)
   border-style: 罫線のスタイル
@@ -172,10 +203,66 @@ label:
   play-end: 再生終了
   second: 秒
   url-placeholder: 指定なしで「停止」の指定
-  locking: ロック中
+  editing: 編集中
+  unknown: "[不明]"
+  really-delete: 本当に削除しますか？
+  input-bcdice-url: BCDice-APIサーバーのURLを設定します
+  secret-dice: シークレットダイス
+  target-all: 全体
+  all: すべて
+  status: ステータス
+  edited: "[編集済]"
+  use: 使う
+  un-use: 使わない
+  sort: 並び替え
+  stand-image-position: 立ち絵の位置
+  has-data: データの有無
+  view-type: 表示モード
+  search-name-box: 名前検索欄
+  search: 検索
+  operation: 操作
+  drop-area: "どうぞそのまま\nドロップインしてください。"
+  local: ローカル
+  dropbox: Dropbox
+  file-name: ファイル名
+  thumbnail: サムネイル
+  list: リスト
+  youtube: Youtube
+  music: 音楽
+  system: システム
+  card-deck-name-placeholder: 山札名(必須項目)
+  card-width: カードの幅(px)
+  card-height: カードの高さ(px)
+  card-corner-radius: 角の半径(px)
+  card-padding-horizontal: 横方向の余白(px)
+  card-padding-top: 上部の余白(px)
+  card-padding-bottom: 下部の余白(px)
+  card-name-height: 名前部分の高さ(px)
+  card-name-font-size: 名前部分のフォントサイズ(px)
+  card-name-background-color: 名前部分の背景色
+  card-text-height: テキスト部分の高さ(px)
+  card-text-font-size: テキスト部分のフォントサイズ(px)
+  card-text-padding: テキスト部分の内余白(px)
+  card-text-background-color: テキスト部分の背景色
+  special-process: 特殊機能
+  importFailure: インポートに失敗しました。
+  resist: 登録
+  layout: レイアウト
+  hand-card-area-width: 手札領域の幅
+  card-deck-columns: 幅(マス数)
+  card-deck-rows: 高さ(マス数)
+  card-width-ratio: カード幅(割合)
+  card-height-ratio: カード高さ(割合)
+  card-layout-columns: カード配置列数
+  card-layout-rows: カード配置行数
 
 message:
   copy-to-clipboard: 复制到剪贴板
+  setting-up-quoridorn: Quoridornをセットアップ中です！
+  processing: 処理中です！
+  creating-room: お部屋を作成しています！
+  entering-room: お部屋に入ります！
+  delete-deck: 山札を削除しますか？
 
 test-window:
   window-title: 体检 萤幕
@@ -186,7 +273,7 @@ sample-window:
 play-youtube-window:
   window-title: Youtube 玩游戏
 
-cut-in-setting-window:
+cut-in-list-window:
   window-title: 插入设定画面
   table-columns:
     -
@@ -219,6 +306,14 @@ create-new-room-window:
 user-login-window:
   window-title: 用户登录
   message: 请输入您的用户信息
+
+bcdice-api-server-setting-window:
+  window-title: BCDice-APIサーバ設定
+  message: BCDice-APIサーバに関する設定
+  success: 接続成功
+  error: 接続失敗
+  error-messages:
+    connect-error: 接続に失敗しました。
 
 app-server-setting-window:
   window-title: 应用服务器 设定
@@ -254,39 +349,166 @@ version-info-window:
 room-info-window:
   window-title: 游戏室信息显示
 
-add-map-mask-window:
+map-mask-add-window:
   window-title: 添加地图蒙版
+  message-list:
+    drag-piece: マップにドラッグすると追加できます。
 
-edit-map-mask-window:
+map-mask-edit-window:
   window-title: 编辑地图遮罩
 
-add-chit-window:
+chit-add-window:
   window-title: 添加聊天
+  message-list:
+    choose-image: 画像を選択してください。
+    drag-piece: マップにドラッグすると追加できます。
 
-edit-chit-window:
+chit-edit-window:
   window-title: チット編集
 
-input-image-password-window:
-  window-title: 输入隐藏图片的密码
-  message: 通过输入密码 可以显示隐藏的图像
-
 scene-list-window:
-  window-title: エリアマップ編集
+  window-title: シーン一覧
 
 edit-scene-window:
   window-title: シーン編集
   message-select:
     layer-view: レイヤーの表示・非表示を切り替えます。
-    object-order: ドラッグでオブジェクトの順番を入れ替えます。
+    layer-order-mode-on: レイヤーの順番を入れ替えるモードにします。
+    layer-order-mode-off: 通常のモードに戻します。
+    layer-order: ドラッグでレイヤーの順番を入れ替えます。
+    original-address: 他のシーンと異なる座標を持つかの設定です。
     object-order-mode-on: オブジェクトの順番を入れ替えるモードにします。
     object-order-mode-off: 通常のモードに戻します。
-    original-address: 他のシーンと異なる座標を持つかの設定です。
+    object-order: ドラッグでオブジェクトの順番を入れ替えます。
 
 chmod-window:
   window-title: 権限変更
 
-add-bgm-window:
+bgm-add-window:
   window-title: BGM追加
 
-edit-bgm-window:
+bgm-edit-window:
   window-title: BGM編集
+
+chat-window:
+  window-title: チャット
+  placeholder: "メッセージ（改行はShift + Enter）\n部分フォント変更は \"&\" を入力"
+  shortcut-title:
+    cut-in: カットイン
+    scene-list: シーン一覧
+    add-actor: アクター追加
+    player-box: プレイヤーボックス
+    card-deck-list: 山札一覧
+    media-list: メディア一覧
+  options:
+    select-sender: 送信者の選択
+    select-output-tab: 送信先タブの選択
+    select-target: 送信相手の選択
+    select-chat-format: 部分フォーマット選択
+    select-is-secret: 秘匿チャットかどうかの選択
+    selected-item: "[選択中]"
+    goto-head: "[先頭へ]"
+    goto-next: "[次へ]"
+    goto-last: "[前へ]"
+    goto-tail: "[末尾へ]"
+  input-info:
+    message-sender: 現在の送信者を表示しています
+    message-target: チャットの送信先を表示しています
+    message-outputTab: チャットを表示するタブを表示しています
+    message-secret: 秘匿チャットかどうかを表示しています
+    secret: 秘匿
+    non-secret: 公開
+  dialog:
+    delete-chat: "本当にこのチャットを消しますか？\nこの操作は取り消せません。"
+    delete-failure: 削除に失敗しました。
+
+chat-tab-list-window:
+  window-title: チャットタブ一覧
+  dialog:
+    delete-tab: "本当にタブ「$1」を削除しますか？\nこの操作は取り消せません。"
+  message-list:
+    edit: 編集
+    chmod: 権限編集
+    delete: 削除
+
+chat-tab-add-window:
+  window-title: チャットタブ追加
+  message-list:
+    default: "元：$1"
+    duplicate: "他のタブと重複します。"
+
+chat-tab-edit-window:
+  window-title: チャットタブ編集
+  message-list:
+    default: "元：$1"
+    duplicate: "他のタブと重複します。"
+
+actor-add-window:
+  window-title: アクター追加
+
+actor-edit-window:
+  window-title: アクター編集
+
+player-box-window:
+  window-title: プレイヤーボックス
+  message-list:
+    edit: 編集
+    chmod: 権限編集
+    delete: 削除
+  dialog:
+    delete-actor: "本当にアクター「$1」を削除しますか？\nこの操作は取り消せません。"
+
+card-deck-builder:
+  title: Quoridornカード山札ビルダー Ver.1.0.0a1
+  description:
+    tool: 部屋データに山札を1つ登録するための機能です。
+    import-text-paranoia-rebooted: "クリックすることでファイル指定ダイアログが表示します。\n専用のテキストファイルを読み込んで、山札を構築することができます。\nParanoia Rebooted公式サイトからダウンロードできるオンラインセッション用カード画像ファイルzipを解凍し、\nそこに含まれている「cards_free_200x300」フォルダ直下のテキストファイルを指定してください。\n「allCards.txt」だけは使用できません。\n事前に画像ファイルをQuoridorn上にアップロードしておく必要があります。"
+  card-frame-preset:
+    text-template: "テキストテンプレート\n（inSANe）"
+    template-image: 画像テンプレート
+    full-image-paranoia: "画像フル\n（Paranoia Rebooted）"
+    full-image-tnm: "画像フル\n（トーキョー・ナイトメア）"
+    full-image-tnx: "画像フル\n（トーキョーN◎VA）"
+  button:
+    import-text-paranoia-rebooted: "テキストからインポート\n（Paranoia Rebooted）"
+  message-list:
+    choose-base-deck: ベース山札の選択
+    create-card: 山札の新規作成
+    create-deck-entrance: "Quoridornにアップロードされた画像を使って、新しい山札を作成します。\n特殊処理を使わない場合は、画面下部の矢印で進んでください。"
+    setting-frame: "カードの表面のフレームを設定してください。\nここで指定したフレームが、後続の工程で流し込む画像や文字のベースとなります。"
+    choose-back-image: "山札に共通するカードの裏面を選んでください。\n新規作成の際に設定できる裏面の種類は１種類のみです。\n複数の裏面を持つ山札は、複数の山札を組み合わせることで作成してください。"
+    create-front: カードの表面を選びつつカードデータを入力してください。
+    choose-card: カードの選択・山札登録
+  header:
+    deck-set-preset: プリセット
+    deck-set-room: 部屋データ
+    card-list: カード一覧
+  options:
+    count-zero: 0枚
+    count-one: 1枚
+    count-two: 2枚
+    count-three: 3枚
+    count-four: 4枚
+    count-more: 5枚以上
+
+card-deck-list-window:
+  window-title: 山札一覧
+
+media-upload-window:
+  window-title: メディアアップロード
+  dialog:
+    input-tag: "まとめて設定するタグを入力してください。"
+    delete-together: "まとめて削除しますか？"
+  message-list:
+    edit-tag-together: まとめてタグ編集
+    delete-together: まとめて削除
+
+media-list-window:
+  window-title: メディア一覧
+  message-list:
+    choose-view-mode: 表示形式の変更
+  dialog:
+    delete-media: "本当にメディア「$1」を削除しますか？\nこの操作は取り消せません。"
+
+card-deck-small-edit-window:
+  window-title: 山札編集

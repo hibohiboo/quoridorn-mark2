@@ -1,27 +1,51 @@
 map:
-  - text: context.edit-area-map
+  - text: context.view-scene-list
     taskName: window-open
     taskArg:
       type: scene-list-window
   - text: context.bgm-setting
     taskName: window-open
     taskArg:
-      type: cut-in-setting-window
+      type: cut-in-list-window
   - text: context.add-map-mask
     taskName: window-open
     taskArg:
-      type: add-map-mask-window
+      type: map-mask-add-window
   - text: context.add-chit
     taskName: window-open
     taskArg:
-      type: add-chit-window
-  - text: 整備中
+      type: chit-add-window
+
+card-object:
+  - text: context.turn-on
+    taskName: card-turn-on
     isViewCompare:
-      lhs: true
+      lhs:
+        refType: db-id-property
+        property: data.isTurnOff
+      rhs: true
+  - text: context.turn-off
+    taskName: card-turn-off
+    isViewCompare:
+      lhs:
+        refType: db-id-property
+        property: data.isTurnOff
       rhs: false
-    children:
-      - taskName: item02-item01-emit
-      - text: item02-item01
+  - ~
+  - ref: card-deck-placement-reset-from-card
+  - ref: card-deck-shuffle-from-card
+  - ref: card-deck-turn-on-all-from-card
+  - ref: card-deck-turn-off-all-from-card
+  - ref: card-deck-layout-select-from-card
+  - ref: card-deck-setting-change-from-card
+
+card-deck-small:
+  - ref: card-deck-placement-reset-from-deck
+  - ref: card-deck-shuffle-from-deck
+  - ref: card-deck-turn-on-all-from-deck
+  - ref: card-deck-turn-off-all-from-deck
+  - ref: card-deck-layout-select-from-deck
+  - ref: card-deck-setting-change-from-deck
 
 map-mask:
   - text: context.modify
@@ -38,7 +62,7 @@ map-mask:
       rhs:
         true
     taskArg:
-      type: edit-map-mask-window
+      type: map-mask-edit-window
   - ref: object-copy
   - ref: object-delete
   - ref: object-chmod
@@ -65,7 +89,7 @@ chit:
       rhs:
         true
     taskArg:
-      type: edit-chit-window
+      type: chit-edit-window
   - ref: object-copy
   - ref: object-delete
   - ref: object-chmod

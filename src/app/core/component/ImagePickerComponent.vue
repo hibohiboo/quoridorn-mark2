@@ -1,16 +1,29 @@
 <template>
   <div class="image-picker-container" @contextmenu.prevent ref="elm">
+    <input
+      type="text"
+      class="search-name"
+      :value="searchText"
+      @input="searchText = $event.target.value"
+      :placeholder="$t('label.search-name-box')"
+      @keydown.enter.prevent.stop
+      @keyup.enter.prevent.stop
+      @keydown.229.prevent.stop
+      @keyup.229.prevent.stop
+      v-if="viewName"
+    />
     <!-- 画像選択エリア -->
-    <div class="choseImage">
-      <img
+    <div class="choseImage" :style="{ '--size': imageSize }">
+      <div
+        class="image"
         v-for="image in useImageList"
-        :class="{ active: value === image.id }"
         :key="image.id"
-        :src="image.data.data"
-        alt=""
+        :class="{ active: value === image.id }"
         @click="localValue = image.id"
-        draggable="false"
-      />
+      >
+        <span v-if="viewName">{{ image.data.name }}</span>
+        <img :src="image.data.url" alt="" draggable="false" />
+      </div>
     </div>
 
     <!-- 絞り込み情報 -->
@@ -35,7 +48,7 @@
           </div>
         </td>
       </tr>
-      <tr>
+      <tr v-if="!isSimple">
         <th>
           <label
             :for="`${windowKey}-image-pick-direction`"
@@ -49,9 +62,6 @@
               :id="`${windowKey}-image-pick-direction`"
               v-model="direction"
             />
-            <ctrl-button @click="inputPassword">
-              <span v-t="'label.image-password'"></span>
-            </ctrl-button>
           </div>
         </td>
       </tr>
@@ -64,14 +74,14 @@ import { Component, Prop, Watch } from "vue-property-decorator";
 import LifeCycle from "../decorator/LifeCycle";
 import { StoreUseData } from "@/@types/store";
 import GameObjectManager from "@/app/basic/GameObjectManager";
-import { Direction, Image } from "@/@types/room";
-import TaskManager from "@/app/core/task/TaskManager";
-import { WindowOpenInfo } from "@/@types/window";
+import { Direction, MediaInfo } from "@/@types/room";
 import { Mixins } from "vue-mixin-decorator";
 import ComponentVue from "@/app/core/window/ComponentVue";
 import DirectionTypeSelect from "@/app/basic/common/components/select/DirectionTypeSelect.vue";
 import ImageTagSelect from "@/app/basic/common/components/select/ImageTagSelect.vue";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
+import { getSrc } from "@/app/core/utility/Utility";
+import VueEvent from "@/app/core/decorator/VueEvent";
 
 @Component({
   components: {
@@ -92,27 +102,43 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
   @Prop({ type: String, default: null })
   private imageTag!: string | null;
 
+  @Prop({ type: Boolean, default: false })
+  private isSimple!: boolean;
+
+  @Prop({ type: Boolean, default: false })
+  private viewName!: boolean;
+
+  @Prop({ type: String, default: "4em" })
+  private imageSize!: string;
+
   private isMounted: boolean = false;
   private selectImageTag: string | null = null;
-  private password: string = "";
   private direction: Direction = "none";
 
-  private rowImageList: StoreUseData<Image>[] = [];
-  private useImageList: StoreUseData<Image>[] = [];
+  private rawImageList: StoreUseData<MediaInfo>[] = [];
+  private useImageList: StoreUseData<MediaInfo>[] = [];
+  private searchText: string = "";
+
+  @VueEvent
+  private getSrc(data: string) {
+    return getSrc(data);
+  }
 
   @Watch("isMounted")
   @Watch("selectImageTag")
-  @Watch("password")
-  @Watch("rowImageList", { deep: true })
+  @Watch("searchText")
+  @Watch("rawImageList", { deep: true })
   private async onChangeImageList() {
     if (!this.isMounted) return;
-    this.useImageList = this.rowImageList.filter(d => {
+    const regExp = this.searchText ? new RegExp(this.searchText) : null;
+    this.useImageList = this.rawImageList.filter(d => {
       if (!d || !d.data) return false;
-      if (d.data.tag !== this.selectImageTag) return false;
-      return d.data.password === this.password;
+      if (regExp && !d.data.name.match(regExp)) return false;
+      return d.data.tag === this.selectImageTag;
     });
   }
 
+  @VueEvent
   private get selectedTagIndexText() {
     const index = this.useImageList.findIndex(
       image => image.id === this.localValue
@@ -120,24 +146,11 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
     return `${index + 1}/${this.useImageList.length}`;
   }
 
-  private async inputPassword() {
-    const imagePasswordList = await TaskManager.instance.ignition<
-      WindowOpenInfo<string>,
-      string
-    >({
-      type: "window-open",
-      owner: "Quoridorn",
-      value: {
-        type: "input-image-password-window",
-        args: this.password
-      }
-    });
-    if (imagePasswordList.length) this.password = imagePasswordList[0];
-  }
-
   @LifeCycle
   private mounted() {
-    this.rowImageList = GameObjectManager.instance.imageList;
+    this.rawImageList = GameObjectManager.instance.mediaList.filter(
+      media => media.data!.type === "image"
+    );
     this.isMounted = true;
   }
 
@@ -180,10 +193,19 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
 
 <style scoped lang="scss">
 @import "../../../assets/common";
+
 .flex-space-between {
   width: 100%;
   @include flex-box(row, space-between, center);
 }
+
+.search-name {
+  @include inline-flex-box(row, flex-start, center);
+  font-size: inherit;
+  height: 2em;
+  min-height: 2em;
+}
+
 .image-picker-container {
   @include flex-box(column, flex-start, flex-start);
 
@@ -210,14 +232,19 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
     box-sizing: border-box;
     width: 100%;
 
-    img {
-      width: 4em;
-      height: 4em;
+    .image {
+      @include flex-box(column, flex-start, flex-start);
       border: solid rgba(0, 0, 0, 0) 1px;
       box-sizing: border-box;
 
       &.active {
         border: solid blue 1px;
+        background-color: var(--uni-color-cream);
+      }
+
+      img {
+        width: var(--size);
+        height: var(--size);
       }
     }
   }

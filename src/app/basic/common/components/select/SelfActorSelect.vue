@@ -2,62 +2,79 @@
   <ctrl-select
     v-model="localValue"
     :optionInfoList="optionInfoList"
-    :maxWidth="7"
-    ref="select"
+    ref="component"
   />
 </template>
 
 <script lang="ts">
 import SelectMixin from "./base/SelectMixin";
-import CtrlSelect from "@/components/parts/CtrlSelect.vue";
-
-import { Prop } from "vue-property-decorator";
-import { Getter } from "vuex-class";
 import { Component, Mixins } from "vue-mixin-decorator";
-import VueEvent from "@/app/core/decorator/VueEvent";
 import ComponentVue from "@/app/core/window/ComponentVue";
+import GameObjectManager from "@/app/basic/GameObjectManager";
+import { HtmlOptionInfo } from "@/@types/window";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
+import TaskProcessor from "@/app/core/task/TaskProcessor";
+import LanguageManager from "@/LanguageManager";
+import { Task, TaskResult } from "task";
+import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
+import { Watch } from "vue-property-decorator";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
 @Component({
   components: { CtrlSelect }
 })
-export default class BackgroundLocationSelect extends Mixins<MultiMixin>(
+export default class SelfActorSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
 ) {
-  @Getter("getSelfActors") private getSelfActors: any;
+  private optionInfoList: HtmlOptionInfo[] = [];
 
-  @Prop({ type: String, default: "アクター" })
-  protected defaultLabel!: string;
+  private actorList = GameObjectManager.instance.actorList;
+  private userList = GameObjectManager.instance.userList;
 
-  @Prop({ type: Array, required: true })
-  private selectedActorList!: any[];
-
-  private get selectActors(): any[] {
-    return this.getSelfActors.filter(
-      (actor: any) =>
-        this.selectedActorList.findIndex(
-          standActor => standActor.key === actor.key
-        ) === -1
-    );
+  @LifeCycle
+  private created() {
+    this.createOptionInfoList();
   }
 
-  @VueEvent
-  private get optionInfoList(): any[] {
-    const resultList = this.selectActors.map((actor: any) => ({
-      key: actor.key,
-      value: actor.key,
-      text: actor.name,
-      disabled: false
-    }));
-    resultList.unshift({
-      key: null,
+  @Watch("actorList", { deep: true })
+  private onChangeActorList() {
+    this.createOptionInfoList();
+  }
+
+  @TaskProcessor("language-change-finished")
+  private async languageChangeFinished(
+    task: Task<never, never>
+  ): Promise<TaskResult<never> | void> {
+    this.createOptionInfoList();
+    task.resolve();
+  }
+
+  private createOptionInfoList() {
+    this.optionInfoList = this.actorList
+      .filter(a => a.owner === GameObjectManager.instance.mySelfUserId)
+      .map(a => {
+        const type = a.data!.type;
+        let additionalText = "";
+        if (a.data!.type === "user") {
+          const user = this.userList.filter(u => u.id === a.owner)[0];
+          additionalText +=
+            "(" + this.$t(`label.${user.data!.type}`)!.toString() + ")";
+        }
+        return {
+          key: a.id!,
+          value: a.id!,
+          text: a.data!.name + additionalText,
+          disabled: false
+        };
+      });
+    this.optionInfoList.unshift({
+      key: "",
       value: "",
-      text: this.defaultLabel,
+      text: this.$t("type.actor")!.toString(),
       disabled: true
     });
-    return resultList;
   }
 }
 </script>

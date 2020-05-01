@@ -19,14 +19,16 @@
 </template>
 
 <script lang="ts">
-import { Component } from "vue-mixin-decorator";
-import { Vue } from "vue-property-decorator";
+import { Component, Mixins } from "vue-mixin-decorator";
 import { Point, Size } from "address";
-import { createPoint, getEventPoint } from "@/app/core/Coordinate";
+import {
+  createPoint,
+  getEventPoint
+} from "@/app/core/utility/CoordinateUtility";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
 import TaskManager from "@/app/core/task/TaskManager";
-import { drawLine2 } from "@/app/core/CanvasDrawer";
+import { drawLine2 } from "@/app/core/utility/CanvasDrawUtility";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import { ThrowParabolaInfo } from "task-info";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
@@ -38,14 +40,15 @@ import {
   getDistance
 } from "@/app/core/throwParabola/parabolaUtil";
 import ThrowCharSelect from "@/app/basic/common/components/select/ThrowCharSelect.vue";
-import { SendDataRequest } from "@/@types/socket";
 import SocketFacade from "@/app/core/api/app-server/SocketFacade";
-import GameObjectManager from "@/app/basic/GameObjectManager";
+import ComponentVue from "@/app/core/window/ComponentVue";
+
 @Component({
   components: { ThrowCharSelect }
 })
-export default class ThrowParabolaSimulator extends Vue {
-  private readonly key = "ThrowParabolaSimulator";
+export default class ThrowParabolaSimulator extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   private isMounted: boolean = false;
 
   private degBlur = 12.5;

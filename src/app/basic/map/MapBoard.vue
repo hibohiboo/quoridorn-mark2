@@ -15,6 +15,7 @@
     <scene-layer-component
       v-for="layer in useLayerList"
       :key="layer.id"
+      :sceneId="sceneId"
       :layer="layer"
     />
   </div>
@@ -22,13 +23,16 @@
 
 <script lang="ts">
 import { Component, Prop, Vue, Watch } from "vue-property-decorator";
-import { drawLine, drawLine2 } from "@/app/core/CanvasDrawer";
+import { drawLine, drawLine2 } from "@/app/core/utility/CanvasDrawUtility";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import { Scene, RoomData } from "@/@types/room";
 import { Matrix, Size } from "address";
-import { createSize } from "@/app/core/Coordinate";
+import { createSize } from "@/app/core/utility/CoordinateUtility";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import SceneLayerComponent from "@/app/basic/map/SceneLayerComponent.vue";
+import TaskManager from "@/app/core/task/TaskManager";
+import { ModeInfo } from "mode";
+
 @Component({
   components: { SceneLayerComponent }
 })
@@ -61,8 +65,20 @@ export default class MapBoard extends Vue {
   @LifeCycle
   private mounted() {
     this.isMounted = true;
-    setTimeout(() => {
+    setTimeout(async () => {
       this.paint();
+      await TaskManager.instance.ignition<ModeInfo, never>({
+        type: "mode-change",
+        owner: "Quoridorn",
+        value: {
+          type: "view-progress",
+          value: {
+            message: "",
+            all: 0,
+            current: 0
+          }
+        }
+      });
     });
   }
 
@@ -96,7 +112,7 @@ export default class MapBoard extends Vue {
     const gridSize = this.scene.gridSize;
 
     // マス目の描画
-    if (this.roomData.isDrawGridLine) {
+    if (this.roomData.settings.isDrawGridLine) {
       ctx.strokeStyle = this.scene.gridColor;
       ctx.globalAlpha = 1;
       for (let c = 0; c <= this.scene.columns; c++) {
@@ -126,7 +142,7 @@ export default class MapBoard extends Vue {
     }
 
     // マス座標の描画
-    if (this.roomData.isDrawGridId) {
+    if (this.roomData.settings.isDrawGridId) {
       ctx.fillStyle = this.scene.fontColor;
       ctx.globalAlpha = 1;
       ctx.textAlign = "center";
@@ -209,6 +225,11 @@ export default class MapBoard extends Vue {
 <style scoped lang="scss">
 #map-canvas-container {
   position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
   z-index: 0;
 }
 
@@ -220,7 +241,7 @@ export default class MapBoard extends Vue {
   bottom: 0;
   margin: auto;
   background-size: 100% 100%;
-  z-index: 1;
+  z-index: -2;
   /* JavaScriptで設定されるプロパティ
   width
   height
@@ -236,7 +257,7 @@ export default class MapBoard extends Vue {
   box-sizing: border-box;
   background-size: 100% 100%;
   pointer-events: none;
-  z-index: 2;
+  z-index: -1;
 
   position: absolute;
   left: 0;

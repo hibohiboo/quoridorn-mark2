@@ -10,10 +10,10 @@
         <div class="detail">
           <table class="info-table">
             <tr>
-              <string-input-tr-component
-                class="value-name"
+              <tr-string-input-component
                 labelName="name"
                 v-model="sceneData.name"
+                inputWidth="10em"
               />
             </tr>
           </table>
@@ -22,26 +22,26 @@
             <legend v-t="'label.size'"></legend>
             <table class="info-table">
               <tr>
-                <number-input-tr-component
-                  class="value-columns"
+                <tr-number-input-component
                   labelName="columns"
                   v-model="sceneData.columns"
+                  inputWidth="3.5em"
                   :min="1"
                 />
               </tr>
               <tr>
-                <number-input-tr-component
-                  class="value-columns"
-                  labelName="columns"
+                <tr-number-input-component
+                  labelName="rows"
                   v-model="sceneData.rows"
+                  inputWidth="3.5em"
                   :min="1"
                 />
               </tr>
               <tr>
-                <number-input-tr-component
-                  class="value-grid-size"
+                <tr-number-input-component
                   labelName="grid-size"
                   v-model="sceneData.gridSize"
+                  inputWidth="3.5em"
                   :min="1"
                 />
               </tr>
@@ -52,15 +52,13 @@
             <legend v-t="'label.decoration'"></legend>
             <table class="info-table">
               <tr>
-                <color-picker-tr-component
-                  class="value-font-color"
+                <tr-color-picker-component
                   labelName="font-color"
                   v-model="sceneData.fontColor"
                 />
               </tr>
               <tr>
-                <color-picker-tr-component
-                  class="value-grid-color"
+                <tr-color-picker-component
                   labelName="grid-line-color"
                   v-model="sceneData.gridColor"
                 />
@@ -90,18 +88,18 @@
             <legend v-t="'label.size'"></legend>
             <table class="info-table">
               <tr>
-                <number-input-tr-component
-                  class="value-margin-columns"
+                <tr-number-input-component
                   labelName="columns"
                   v-model="sceneData.margin.columns"
+                  inputWidth="3.5em"
                   :min="0"
                 />
               </tr>
               <tr>
-                <number-input-tr-component
-                  class="value-margin-rows"
+                <tr-number-input-component
                   labelName="rows"
                   v-model="sceneData.margin.rows"
+                  inputWidth="3.5em"
                   :min="0"
                 />
               </tr>
@@ -112,32 +110,21 @@
             <legend v-t="'label.grid-line'"></legend>
             <table class="info-table">
               <tr>
-                <th>
-                  <label
-                    :for="`${key}-grid-check`"
-                    class="label-color label-input"
-                    v-t="'label.grid-line'"
-                  ></label>
-                </th>
-                <td>
-                  <base-input
-                    :id="`${key}-grid-check`"
-                    type="checkbox"
-                    :checked="sceneData.margin.isUseGrid"
-                    @input="sceneData.margin.isUseGrid = $event.target.checked"
-                  />
-                </td>
+                <tr-checkbox-component
+                  labelName="grid-line"
+                  :cLabel="$t('label.exist')"
+                  :nLabel="$t('label.not-exist')"
+                  v-model="sceneData.margin.isUseGrid"
+                />
               </tr>
               <tr>
-                <color-picker-tr-component
-                  class="value-grid-color-main"
+                <tr-color-picker-component
                   labelName="main"
                   v-model="sceneData.margin.gridColorBold"
                 />
               </tr>
               <tr>
-                <color-picker-tr-component
-                  class="value-grid-color-sub"
+                <tr-color-picker-component
                   labelName="sub"
                   v-model="sceneData.margin.gridColorThin"
                   :disabled="!sceneData.margin.isUseGrid"
@@ -150,17 +137,16 @@
             <legend v-t="'label.mask'"></legend>
             <table class="info-table">
               <tr>
-                <color-picker-tr-component
-                  class="value-mask-color"
+                <tr-color-picker-component
                   labelName="color"
                   v-model="sceneData.margin.maskColor"
                 />
               </tr>
               <tr>
-                <number-input-tr-component
-                  class="value-mask-blur"
+                <tr-number-input-component
                   labelName="blur"
                   v-model="sceneData.margin.maskBlur"
+                  inputWidth="3.5em"
                   :min="0"
                 />
               </tr>
@@ -171,15 +157,15 @@
             <legend v-t="'label.frame-border'"></legend>
             <table class="info-table">
               <tr>
-                <number-input-tr-component
-                  class="value-border-width"
+                <tr-number-input-component
                   labelName="width"
                   v-model="sceneData.margin.border.width"
+                  inputWidth="3.5em"
                   :min="0"
                 />
               </tr>
               <tr>
-                <color-picker-tr-component
+                <tr-color-picker-component
                   class="value-border-color"
                   labelName="color"
                   v-model="sceneData.margin.border.color"
@@ -237,16 +223,17 @@
         <edit-scene-layer-chooser-component
           :sceneId="sceneId"
           v-model="selectedLayerId"
-          @hover="onHoverLayerView"
+          @hoverView="onHoverLayerView"
+          @hoverOrder="onHoverOrderLayer"
+          @hoverOrderMode="onHoverLayerOrderMode"
         />
         <edit-scene-object-chooser-component
           :sceneId="sceneId"
           :selectedLayerId="selectedLayerId"
           v-model="selectedSceneObjectId"
           @hoverAddress="onHoverAddress"
-          @hoverOrder="onHoverOrder"
-          @hoverOrderMode="onHoverOrderMode"
-          @onChangeDragMode="onChangeDragMode"
+          @hoverOrder="onHoverOrderObject"
+          @hoverOrderMode="onHoverObjectOrderMode"
         />
       </div>
     </simple-tab-component>
@@ -257,11 +244,10 @@
 import { Component, Watch } from "vue-property-decorator";
 import { Mixins } from "vue-mixin-decorator";
 import ColorPickerComponent from "@/app/core/component/ColorPickerComponent.vue";
-import BaseInput from "@/app/core/component/BaseInput.vue";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
 import WindowVue from "@/app/core/window/WindowVue";
-import SeekBarComponent from "@/app/basic/music/SeekBarComponent.vue";
+import SeekBarComponent from "@/app/basic/cut-in/bgm/SeekBarComponent.vue";
 import SimpleTabComponent from "@/app/core/component/SimpleTabComponent.vue";
 import SceneLayerSelect from "@/app/basic/common/components/select/SceneLayerSelect.vue";
 import SocketFacade, {
@@ -275,25 +261,28 @@ import { Task, TaskResult } from "task";
 import BackgroundTypeRadio from "@/app/basic/common/components/radio/BackgroundTypeRadio.vue";
 import ImagePickerComponent from "@/app/core/component/ImagePickerComponent.vue";
 import { StoreUseData } from "@/@types/store";
-import { Scene, SceneAndLayer, SceneLayer, Texture } from "@/@types/room";
+import { Scene, SceneAndLayer, SceneLayer } from "@/@types/room";
 import InputTextureComponent from "@/app/basic/map/InputTextureComponent.vue";
 import BorderStyleSelect from "@/app/basic/common/components/select/BorderStyleSelect.vue";
 import TaskManager from "@/app/core/task/TaskManager";
 import AddressInput from "@/app/basic/common/components/AddressInput.vue";
-import StringInputTrComponent from "@/app/basic/common/components/StringInputTrComponent.vue";
-import NumberInputTrComponent from "@/app/basic/common/components/NumberInputTrComponent.vue";
-import ColorPickerTrComponent from "@/app/basic/common/components/ColorPickerTrComponent.vue";
+import TrStringInputComponent from "@/app/basic/common/components/TrStringInputComponent.vue";
+import TrNumberInputComponent from "@/app/basic/common/components/TrNumberInputComponent.vue";
+import TrColorPickerComponent from "@/app/basic/common/components/TrColorPickerComponent.vue";
 import VueEvent from "@/app/core/decorator/VueEvent";
 import EditSceneLayerChooserComponent from "@/app/basic/map/EditSceneLayerChooserComponent.vue";
 import EditSceneObjectChooserComponent from "@/app/basic/map/EditSceneObjectChooserComponent.vue";
+import { SceneObject } from "@/@types/gameObject";
+import TrCheckboxComponent from "@/app/basic/common/components/TrCheckboxComponent.vue";
 
 @Component({
   components: {
+    TrCheckboxComponent,
     EditSceneObjectChooserComponent,
     EditSceneLayerChooserComponent,
-    ColorPickerTrComponent,
-    NumberInputTrComponent,
-    StringInputTrComponent,
+    TrColorPickerComponent,
+    TrNumberInputComponent,
+    TrStringInputComponent,
     AddressInput,
     BorderStyleSelect,
     InputTextureComponent,
@@ -302,7 +291,6 @@ import EditSceneObjectChooserComponent from "@/app/basic/map/EditSceneObjectChoo
     SceneLayerSelect,
     SimpleTabComponent,
     ColorPickerComponent,
-    BaseInput,
     SeekBarComponent,
     CtrlButton
   }
@@ -313,21 +301,61 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
   private isMounted: boolean = false;
   private isProcessed: boolean = false;
   private sceneId: string | null = null;
+  private oldSceneId: string | null = null;
   private defaultTag: string = LanguageManager.instance.getText("type.map");
 
   private sceneList = GameObjectManager.instance.sceneList;
   private layerList = GameObjectManager.instance.sceneLayerList;
   private sceneAndLayerList = GameObjectManager.instance.sceneAndLayerList;
+  private sceneObjectList = GameObjectManager.instance.sceneObjectList;
 
   private cc = SocketFacade.instance.sceneListCC();
 
   private sceneInfo: StoreUseData<Scene> | null = null;
   private sceneData: Scene | null = null;
   private sceneAndLayerInfoList: StoreUseData<SceneAndLayer>[] | null = null;
+  private sceneObjectInfoList: StoreUseData<SceneObject>[] | null = null;
   private layerInfoList: StoreUseData<SceneLayer>[] | null = null;
 
   private selectedLayerId: string = "";
   private selectedSceneObjectId: string = "";
+
+  @Watch("sceneObjectList", { deep: true })
+  @Watch("selectedLayerId")
+  private async onChangeSceneObjectInfoList() {
+    setTimeout(async () => {
+      type SceneObjectList = StoreUseData<SceneObject>[];
+      const oldList: SceneObjectList = [];
+
+      if (this.sceneObjectInfoList) {
+        oldList.push(...this.sceneObjectInfoList.concat());
+      }
+      this.sceneObjectInfoList = this.sceneObjectList.filter(
+        mo => mo.data!.layerId === this.selectedLayerId
+      );
+
+      const clearFocusList: SceneObjectList = oldList.filter(
+        o => this.sceneObjectInfoList!.findIndex(so => so.id === o.id) < 0
+      );
+      const setFocusList: SceneObjectList = this.sceneObjectInfoList!.filter(
+        so => oldList.findIndex(o => o.id === so.id) < 0
+      );
+
+      const focusFunc = async (id: string, isFocus: boolean): Promise<void> => {
+        await EditSceneWindow.changeFocus(id, isFocus);
+      };
+
+      // 直列の非同期で全部実行する
+      await clearFocusList
+        .map(obj => () => focusFunc(obj.id!, false))
+        .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+      // 直列の非同期で全部実行する
+      await setFocusList
+        .map(obj => () => focusFunc(obj.id!, true))
+        .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+    });
+  }
 
   @Watch("selectedLayerId")
   private async onChangeSelectedLayerId() {
@@ -336,18 +364,64 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
 
   @Watch("selectedSceneObjectId")
   private async onChangeSelectedSceneObjectId(newVal: string, oldVal: string) {
-    await EditSceneWindow.changeFocus(oldVal, false);
-    await EditSceneWindow.changeFocus(newVal, true);
+    const focusFunc = async (id: string, isFocus: boolean): Promise<void> => {
+      await EditSceneWindow.changeFocus(id, isFocus);
+    };
+
+    await focusFunc(oldVal, false);
+
+    if (!this.sceneObjectInfoList) {
+      await focusFunc(newVal, true);
+      return;
+    }
+
+    type SceneObjectList = StoreUseData<SceneObject>[];
+
+    const clearFocusList: SceneObjectList = this.sceneObjectInfoList.filter(
+      so => so.id !== newVal
+    );
+
+    // 直列の非同期で全部実行する
+    await clearFocusList
+      .map(obj => () => focusFunc(obj.id!, false))
+      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
+
+    if (this.sceneObjectInfoList.findIndex(so => so.id === newVal) < 0) {
+      await focusFunc(newVal, true);
+    }
+
+    this.sceneObjectInfoList = null;
   }
 
   @Watch("windowInfo.status")
   private async onChangeWindowInfoStatus() {
-    await EditSceneWindow.changeFocus(this.selectedSceneObjectId, false);
+    await this.focusAll(false);
     if (this.windowInfo.status === "window") {
       setTimeout(async () => {
-        await EditSceneWindow.changeFocus(this.selectedSceneObjectId, true);
+        await this.focusAll(true);
       });
     }
+  }
+
+  @Watch("currentTabInfo.target")
+  private async onChangeTabTarget() {
+    if (this.currentTabInfo && this.currentTabInfo.target !== "layer") {
+      await this.focusAll(false);
+    } else {
+      this.selectedLayerId = "";
+    }
+  }
+
+  private async focusAll(isFocus: boolean) {
+    const targetList: string[] = this.sceneObjectInfoList
+      ? this.sceneObjectInfoList.map(so => so.id!)
+      : [];
+    if (this.selectedSceneObjectId) targetList.push(this.selectedSceneObjectId);
+
+    // 直列の非同期で全部実行する
+    await targetList
+      .map(id => () => EditSceneWindow.changeFocus(id, isFocus))
+      .reduce((prev, curr) => prev.then(curr), Promise.resolve());
   }
 
   private static async changeFocus(id: string, isFocus: boolean) {
@@ -370,30 +444,16 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
     if (oldValue === null) return;
 
     try {
-      await this.cc.update(this.sceneId!, this.sceneData!, {
-        continuous: true
-      });
+      await this.cc.update(
+        [this.sceneId!],
+        [this.sceneData!],
+        [{ continuous: true }]
+      );
     } catch (err) {
       window.console.log("==========");
       window.console.log(err);
     }
   }
-
-  // @Watch("marginRows")
-  // private async onChangeMarginRows(newValue: number, oldValue: number | null) {
-  //   if (oldValue === null) return;
-  //   this.mapInfo!.data!.margin.row = newValue;
-  //   await this.updateMap();
-  // }
-  //
-  // private async updateMap() {
-  //   try {
-  //     await this.cc.update(this.sceneId!, this.sceneData!, true);
-  //   } catch (err) {
-  //     window.console.log("==========");
-  //     window.console.log(err);
-  //   }
-  // }
 
   private tabList: TabInfo[] = [
     { target: "map", text: "" },
@@ -417,11 +477,8 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
   }
 
   private createTabInfoList() {
-    const getText = LanguageManager.instance.getText.bind(
-      LanguageManager.instance
-    );
     this.tabList.forEach(t => {
-      t.text = getText(`label.${t.target}`);
+      t.text = this.$t(`label.${t.target}`)!.toString();
     });
   }
 
@@ -432,6 +489,14 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
     this.sceneId = this.windowInfo.args!;
     this.sceneInfo = this.sceneList.filter(map => map.id === this.sceneId)[0];
     this.sceneData = this.sceneInfo.data!;
+
+    this.oldSceneId = GameObjectManager.instance.roomData.sceneId;
+    GameObjectManager.instance.roomData.sceneId = this.sceneId;
+
+    setTimeout(() => {
+      GameObjectManager.instance.isSceneEditing = true;
+    });
+
     this.sceneAndLayerInfoList = this.sceneAndLayerList
       .filter(map => map.data!.sceneId === this.sceneId)
       .sort((m1, m2) => {
@@ -463,7 +528,7 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
 
     if (this.windowInfo.status === "window") {
       try {
-        await this.cc.touchModify(this.sceneId);
+        await this.cc.touchModify([this.sceneId]);
       } catch (err) {
         this.isProcessed = true;
         window.console.warn(err);
@@ -472,89 +537,64 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
     }
   }
 
-  private static getBgObj(info: Texture): Texture {
-    if (info.type === "image") {
-      return {
-        type: "image",
-        imageId: info.imageId,
-        imageTag: info.imageTag,
-        direction: info.direction,
-        backgroundSize: info.backgroundSize
-      };
-    } else {
-      return {
-        type: "color",
-        backgroundColor: info.backgroundColor,
-        fontColor: info.fontColor,
-        text: info.text
-      };
-    }
-  }
-
   @TaskProcessor("window-close-closing")
   private async windowCloseClosing2(
     task: Task<string, never>
   ): Promise<TaskResult<never> | void> {
     if (task.value !== this.windowInfo.key) return;
-    if (this.selectedSceneObjectId) {
-      await EditSceneWindow.changeFocus(this.selectedSceneObjectId, false);
-    }
+    await this.focusAll(false);
+    GameObjectManager.instance.isSceneEditing = false;
+
+    GameObjectManager.instance.roomData.sceneId =
+      GameObjectManager.instance.sceneEditingUpdateSceneId || this.oldSceneId!;
+    GameObjectManager.instance.sceneEditingUpdateSceneId = null;
     if (!this.isProcessed) {
       try {
-        await this.cc!.releaseTouch(this.sceneId!);
+        await this.cc!.releaseTouch([this.sceneId!]);
       } catch (err) {
         // nothing
       }
     }
   }
 
-  @VueEvent
-  private onHoverLayerView(isHover: boolean) {
+  private setHoverWindowMessage(isHover: boolean, messageType: string) {
     this.windowInfo.message = isHover
       ? LanguageManager.instance.getText(
-          `${this.windowInfo.type}.message-select.layer-view`
+          `${this.windowInfo.type}.message-select.${messageType}`
         )
       : "";
+  }
+
+  @VueEvent
+  private onHoverLayerView(isHover: boolean) {
+    this.setHoverWindowMessage(isHover, "layer-view");
   }
 
   @VueEvent
   private onHoverAddress(isHover: boolean) {
-    this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
-          `${this.windowInfo.type}.message-select.original-address`
-        )
-      : "";
+    this.setHoverWindowMessage(isHover, "original-address");
   }
 
   @VueEvent
-  private onHoverOrder(isHover: boolean) {
-    this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
-          `${this.windowInfo.type}.message-select.object-order`
-        )
-      : "";
+  private onHoverOrderLayer(isHover: boolean) {
+    this.setHoverWindowMessage(isHover, "layer-order");
   }
 
   @VueEvent
-  private onHoverOrderMode(isHover: boolean, dragMode: boolean) {
-    this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
-          `${this.windowInfo.type}.message-select.${
-            dragMode ? "object-order-mode-off" : "object-order-mode-on"
-          }`
-        )
-      : "";
+  private onHoverOrderObject(isHover: boolean) {
+    this.setHoverWindowMessage(isHover, "object-order");
   }
 
   @VueEvent
-  private onChangeDragMode(dragMode: boolean) {
-    this.windowInfo.message = this.windowInfo.message
-      ? LanguageManager.instance.getText(
-          `${this.windowInfo.type}.message-select.${
-            dragMode ? "object-order-mode-off" : "object-order-mode-on"
-          }`
-        )
-      : "";
+  private onHoverLayerOrderMode(isHover: boolean, dragMode: boolean) {
+    const messageType = `layer-order-mode-${dragMode ? "off" : "on"}`;
+    this.setHoverWindowMessage(isHover, messageType);
+  }
+
+  @VueEvent
+  private onHoverObjectOrderMode(isHover: boolean, dragMode: boolean) {
+    const messageType = `object-order-mode-${dragMode ? "off" : "on"}`;
+    this.setHoverWindowMessage(isHover, messageType);
   }
 }
 </script>
@@ -575,7 +615,6 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
 .value-grid-size,
 .value-margin-rows,
 .value-margin-columns,
-.value-border-width,
 .value-mask-blur {
   width: 3.5em;
 }

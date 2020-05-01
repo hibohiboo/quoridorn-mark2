@@ -8,6 +8,7 @@
       @input="colorCode = $event.target.value"
       @change="onChange()"
       :disabled="disabled"
+      :readonly="readonly"
       @keydown.enter.stop
       @keyup.enter.stop
       @keydown.229.stop
@@ -21,7 +22,7 @@
         colorCode = $event.target.value;
         onChange();
       "
-      :disabled="disabled"
+      :disabled="disabled || readonly"
     />
     <input
       class="input value-alpha"
@@ -33,6 +34,7 @@
       :value="alpha"
       @input="alpha = $event.target.valueAsNumber"
       :disabled="disabled"
+      :readonly="readonly"
       @keydown.enter.stop
       @keyup.enter.stop
       @keydown.229.stop
@@ -43,13 +45,13 @@
 
 <script lang="ts">
 import { Component, Prop, Watch } from "vue-property-decorator";
-import { parseColor } from "../Utility";
-import LifeCycle from "../decorator/LifeCycle";
-import VueEvent from "../decorator/VueEvent";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
 import ComponentVue from "@/app/core/window/ComponentVue";
 import { Mixins } from "vue-mixin-decorator";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
+import { parseColor } from "@/app/core/utility/ColorUtility";
+import VueEvent from "@/app/core/decorator/VueEvent";
 
 @Component({
   components: { BaseInput, CtrlButton }
@@ -69,6 +71,9 @@ export default class ColorPickerComponent extends Mixins<ComponentVue>(
   @Prop({ type: Boolean, default: false })
   private disabled!: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  private readonly!: boolean;
+
   private firstValue: string | null = null;
 
   private isMounted: boolean = false;
@@ -77,9 +82,7 @@ export default class ColorPickerComponent extends Mixins<ComponentVue>(
 
   @LifeCycle
   private created() {
-    const colorObj = parseColor(this.value);
-    this.colorCode = colorObj.getColorCode();
-    this.alpha = this.useAlpha ? colorObj.a : 1;
+    this.updateColor();
   }
 
   @LifeCycle
@@ -92,6 +95,13 @@ export default class ColorPickerComponent extends Mixins<ComponentVue>(
     if (this.firstValue === null) {
       this.firstValue = this.value;
     }
+    this.updateColor();
+  }
+
+  private updateColor() {
+    const colorObj = parseColor(this.value);
+    this.colorCode = colorObj.getColorCode();
+    this.alpha = this.useAlpha ? colorObj.a : 1;
   }
 
   private get localValue(): string {
@@ -146,10 +156,15 @@ export default class ColorPickerComponent extends Mixins<ComponentVue>(
 input {
   font-size: 1em;
   margin: 0;
+
+  &:disabled,
+  &:read-only {
+    background-color: lightgray;
+  }
 }
 
 .color-picker-container {
-  @include flex-box(row, flex-start, center, wrap);
+  @include inline-flex-box(row, flex-start, center, wrap);
 
   .color-input {
     width: 5em;

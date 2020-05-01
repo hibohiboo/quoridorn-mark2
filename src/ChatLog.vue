@@ -143,11 +143,11 @@ import Vue from "vue";
 import Component from "vue-class-component";
 import TabsComponent from "@/app/basic/common/components/tab-component/TabsComponent.vue";
 import { Action, Getter, Mutation } from "vuex-class";
-import ChatLogViewer from "@/app/basic/chat/ChatLogViewer.vue";
+import ChatLogViewer from "@/app/basic/chat/log/ChatLogViewerOrg.vue";
 import { Watch } from "vue-property-decorator";
 import ImportTypeRadio from "@/app/basic/common/components/radio/ImportTypeRadio.vue";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
-import { saveJson, saveHTML, saveText } from "@/app/core/Utility";
+import { saveJson, saveHTML, saveText } from "@/app/core/utility/FileUtility";
 import moment from "moment";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 
@@ -370,7 +370,7 @@ export default class ChatLog extends Vue {
 
   private onClickSaveAsJson() {
     const dateStr = moment().format("YYYYMMDD_HHmmss");
-    saveJson(`chatLog_${dateStr}`, this.jsonData);
+    saveJson(`chatLog_${dateStr}`, "chat-log", this.jsonData);
   }
 
   private get jsonData(): any {
