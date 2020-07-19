@@ -1,4 +1,4 @@
-FROM node:12.12.0-alpine
+FROM node:12-alpine
 
 # コンテナ上の作業ディレクトリ作成
 WORKDIR /app

@@ -1,8 +1,4 @@
 ---
-# docker
-# Installation ubuntu
-# https://docs.docker.com/engine/installation/linux/ubuntulinux/
-
 - block:
     - name: dockerがインストールされていればバージョンを確認
       shell: docker --version | grep {{ docker_version }}
@@ -39,28 +35,11 @@
         path: /etc/hosts
         line: "127.0.1.1 vagrant"
 
-    # http://qiita.com/udzura/items/576c2c782adb241070bc
-    # https://gist.github.com/indykish/a6facea4748dc578abbaf2b09065ead5
     - name: step1
       shell: export DEBIAN_FRONTEND=noninteractive
-
-    # 一部環境では以下を実行しないとエラーが発生
-    # aptが起動していて次のタスクが立ち上がらないエラー
     - name: step1.5
       shell: killall -KILL apt.systemd.daily
       ignore_errors: True
-
-    # ansible 2.8.4 deprecate
-    # - name: step2
-    #   apt:
-    #     name: "{{item}}"
-    #     state: present
-    #     update_cache: yes
-    #   with_items:
-    #     - apt-transport-https
-    #     - ca-certificates
-    #     - curl
-    #     - software-properties-common
 
     - name: step2
       apt:
@@ -114,7 +93,7 @@
       debug: var=ver_check_compose
 
     - name: バージョンがvarsで指定されたものと異なれば、Remove "docker-compose" package
-      command: rm /usr/local/bin/docker-compose
+      shell: rm /usr/local/bin/docker-compose
       ignore_errors: True
       when: ver_check_compose.rc != 0
 
@@ -129,7 +108,6 @@
     - name: debug docker-compose
       debug: var=result_compose
 
-# 現在のバージョンに合わせてURLを変えること
 - block:
     - name: debug docker-compose result
       debug: var=result_compose
@@ -137,18 +115,10 @@
       shell: curl -L "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-$(uname -s)-$(uname -m)" > /usr/local/bin/docker-compose &&  chmod +x /usr/local/bin/docker-compose warn=no
   when: result_compose.rc != 0
 
-# https://qiita.com/tk555/items/23bb5d3d5b613a03ca2b
-# 以下のエラーが出たため。
-# ERROR: Service 'firebase' failed to build: Get https://registry-1.docker.io/v2/: dial tcp: lookup registry-1.docker.io: Temporary failure in name resolution
-# 発生バージョン。
-# "Ubuntu 18.04.3 LTS (Bionic Beaver)"
-# Docker version 19.03.2, build 6a30dfc
-# docker-compose version 1.24.1, build 4667896b
-
 - name: "プロキシ設定の修正(1)"
-  lineinfile: >-
-    dest='/etc/resolv.conf'
-    state=present
-    backrefs=yes
-    regexp='^nameserver'
-    line='nameserver 8.8.8.8'
+  lineinfile:
+    dest: "/etc/resolv.conf"
+    state: present
+    backrefs: yes
+    regexp: "^nameserver"
+    line: "nameserver 8.8.8.8"

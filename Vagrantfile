@@ -2,7 +2,6 @@ $ansible_install = <<SHELL
   if ! type venv > /dev/null 2>&1; then
     # rootユーザとして実行されるためsudo不要
     apt-get -y update
-    apt-get -y install curl
     # apt をスクリプトで使うと警告が出る。 https://codeday.me/jp/qa/20190808/1404436.html
     apt-get install -y python3-venv python3-pip
 
@@ -14,7 +13,7 @@ SHELL
 
 # virtual machine設定
 Vagrant.configure(2) do |config|
-  config.vm.box = "bento/ubuntu-18.04"
+  config.vm.box = "bento/ubuntu-20.04"
   config.vm.network "private_network", ip: "192.168.74.60"
 
   config.vm.provider "virtualbox" do |vm|

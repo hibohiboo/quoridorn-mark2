@@ -6,16 +6,19 @@
 
 # 警告がでるので追加。
 - name: install aptitude
-  apt: pkg=aptitude
+  apt:
+    pkg: aptitude
 
 # 対話型シェルの自動化に使用
 - name: expect install
-  apt: name=expect state=present
+  apt:
+    name: expect
+    state: present
 
 - name: bashの設定ファイルをコピー
-  copy: >
-    src=.bashrc
-    dest=/home/vagrant/.bashrc
-    owner=vagrant
-    group=vagrant
-    mode=0644
+  copy:
+    src: .bashrc
+    dest: /home/vagrant/.bashrc
+    owner: vagrant
+    group: vagrant
+    mode: "0644"

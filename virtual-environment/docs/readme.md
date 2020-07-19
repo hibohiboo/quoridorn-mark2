@@ -67,6 +67,11 @@ vagrant provision
 
 ![](img/2019-10-19-18-10-51.png)
 
+## 接続の確認
+
+以下の URL にアクセス
+https://192.168.74.60/quoridorn2/
+
 ## 詳細
 
 ### インストールしたツールについて
@@ -78,30 +83,14 @@ vagrant provision
 
 ### Vagrantfile について
 
-- `ssh develop`コマンドで仮想環境のサーバ上にログインできる。
+- `vagrant ssh`コマンドで仮想環境のサーバ上にログインできる。
 - 仮想環境上では/vagrant ディレクトリが、Vagrantfile の置かれているフォルダとなる。つまり、/vagrant/Vagrantfile のようになっている。
 
 ### docker について
 
-以下は LaraDock の dokcer 設定を持ってきている。
+以下は LaraDock の docker 設定を持ってきている。
 
-- mongo
-- mongo-webui
 - nginx
-
-### 設定について
-
-.env
-
-```
-### MONGOWEBUI ###############################################
-MONGO_WEBUI_PORT=3000
-MONGO_WEBUI_ROOT_URL=http://192.168.74.60
-MONGO_WEBUI_MONGO_URL=mongodb://mongo:27017/quoridorn
-MONGO_WEBUI_INSTALL_MONGO=false
-```
-
-MONGO_WEBUI_MONGO_URL の quoridorn が作成を期待する DB となる。
 
 ## 参考
 
