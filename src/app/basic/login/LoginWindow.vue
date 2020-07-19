@@ -40,7 +40,7 @@
         :status="status"
         :dataList="roomList"
         v-if="roomList"
-        :selectLock="isInputtingRoomInfo"
+        :selectLock="roomStatus !== 'normal'"
         keyProp="order"
         :rowClassGetter="getRowClasses"
         v-model="selectedRoomNo"
@@ -136,7 +136,7 @@ import {
   LoginWindowInput,
   ServerTestResult
 } from "@/@types/socket";
-import { PermissionNode, StoreObj, StoreUseData } from "@/@types/store";
+import { StoreObj, StoreUseData } from "@/@types/store";
 import TaskManager from "@/app/core/task/TaskManager";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import VueEvent from "@/app/core/decorator/VueEvent";
@@ -146,13 +146,12 @@ import LanguageSelect from "@/app/basic/common/components/select/LanguageSelect.
 import LanguageManager from "@/LanguageManager";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
-import { extname, loadYaml } from "@/app/core/utility/FileUtility";
+import { getUrlType, loadYaml } from "@/app/core/utility/FileUtility";
 import {
   Scene,
-  RoomData,
-  SceneLayerType,
   CutInDeclareInfo,
-  MediaInfo
+  MediaInfo,
+  AddRoomPresetDataRequest
 } from "@/@types/room";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import * as Cookies from "es-cookie";
@@ -197,14 +196,15 @@ export default class LoginWindow extends Mixins<
   private roomList: StoreUseData<ClientRoomInfo>[] | null = null;
   private selectedRoomNo: number | null = null;
   private isInputtingServerSetting: boolean = false;
-  private isInputtingRoomInfo: boolean = false;
+  private roomStatus: "normal" | "processing" | "processingNoneRelease" =
+    "normal";
   private message: Message | null = null;
   private serverTestResult: ServerTestResult | null = null;
   private readonly htmlRegExp: RegExp = new RegExp(
     '\\[([^"<>\\]]+)]\\(([^)"<>]+)\\)',
     "g"
   );
-  private language: string = LanguageManager.instance.defaultLanguage;
+  private language: string = LanguageManager.defaultLanguage;
   private urlPassword: string | null = null;
   private urlPlayerName: string | null = null;
 
@@ -431,7 +431,7 @@ export default class LoginWindow extends Mixins<
 
   @VueEvent
   private get disabledCreate(): boolean {
-    if (this.isInputtingRoomInfo) return true;
+    if (this.roomStatus !== "normal") return true;
     if (this.selectedRoomNo === null) return true;
     if (!this.roomList) return true;
     return !!this.roomList[this.selectedRoomNo].data;
@@ -439,7 +439,7 @@ export default class LoginWindow extends Mixins<
 
   @VueEvent
   private get disabledLogin(): boolean {
-    if (this.isInputtingRoomInfo) return true;
+    if (this.roomStatus !== "normal") return true;
     if (this.selectedRoomNo === null) return true;
     if (!this.roomList) return true;
     return !this.roomList[this.selectedRoomNo].data;
@@ -447,7 +447,7 @@ export default class LoginWindow extends Mixins<
 
   @LifeCycle
   public async beforeDestroy() {
-    await this.releaseTouchRoom();
+    if (this.roomStatus === "processing") await this.releaseTouchRoom();
   }
 
   @VueEvent
@@ -466,17 +466,13 @@ export default class LoginWindow extends Mixins<
 
   @VueEvent
   private async deleteRoom(order: number) {
-    this.isInputtingRoomInfo = true;
-
     // タッチ
-    if (!(await this.touchRoom(true, order))) {
-      this.isInputtingRoomInfo = false;
-      return;
-    }
+    if (!(await this.touchRoom(true, order))) return;
 
     // 確認画面
     let confirmResult: boolean;
-    this.isInputtingRoomInfo = true;
+    this.roomStatus = "processing";
+
     try {
       const confirmResultList = await TaskManager.instance.ignition<
         WindowOpenInfo<ConfirmInfo>,
@@ -496,14 +492,14 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom(order);
-      this.isInputtingRoomInfo = false;
+      this.roomStatus = "normal";
       return;
     }
 
     // 入力画面がキャンセルされていたらタッチ状態を解除
     if (!confirmResult) {
       await this.releaseTouchRoom(order);
-      this.isInputtingRoomInfo = false;
+      this.roomStatus = "normal";
       return;
     }
 
@@ -524,14 +520,14 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom(order);
+      this.roomStatus = "normal";
       return;
-    } finally {
-      this.isInputtingRoomInfo = false;
     }
 
     // 入力画面がキャンセルされていたらタッチ状態を解除
     if (!deleteRoomInput) {
       await this.releaseTouchRoom(order);
+      this.roomStatus = "normal";
       return;
     }
 
@@ -549,9 +545,11 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom(order);
-      this.isInputtingRoomInfo = false;
+      this.roomStatus = "normal";
       return;
     }
+    this.roomStatus = "normal";
+
     setTimeout(() => {
       alert(
         deleteResult ? "部屋を削除しました。" : "部屋の削除に失敗しました。"
@@ -606,13 +604,9 @@ export default class LoginWindow extends Mixins<
       return;
     }
 
-    this.isInputtingRoomInfo = true;
-
     // タッチ
-    if (!(await this.touchRoom(false))) {
-      this.isInputtingRoomInfo = false;
-      return;
-    }
+    if (!(await this.touchRoom(false))) return;
+    this.roomStatus = "processing";
 
     /* ----------------------------------------------------------------------
      * 部屋情報入力画面
@@ -630,17 +624,17 @@ export default class LoginWindow extends Mixins<
         }
       });
       createRoomInput = roomInfoList[0];
-
-      if (!createRoomInput) {
-        // 入力画面キャンセル
-        await this.releaseTouchRoom();
-        this.isInputtingRoomInfo = false;
-        return;
-      }
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom();
-      this.isInputtingRoomInfo = false;
+      this.roomStatus = "normal";
+      return;
+    }
+
+    if (!createRoomInput) {
+      // 入力画面キャンセル
+      await this.releaseTouchRoom();
+      this.roomStatus = "normal";
       return;
     }
 
@@ -670,30 +664,27 @@ export default class LoginWindow extends Mixins<
       if (!userLoginInput) {
         // 入力画面キャンセル
         await this.releaseTouchRoom();
+        this.roomStatus = "normal";
         return;
       }
     } catch (err) {
       window.console.warn(err);
       await this.releaseTouchRoom();
+      this.roomStatus = "normal";
       return;
-    } finally {
-      this.isInputtingRoomInfo = false;
     }
 
-    await TaskManager.instance.ignition<ModeInfo, never>({
-      type: "mode-change",
-      owner: "Quoridorn",
-      value: {
-        type: "view-progress",
-        value: {
-          message: LanguageManager.instance.getText("message.creating-room"),
-          all: 0,
-          current: 0
-        }
-      }
-    });
-
     const roomId = this.roomList![this.selectedRoomNo].id!;
+
+    /* ----------------------------------------------------------------------
+     * 部屋の使用準備
+     */
+    this.roomStatus = "processingNoneRelease";
+    await this.close();
+    performance.mark("room-init-start");
+    this.roomStatus = "processing";
+
+    await LoginWindow.viewProcessView("creating-room");
 
     /* ----------------------------------------------------------------------
      * 部屋作成リクエスト
@@ -710,20 +701,28 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
 
-      await TaskManager.instance.ignition<ModeInfo, never>({
-        type: "mode-change",
+      await LoginWindow.viewProcessView("");
+
+      await TaskManager.instance.ignition<
+        WindowOpenInfo<LoginWindowInput>,
+        never
+      >({
+        type: "window-open",
         owner: "Quoridorn",
         value: {
-          type: "view-progress",
-          value: {
-            message: "",
-            all: 0,
-            current: 0
+          type: "login-window",
+          args: {
+            roomList: this.roomList,
+            message: this.message!,
+            serverTestResult: this.serverTestResult!
           }
         }
       });
+
       return;
     }
+
+    await LoginWindow.viewProcessView("entering-room");
 
     /* ----------------------------------------------------------------------
      * ログインリクエスト
@@ -737,20 +736,40 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
       alert("ログイン失敗");
+
+      await LoginWindow.viewProcessView("");
+
       SocketFacade.instance.roomCollectionPrefix = null;
+
+      await TaskManager.instance.ignition<
+        WindowOpenInfo<LoginWindowInput>,
+        never
+      >({
+        type: "window-open",
+        owner: "Quoridorn",
+        value: {
+          type: "login-window",
+          args: {
+            roomList: this.roomList,
+            message: this.message!,
+            serverTestResult: this.serverTestResult!
+          }
+        }
+      });
+
       return;
     }
+
     SocketFacade.instance.userId = userLoginResponse.userId;
     Cookies.set(`${roomId}/${userLoginInput.name}`, userLoginResponse.token, {
       expires: 365
     });
 
-    /* ----------------------------------------------------------------------
-     * 部屋の使用準備
-     */
-    await this.close();
+    await LoginWindow.viewProcessView("add-preset-room");
 
     await this.addPresetData(createRoomInput);
+
+    await LoginWindow.viewProcessView("last-process-room");
 
     const loginResult: ClientRoomInfo = {
       name: createRoomInput.name,
@@ -772,6 +791,20 @@ export default class LoginWindow extends Mixins<
       type: "room-initialize",
       owner: "Quoridorn",
       value: loginResult
+    });
+  }
+
+  private static async viewProcessView(msgTarget: string | null) {
+    const message: string = msgTarget
+      ? LanguageManager.instance.getText(`message.${msgTarget}`)
+      : "";
+    await TaskManager.instance.ignition<ModeInfo, never>({
+      type: "mode-change",
+      owner: "Quoridorn",
+      value: {
+        type: "view-progress",
+        value: { message, all: 0, current: 0 }
+      }
     });
   }
 
@@ -805,13 +838,10 @@ export default class LoginWindow extends Mixins<
       return;
     }
 
-    this.isInputtingRoomInfo = true;
-
     // タッチ
-    if (!(await this.touchRoom(true))) {
-      this.isInputtingRoomInfo = false;
-      return;
-    }
+    if (!(await this.touchRoom(true))) return;
+
+    this.roomStatus = "processing";
 
     let loginRoomInput: LoginRoomInput;
     if (this.urlPassword !== null) {
@@ -822,7 +852,6 @@ export default class LoginWindow extends Mixins<
       /* ----------------------------------------------------------------------
        * 部屋情報入力画面
        */
-      this.isInputtingRoomInfo = true;
       try {
         const loginRoomInputList = await TaskManager.instance.ignition<
           WindowOpenInfo<never>,
@@ -839,13 +868,13 @@ export default class LoginWindow extends Mixins<
         if (!loginRoomInput) {
           // 入力画面キャンセル
           await this.releaseTouchRoom();
-          this.isInputtingRoomInfo = false;
+          this.roomStatus = "normal";
           return;
         }
       } catch (err) {
         window.console.warn(err);
         await this.releaseTouchRoom();
-        this.isInputtingRoomInfo = false;
+        this.roomStatus = "normal";
         return;
       }
     }
@@ -867,10 +896,7 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
       alert("ログイン失敗");
-      if (this.urlPassword !== null) {
-        // TODO URLパラメータによる自動部屋ログイン時のログイン失敗の場合の処理
-      }
-      this.isInputtingRoomInfo = false;
+      this.roomStatus = "normal";
       return;
     }
 
@@ -901,29 +927,14 @@ export default class LoginWindow extends Mixins<
 
       if (!userLoginInput) {
         // 入力画面キャンセル
-        // TODO 部屋ログアウト
-        this.isInputtingRoomInfo = false;
+        this.roomStatus = "normal";
         return;
       }
     } catch (err) {
       window.console.warn(err);
-      // TODO 部屋ログアウト
-      this.isInputtingRoomInfo = false;
+      this.roomStatus = "normal";
       return;
     }
-
-    await TaskManager.instance.ignition<ModeInfo, never>({
-      type: "mode-change",
-      owner: "Quoridorn",
-      value: {
-        type: "view-progress",
-        value: {
-          message: LanguageManager.instance.getText("message.entering-room"),
-          all: 0,
-          current: 0
-        }
-      }
-    });
 
     /* ----------------------------------------------------------------------
      * ログインリクエスト
@@ -937,11 +948,11 @@ export default class LoginWindow extends Mixins<
     } catch (err) {
       window.console.warn(err);
       alert("ログイン失敗");
+      this.roomStatus = "normal";
       SocketFacade.instance.roomCollectionPrefix = null;
       return;
-    } finally {
-      this.isInputtingRoomInfo = false;
     }
+    this.roomStatus = "normal";
     SocketFacade.instance.userId = userLoginResponse.userId;
     Cookies.set(`${roomId}/${userLoginInput.name}`, userLoginResponse.token, {
       expires: 365
@@ -951,6 +962,9 @@ export default class LoginWindow extends Mixins<
      * 部屋の使用準備
      */
     await this.close();
+    performance.mark("room-init-start");
+    await LoginWindow.viewProcessView("entering-room");
+
     const loginResult: ClientRoomInfo = this.roomList![this.selectedRoomNo]
       .data!;
     loginResult.roomNo = this.selectedRoomNo;
@@ -974,39 +988,20 @@ export default class LoginWindow extends Mixins<
    * @param createRoomInput
    */
   private async addPresetData(createRoomInput: CreateRoomInput) {
-    const mediaList: MediaInfo[] = await loadYaml<MediaInfo[]>(
+    /* --------------------------------------------------
+     * メディアデータを用意する
+     */
+    // 読み込み必須のためthrowは伝搬させる
+    const mediaDataList = await loadYaml<MediaInfo[]>(
       "./static/conf/media.yaml"
     );
     let firstImageIdx: number = -1;
 
-    const getType = (url: string) => {
-      if (url.match(/^https?:\/\/www.youtube.com\/watch\?v=/)) {
-        return "youtube";
-      } else {
-        const ext = extname(url);
-        switch (ext) {
-          case "png":
-          case "gif":
-          case "jpg":
-          case "jpeg":
-            return "image";
-          case "mp3":
-          case "wav":
-          case "wave":
-            return "music";
-          case "json":
-          case "yaml":
-            return "setting";
-          default:
-            return "unknown";
-        }
-      }
-    };
-    mediaList.forEach((media: MediaInfo, idx: number) => {
+    mediaDataList.forEach((media: MediaInfo, idx: number) => {
       if (!media.tag) media.tag = "";
       media.url = getSrc(media.url);
 
-      const type = getType(media.url);
+      const type = getUrlType(media.url);
       media.type = type;
       if (type === "youtube") {
         if (!media.name)
@@ -1016,6 +1011,7 @@ export default class LoginWindow extends Mixins<
           if (firstImageIdx === -1) firstImageIdx = idx;
         }
         if (!media.name) {
+          // ファイル名を名前とする
           media.name = media.url.replace(/^https?:\/\/.+\//, "");
         }
       }
@@ -1039,47 +1035,36 @@ export default class LoginWindow extends Mixins<
     });
 
     /* --------------------------------------------------
-     * BGMデータのプリセットデータ投入
+     * カットインデータを用意する
      */
-    const bgmList: CutInDeclareInfo[] = await loadYaml("/static/conf/bgm.yaml");
-    bgmList.forEach(bgm => {
-      bgm.duration = 0;
-      bgm.url = getSrc(bgm.url);
+    // 読み込み必須のためthrowは伝搬させる
+    const cutInDataList = await loadYaml<CutInDeclareInfo[]>(
+      "/static/conf/bgm.yaml"
+    );
+    cutInDataList.forEach(cutIn => {
+      cutIn.duration = 0;
+      cutIn.url = getSrc(cutIn.url);
 
-      const mediaInfo = mediaList.filter(m => m.url === bgm.url)[0];
+      const mediaInfo = mediaDataList.find(m => m.url === cutIn.url);
       if (mediaInfo) {
         // 上書き
-        mediaInfo.name = bgm.title;
-        mediaInfo.tag = bgm.tag;
+        mediaInfo.name = cutIn.title;
+        mediaInfo.tag = cutIn.tag;
       } else {
         // 追加
-        if (bgm.url) {
-          mediaList.push({
-            name: bgm.title,
-            url: bgm.url,
-            tag: bgm.tag,
-            type: getType(bgm.url)
+        if (cutIn.url) {
+          mediaDataList.push({
+            name: cutIn.title,
+            url: cutIn.url,
+            tag: cutIn.tag,
+            type: getUrlType(cutIn.url)
           });
         }
       }
     });
-    const cutInDataCC = SocketFacade.instance.cutInDataCC();
-
-    await cutInDataCC.addDirect(bgmList);
 
     /* --------------------------------------------------
-     * メディアデータのプリセットデータ投入
-     */
-    const mediaCC = SocketFacade.instance.mediaCC();
-    const docIdList = await mediaCC.addDirect(
-      mediaList,
-      mediaList.map(() => ({ owner: null }))
-    );
-
-    const imageId: string = docIdList[firstImageIdx];
-
-    /* --------------------------------------------------
-     * マップデータのプリセットデータ投入
+     * マップデータのプリセットデータを用意する
      */
     const scene: Scene = {
       name: "A-1",
@@ -1100,16 +1085,16 @@ export default class LoginWindow extends Mixins<
       shapeType: "square",
       texture: {
         type: "image",
-        imageTag: mediaList[firstImageIdx].tag,
-        imageId: imageId!,
+        imageTag: "", // サーバサイドで自動投入
+        imageId: "", // サーバサイドで自動投入
         direction: "none",
         backgroundSize: "100%"
       },
       background: {
         texture: {
           type: "image",
-          imageTag: mediaList[firstImageIdx].tag,
-          imageId: imageId!,
+          imageTag: "", // サーバサイドで自動投入
+          imageId: "", // サーバサイドで自動投入
           direction: "none",
           backgroundSize: "100%"
         },
@@ -1119,8 +1104,8 @@ export default class LoginWindow extends Mixins<
         useTexture: "original",
         texture: {
           type: "image",
-          imageTag: mediaList[firstImageIdx].tag,
-          imageId: imageId!,
+          imageTag: "", // サーバサイドで自動投入
+          imageId: "", // サーバサイドで自動投入
           direction: "none",
           backgroundSize: "100%"
         },
@@ -1140,85 +1125,28 @@ export default class LoginWindow extends Mixins<
       chatLinkage: 0,
       chatLinkageSearch: ""
     };
-    const addMapResult = await GameObjectManager.instance.addScene(scene);
-
-    /* --------------------------------------------------
-     * マップレイヤーのプリセットデータ投入
-     */
-    const addSceneLayer = async (
-      type: SceneLayerType,
-      defaultOrder: number
-    ) => {
-      await GameObjectManager.instance.addSceneLayer({
-        type,
-        defaultOrder,
-        isSystem: true
-      });
-    };
-    await addSceneLayer("floor-tile", 1);
-    await addSceneLayer("map-mask", 2);
-    await addSceneLayer("map-marker", 3);
-    await addSceneLayer("dice-symbol", 4);
-    await addSceneLayer("card", 5);
-    await addSceneLayer("character", 6);
 
     /* --------------------------------------------------
      * 部屋データのプリセットデータ投入
      */
-    const roomDataCC = SocketFacade.instance.roomDataCC();
-
-    const roomData: RoomData = {
-      sceneId: addMapResult.sceneId,
-      settings: createRoomInput.extend,
-      name: createRoomInput.name
-    };
-    await roomDataCC.addDirect([roomData]);
-
-    // ActorGroupを取得する関数
-    const getActorGroup = async (name: string) =>
-      (await SocketFacade.instance
-        .actorGroupCC()
-        .find([{ property: "data.name", operand: "==", value: name }]))![0];
-
-    /* --------------------------------------------------
-     * チャットタブのプリセットデータ投入
-     */
-    const gameMastersActorGroup = await getActorGroup("GameMasters");
-    const gameMastersPermission: PermissionNode = {
-      type: "group",
-      id: gameMastersActorGroup.id!
-    };
-    await SocketFacade.instance.chatTabListCC().addDirect(
-      [
-        {
-          name: LanguageManager.instance.getText("label.main"),
-          isSystem: true
-        }
-      ],
-      [
-        {
-          permission: {
-            view: { type: "none", list: [] },
-            edit: { type: "allow", list: [gameMastersPermission] },
-            chmod: { type: "allow", list: [gameMastersPermission] }
-          }
-        }
-      ]
-    );
-
-    /* --------------------------------------------------
-     * グループチャットタブのプリセットデータ投入
-     */
-    const allActorGroup = await getActorGroup("All");
-    await SocketFacade.instance.groupChatTabListCC().addDirect([
-      {
-        name: LanguageManager.instance.getText("label.target-all"),
-        isSystem: true,
-        actorGroupId: allActorGroup.id!,
-        isSecret: false,
-        outputChatTabId: null
+    await SocketFacade.instance.socketCommunication<
+      AddRoomPresetDataRequest,
+      void
+    >("add-room-preset-data", {
+      mediaDataList,
+      backgroundMediaIndex: firstImageIdx,
+      cutInDataList,
+      sceneData: scene,
+      roomExtendInfo: createRoomInput.extend,
+      roomName: createRoomInput.name,
+      language: {
+        mainChatTabName: LanguageManager.instance.getText("label.main"),
+        allGroupChatTabName: LanguageManager.instance.getText(
+          "label.target-all"
+        ),
+        nameLabel: LanguageManager.instance.getText("label.name")
       }
-    ]);
+    });
   }
 }
 </script>

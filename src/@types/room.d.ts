@@ -313,4 +313,20 @@ type ChatInfo = {
 type ChatTabInfo = {
   name: string;
   isSystem: boolean;
+  useReadAloud: boolean;
+  readAloudVolume: number;
+};
+
+type AddRoomPresetDataRequest = {
+  mediaDataList: MediaInfo[];
+  backgroundMediaIndex: number;
+  cutInDataList: CutInDeclareInfo[];
+  sceneData: Scene;
+  roomExtendInfo: RoomInfoExtend;
+  roomName: string;
+  language: {
+    mainChatTabName: string;
+    allGroupChatTabName: string;
+    nameLabel: string;
+  };
 };

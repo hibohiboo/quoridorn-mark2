@@ -43,7 +43,10 @@ import {
   CardMeta,
   CardObject,
   CardDeckBig,
-  CardDeckSmall
+  CardDeckSmall,
+  ResourceMasterStore,
+  ResourceStore,
+  InitiativeColumnStore
 } from "@/@types/gameObject";
 import { ApplicationError } from "@/app/core/error/ApplicationError";
 import {
@@ -53,8 +56,7 @@ import {
 } from "@/app/core/api/Github";
 import yaml from "js-yaml";
 import GameObjectManager from "@/app/basic/GameObjectManager";
-
-const connectYamlPath = "/static/conf/connect.yaml";
+import { ModeInfo } from "mode";
 
 export type ConnectInfo = {
   quoridornServer: string | string[];
@@ -179,7 +181,10 @@ export default class SocketFacade {
   private constructor() {}
 
   public async init() {
-    this.__connectInfo = await loadYaml(connectYamlPath);
+    // 読み込み必須のためthrowは伝搬させる
+    this.__connectInfo = await loadYaml<ConnectInfo>(
+      "/static/conf/connect.yaml"
+    );
 
     // 相互運用性チェック
     try {
@@ -213,7 +218,20 @@ export default class SocketFacade {
     await this.setDefaultServerUrlList();
     const serverInfo = this.appServerUrlList[0];
     if (!serverInfo) {
-      // window.console.error("有効なアプリケーションサーバに接続できませんでした。");
+      swal({
+        title: "通信エラー",
+        text: "有効なアプリケーションサーバに接続できませんでした。",
+        icon: "error"
+      });
+
+      await TaskManager.instance.ignition<ModeInfo, never>({
+        type: "mode-change",
+        owner: "Quoridorn",
+        value: {
+          type: "view-progress",
+          value: { message: "", all: 0, current: 0 }
+        }
+      });
       return;
     }
     await this.setAppServerUrl(serverInfo.url);
@@ -420,7 +438,8 @@ export default class SocketFacade {
     event: string,
     callback: (err: any, result: T) => void
   ): void {
-    this.socket!.on(event, (err: any, result: T) => {
+    if (!this.socket) return;
+    this.socket.on(event, (err: any, result: T) => {
       if (err) window.console.error(err);
       callback(err, result);
     });
@@ -513,6 +532,26 @@ export default class SocketFacade {
     return this.roomCollectionController<PropertyStore>("property-list");
   }
 
+  public resourceMasterCC(): NekostoreCollectionController<
+    ResourceMasterStore
+  > {
+    return this.roomCollectionController<ResourceMasterStore>(
+      "resource-master-list"
+    );
+  }
+
+  public resourceCC(): NekostoreCollectionController<ResourceStore> {
+    return this.roomCollectionController<ResourceStore>("resource-list");
+  }
+
+  public initiativeColumnCC(): NekostoreCollectionController<
+    InitiativeColumnStore
+  > {
+    return this.roomCollectionController<InitiativeColumnStore>(
+      "initiative-column-list"
+    );
+  }
+
   public propertySelectionCC(): NekostoreCollectionController<
     PropertySelectionStore
   > {
@@ -565,17 +604,23 @@ export default class SocketFacade {
         return this.roomDataCC();
       case "media":
         return this.mediaCC();
-      case "image-tag-list":
+      case "image-tag":
         return this.imageTagCC();
       case "cut-in":
         return this.cutInDataCC();
-      case "user-list":
+      case "user":
         return this.userCC();
-      case "property-list":
+      case "property":
         return this.propertyCC();
-      case "property-selection-list":
+      case "resource-master":
+        return this.resourceMasterCC();
+      case "resource":
+        return this.resourceCC();
+      case "initiative-column":
+        return this.initiativeColumnCC();
+      case "property-selection":
         return this.propertySelectionCC();
-      case "property-face-list":
+      case "property-face":
         return this.propertyFaceCC();
       case "character":
       case "dice-symbol":
@@ -589,9 +634,9 @@ export default class SocketFacade {
         return this.sceneLayerCC();
       case "map-and-layer":
         return this.sceneAndLayerCC();
-      case "tag-note-list":
+      case "tag-note":
         return this.tagNoteCC();
-      case "role-group-list":
+      case "actor-group":
         return this.actorGroupCC();
       case "card-meta":
         return this.cardMetaCC();

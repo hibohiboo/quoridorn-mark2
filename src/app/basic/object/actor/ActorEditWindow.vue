@@ -7,12 +7,11 @@
       :chatFontColorType.sync="chatFontColorType"
       :chatFontColor.sync="chatFontColor"
       :standImagePosition.sync="standImagePosition"
-      :isUseTableData.sync="isUseTableData"
     />
 
     <div class="button-area">
       <ctrl-button @click="commit()" :disabled="!isCommitAble">
-        <span v-t="'button.add'"></span>
+        <span v-t="'button.modify'"></span>
       </ctrl-button>
       <ctrl-button @click="rollback()">
         <span v-t="'button.reject'"></span>
@@ -40,6 +39,7 @@ import SocketFacade, {
 } from "@/app/core/api/app-server/SocketFacade";
 import NekostoreCollectionController from "@/app/core/api/app-server/NekostoreCollectionController";
 import { DataReference } from "@/@types/data";
+import { findRequireById } from "@/app/core/utility/Utility";
 
 @Component({
   components: { ActorInfoForm, CtrlButton, BaseInput }
@@ -61,7 +61,6 @@ export default class ActorEditWindow extends Mixins<
   private chatFontColorType: "owner" | "original" = "owner";
   private chatFontColor: string = "#000000";
   private standImagePosition: number = 1;
-  private isUseTableData: boolean = false;
 
   @LifeCycle
   public async mounted() {
@@ -90,7 +89,6 @@ export default class ActorEditWindow extends Mixins<
     this.chatFontColorType = data.data!.chatFontColorType;
     this.chatFontColor = data.data!.chatFontColor;
     this.standImagePosition = data.data!.standImagePosition;
-    this.isUseTableData = data.data!.isUseTableData;
 
     if (this.windowInfo.status === "window") {
       try {
@@ -131,13 +129,12 @@ export default class ActorEditWindow extends Mixins<
 
   @VueEvent
   private async commit() {
-    const data = this.actorList.filter(a => a.id === this.docId)[0].data!;
+    const data = findRequireById(this.actorList, this.docId).data!;
     data.name = this.name;
     data.tag = this.tag;
     data.chatFontColorType = this.chatFontColorType;
     data.chatFontColor = this.chatFontColor;
     data.standImagePosition = this.standImagePosition;
-    data.isUseTableData = this.isUseTableData;
     await this.cc!.update([this.docId], [data]);
     this.isProcessed = true;
     await this.close();
@@ -156,6 +153,11 @@ export default class ActorEditWindow extends Mixins<
 
   @VueEvent
   private async rollback() {
+    try {
+      await this.cc!.releaseTouch([this.docId]);
+    } catch (err) {
+      // nothing
+    }
     if (!this.isProcessed) {
       this.isProcessed = true;
       await this.close();

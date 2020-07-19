@@ -20,6 +20,13 @@
         :docId="sceneObject.id"
         type="chit"
       />
+
+      <character
+        v-if="sceneObject.data.type === 'character'"
+        :key="sceneObject.id"
+        :docId="sceneObject.id"
+        type="character"
+      />
     </template>
   </div>
 </template>
@@ -28,6 +35,7 @@
 import { Component, Prop, Watch } from "vue-property-decorator";
 import MapMask from "@/app/basic/object/map-mask/MapMaskPieceComponent.vue";
 import Chit from "@/app/basic/object/chit/ChitPieceComponent.vue";
+import Character from "@/app/basic/object/character/CharacterPieceComponent.vue";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import { StoreObj, StoreUseData } from "@/@types/store";
 import VueEvent from "@/app/core/decorator/VueEvent";
@@ -40,12 +48,14 @@ import SocketFacade, {
 import ComponentVue from "@/app/core/window/ComponentVue";
 import { Mixins } from "vue-mixin-decorator";
 import CardDeckSmallComponent from "@/app/basic/card/CardDeckSmallComponent.vue";
+import { findRequireById } from "@/app/core/utility/Utility";
 
 @Component({
   components: {
     CardDeckSmallComponent,
     MapMask,
-    Chit
+    Chit,
+    Character
   }
 })
 export default class SceneLayerComponent extends Mixins<ComponentVue>(
@@ -61,12 +71,12 @@ export default class SceneLayerComponent extends Mixins<ComponentVue>(
 
   private cardDeckSmallList = GameObjectManager.instance.cardDeckSmallList;
   private sceneObjectList = GameObjectManager.instance.sceneObjectList;
-  private sceneAndLayerList = GameObjectManager.instance.sceneAndLayerList;
   private sceneAndObjectList = GameObjectManager.instance.sceneAndObjectList;
 
   private isMounted: boolean = false;
   private sceneAndLayerInfo: StoreUseData<SceneAndLayer> | null = null;
 
+  @VueEvent
   private get className(): string {
     return this.layer.data!.isSystem
       ? this.layer.data!.type
@@ -107,10 +117,7 @@ export default class SceneLayerComponent extends Mixins<ComponentVue>(
   private get useSceneObjectList() {
     return this.sceneAndObjectList
       .filter(sao => sao.data!.sceneId === this.sceneId)
-      .map(
-        sao =>
-          this.sceneObjectList.filter(mo => mo.id === sao.data!.objectId)[0]
-      )
+      .map(sao => findRequireById(this.sceneObjectList, sao.data!.objectId))
       .filter(
         so => so.data!.place === "field" && so.data!.layerId === this.layer.id
       );

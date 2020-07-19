@@ -1,5 +1,5 @@
 import { Address, Point, Rectangle } from "address";
-import { Texture } from "@/@types/room";
+import { Direction, Texture } from "@/@types/room";
 
 type SceneObjectType =
   | "character"
@@ -24,7 +24,7 @@ type SceneObject = Address & {
   type: SceneObjectType;
   tag: string;
   name: string;
-  owner: string; // id
+  actorId: string | null; // id
   rows: number;
   columns: number;
   isHideBorder: boolean;
@@ -49,7 +49,6 @@ type ActorStore = {
   chatFontColorType: "owner" | "original"; // チャット文字色はオーナー（ユーザ）の色か独自の色か
   chatFontColor: string; // 独自のチャット文字色
   standImagePosition: number; // 1〜12
-  isUseTableData: boolean; // イニシアティブ表のデータを持つかどうか
   pieceIdList: string[]; // コマのID一覧
   statusId: string; // ステータスへの参照
 };
@@ -96,8 +95,65 @@ type PropertyFaceStore = {
   targets: string[];
 };
 
+// リソース定義
+type ResourceType =
+  | "no-contents"
+  | "ref-normal"
+  | "ref-owner"
+  | "text"
+  | "input-text"
+  | "number"
+  | "check"
+  | "select"
+  | "combo"
+  | "color";
+
+type RefProperty =
+  | "name"
+  | "type"
+  | "tag"
+  | "actor-name"
+  | "actor-type"
+  | "actor-tag"
+  | "owner-name"
+  | "owner-type"
+  | "object-other-text"
+  | "object-layer"
+  | "actor-status-name"
+  | "actor-chat-text-color"
+  | "actor-stand-image-position";
+
+type ResourceMasterStore = {
+  label: string;
+  type: ResourceType;
+  systemColumnType: "name" | "initiative" | null; // システム列の種類
+  isAutoAddActor: boolean; // アクターに自動付与するかどうか
+  isAutoAddMapObject: boolean; // コマに自動付与するかどうか
+  iconImageId: string | null; // アイコンを設定するならその画像のID
+  iconImageTag: string | null; // アイコンを設定するならその画像のタグ
+  iconImageDirection: Direction | null; // アイコンを設定するならその画像の表示方法
+  refProperty: RefProperty | null; // 参照先プロパティ
+  min: number | null; // 数値の場合、その最小値
+  max: number | null; // 数値の場合、その最大値
+  interval: number | null; // 数値の場合、その変化値
+  selectionStr: string | null; // radio or select or comboの場合、その候補
+  defaultValue: string;
+};
+
+// イニシアティブ表の列の定義
+type InitiativeColumnStore = {
+  resourceMasterId: string;
+};
+
+// リソースインスタンス
+type ResourceStore = {
+  // 誰のリソースかはownerで表現
+  masterId: string;
+  type: ResourceType;
+  value: string;
+};
+
 type PropertyStore = {
-  owner: string;
   label: string;
   type:
     | "title"

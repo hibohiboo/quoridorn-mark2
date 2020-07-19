@@ -91,16 +91,6 @@
                     v-model="actor.data.standImagePosition"
                   />
                 </tr>
-                <!-- データの有無 -->
-                <tr>
-                  <tr-checkbox-component
-                    labelName="has-data"
-                    :readonly="true"
-                    :cLabel="$t('label.exist')"
-                    :nLabel="$t('label.not-exist')"
-                    v-model="actor.data.isUseTableData"
-                  />
-                </tr>
                 <!-- ステータス -->
                 <tr>
                   <tr-actor-status-select-component
@@ -111,6 +101,31 @@
                   />
                 </tr>
               </table>
+
+              <div class="last-line piece-list-container">
+                <template v-for="sceneObject in getSceneObjectList(actor)">
+                  <map-mask
+                    v-if="sceneObject.data.type === 'map-mask'"
+                    :key="sceneObject.id"
+                    :docId="sceneObject.id"
+                    type="map-mask"
+                  />
+
+                  <chit
+                    v-if="sceneObject.data.type === 'chit'"
+                    :key="sceneObject.id"
+                    :docId="sceneObject.id"
+                    type="chit"
+                  />
+
+                  <character
+                    v-if="sceneObject.data.type === 'character'"
+                    :key="sceneObject.id"
+                    :docId="sceneObject.id"
+                    type="character"
+                  />
+                </template>
+              </div>
             </div>
           </div>
         </simple-tab-component>
@@ -155,6 +170,11 @@ import TrColorPickerComponent from "@/app/basic/common/components/TrColorPickerC
 import TrChatColorInputComponent from "@/app/basic/common/components/TrChatColorInputComponent.vue";
 import BaseInput from "@/app/core/component/BaseInput.vue";
 import TrActorStatusSelectComponent from "@/app/basic/common/components/TrActorStatusSelectComponent.vue";
+import MapMask from "@/app/basic/object/map-mask/MapMaskPieceComponent.vue";
+import Chit from "@/app/basic/object/chit/ChitPieceComponent.vue";
+import Character from "@/app/basic/object/character/CharacterPieceComponent.vue";
+import App from "@/views/App.vue";
+import { findRequireById } from "@/app/core/utility/Utility";
 
 @Component({
   components: {
@@ -172,7 +192,10 @@ import TrActorStatusSelectComponent from "@/app/basic/common/components/TrActorS
     ActorSelect,
     SimpleTabComponent,
     UserSelect,
-    ColorPickerComponent
+    ColorPickerComponent,
+    MapMask,
+    Chit,
+    Character
   }
 })
 export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
@@ -184,6 +207,8 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   private userId: string = GameObjectManager.instance.mySelfUserId;
   private viewType: "actor" | "piece" = "actor";
   private searchText: string = "";
+  private sceneObjectList = GameObjectManager.instance.sceneObjectList;
+  private sceneAndObjectList = GameObjectManager.instance.sceneAndObjectList;
 
   @LifeCycle
   public async mounted() {
@@ -225,8 +250,21 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   }
 
   @VueEvent
+  private getSceneObjectList(actor: StoreUseData<ActorStore>) {
+    const sceneId = GameObjectManager.instance.roomData.sceneId;
+    return this.sceneAndObjectList
+      .filter(
+        sao =>
+          sao.data!.sceneId === sceneId &&
+          actor.data!.pieceIdList.filter(p => p === sao.data!.objectId).length
+      )
+      .map(sao => findRequireById(this.sceneObjectList, sao.data!.objectId))
+      .filter(so => so.data!.place === "field");
+  }
+
+  @VueEvent
   private getOwnerType(userId: string): string {
-    const user = this.userList.filter(u => u.id === userId)[0];
+    const user = findRequireById(this.userList, userId);
     return this.$t(`label.${user.data!.type}`)!.toString();
   }
 
@@ -279,13 +317,7 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
 
   @VueEvent
   private async addActor() {
-    await TaskManager.instance.ignition<WindowOpenInfo<void>, never>({
-      type: "window-open",
-      owner: "Quoridorn",
-      value: {
-        type: "actor-add-window"
-      }
-    });
+    await App.openSimpleWindow("actor-add-window");
   }
 
   @VueEvent
@@ -365,7 +397,7 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   private onHover(messageType: string, isHover: boolean) {
     this.windowInfo.message = isHover
       ? LanguageManager.instance.getText(
-          `chat-tab-list-window.message-list.${messageType}`
+          `chat-setting-window.message-list.${messageType}`
         )
       : "";
   }
@@ -383,17 +415,11 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
 }
 
 .user-area {
-  @include flex-box(row, flex-start, center, wrap);
-}
-
-.tab-component {
-  @include flex-box(column, stretch, flex-start);
-  align-self: stretch;
-  flex: 1;
+  @include inline-flex-box(row, flex-start, center, wrap);
 }
 
 .view-type-select {
-  @include flex-box(row, flex-start, center);
+  @include inline-flex-box(row, flex-start, center);
   margin-top: 0.5rem;
   align-self: stretch;
 }
@@ -407,15 +433,25 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
 .view-area,
 .tab-container {
   @include flex-box(column, stretch, flex-start);
-  flex: 1;
   align-self: stretch;
+}
+
+.view-area {
+  height: calc(100% - 6em);
 }
 
 .tab-container {
   border: 1px solid gray;
+  flex: 1;
   overflow-y: scroll;
   background-color: var(--uni-color-white);
   margin-top: -1px;
+}
+
+.tab-component {
+  @include flex-box(column, stretch, flex-start);
+  align-self: stretch;
+  flex: 1;
 }
 
 .actor-info {
@@ -474,5 +510,18 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
 
 .info-table {
   margin-left: 1.5rem;
+}
+
+.piece-list-container {
+  @include inline-flex-box(row, space-between, center);
+  position: relative;
+
+  > * {
+    position: relative;
+    margin-top: 1.5em;
+    width: 50px !important;
+    height: 50px !important;
+    transform: none !important;
+  }
 }
 </style>

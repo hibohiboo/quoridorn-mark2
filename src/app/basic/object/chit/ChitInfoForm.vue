@@ -460,6 +460,7 @@ export default class ChitInfoForm extends Mixins<ComponentVue>(ComponentVue) {
 
   > *:not(:first-child) {
     width: 100%;
+    height: calc(100% - 2em);
     flex: 1;
   }
 

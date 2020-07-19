@@ -27,7 +27,7 @@ export function convertNumberNull(
   radix: number = 10
 ): number | null {
   if (str === null) return null;
-  return str.match(/^[0-9]+$/) ? parseInt(str, radix) : null;
+  return str.match(/^-?[0-9]+$/) ? parseInt(str, radix) : null;
 }
 
 /**
@@ -45,6 +45,16 @@ export function convertNumberZero(
   else if (radix === 16)
     return str.match(/^[0-9a-fA-F]+$/) ? parseInt(str, radix) : 0;
   return 0;
+}
+
+/**
+ * 文字列をbooleanに変換する
+ * 変換できない場合は false を返却する
+ * @param str
+ */
+export function convertBooleanFalse(str: string | null): boolean {
+  if (str === null) return false;
+  return str.toLowerCase() === "true";
 }
 
 /**

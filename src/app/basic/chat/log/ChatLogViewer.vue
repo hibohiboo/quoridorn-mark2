@@ -8,18 +8,20 @@
       @settingOpen="onSettingOpen()"
     >
       <div class="chat-line-container selectable">
-        <chat-log-line-component
-          v-for="chat in chatList"
-          :key="chat.id"
-          :chat="chat"
-          :userList="userList"
-          :actorList="actorList"
-          :groupChatTabList="groupChatTabList"
-          :editedMessage="editedMessage"
-          :userTypeLanguageMap="userTypeLanguageMap"
-          @edit="id => $emit('edit', id)"
-          @delete="id => $emit('delete', id)"
-        />
+        <template v-for="chat in chatList">
+          <chat-log-line-component
+            v-if="chat.data.tabId === currentTabInfo.target"
+            :key="chat.id"
+            :chat="chat"
+            :userList="userList"
+            :actorList="actorList"
+            :groupChatTabList="groupChatTabList"
+            :editedMessage="editedMessage"
+            :userTypeLanguageMap="userTypeLanguageMap"
+            @edit="id => $emit('edit', id)"
+            @delete="id => $emit('delete', id)"
+          />
+        </template>
       </div>
     </simple-tab-component>
   </div>
@@ -28,7 +30,7 @@
 <script lang="ts">
 import { Component, Prop, Watch } from "vue-property-decorator";
 import { Mixins } from "vue-mixin-decorator";
-import { TabInfo, WindowInfo, WindowOpenInfo } from "@/@types/window";
+import { TabInfo, WindowInfo } from "@/@types/window";
 import ChatLogLineComponent from "@/app/basic/chat/log/ChatLogLineComponent.vue";
 import {
   ChatInfo,
@@ -36,7 +38,6 @@ import {
   GroupChatTabInfo,
   UserData
 } from "@/@types/room";
-import TaskManager from "../../../core/task/TaskManager";
 import SimpleTabComponent from "@/app/core/component/SimpleTabComponent.vue";
 import ComponentVue from "@/app/core/window/ComponentVue";
 import { StoreUseData } from "@/@types/store";
@@ -44,6 +45,7 @@ import { ActorStore } from "@/@types/gameObject";
 import { UserType } from "@/@types/socket";
 import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
 import VueEvent from "@/app/core/decorator/VueEvent";
+import App from "@/views/App.vue";
 
 @Component({
   components: {
@@ -80,6 +82,11 @@ export default class ChatLogViewer extends Mixins<ComponentVue>(ComponentVue) {
   private tabList: TabInfo[] = [];
   private currentTabInfo: TabInfo | null = null;
 
+  @Watch("currentTabInfo")
+  private onChangeCurrentTabInfo() {
+    this.$emit("changeTab", this.currentTabInfo!.target);
+  }
+
   @Watch("chatTabList", { immediate: true, deep: true })
   private onChangeChatTabList() {
     this.tabList = this.chatTabList
@@ -98,13 +105,7 @@ export default class ChatLogViewer extends Mixins<ComponentVue>(ComponentVue) {
 
   @VueEvent
   private async onSettingOpen() {
-    await TaskManager.instance.ignition<WindowOpenInfo<void>, never>({
-      type: "window-open",
-      owner: "Quoridorn",
-      value: {
-        type: "chat-tab-list-window"
-      }
-    });
+    await App.openSimpleWindow("chat-setting-window");
   }
 }
 </script>

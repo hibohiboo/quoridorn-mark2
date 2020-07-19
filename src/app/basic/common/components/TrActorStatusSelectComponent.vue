@@ -1,5 +1,5 @@
 <template>
-  <tr class="tr-check-box-component">
+  <tr class="tr-actor-status-select-component">
     <th class="label-input">
       <label v-t="`label.${labelName}`"></label>
     </th>
@@ -51,7 +51,7 @@ export default class TrActorStatusSelectComponent extends Mixins<ComponentVue>(
 </script>
 
 <style scoped lang="scss">
-.tr-check-box-component {
+.tr-actor-status-select-component {
   display: contents;
 }
 th,
