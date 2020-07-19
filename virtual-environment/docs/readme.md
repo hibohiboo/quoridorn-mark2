@@ -85,6 +85,11 @@ https://192.168.74.60/quoridorn2/
 
 - `vagrant ssh`コマンドで仮想環境のサーバ上にログインできる。
 - 仮想環境上では/vagrant ディレクトリが、Vagrantfile の置かれているフォルダとなる。つまり、/vagrant/Vagrantfile のようになっている。
+- docker で nginx が動いている。トラブルがあったときは、ここを確認するとよい。
+  - `cd /vagrant/virtual-environment/provision/docker`で docker のディレクトリに移動
+  - `docker-compose build`で docker コンテナのビルド確認
+  - `docker-compose stop`で現在動いているコンテナの停止
+  - `docker-compose up`で再起動。ログを確認。
 
 ### docker について
 
