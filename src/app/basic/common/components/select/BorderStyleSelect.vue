@@ -10,13 +10,13 @@
 import SelectMixin from "./base/SelectMixin";
 
 import { Component, Mixins } from "vue-mixin-decorator";
-import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
-import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
-import LanguageManager from "@/LanguageManager";
-import ComponentVue from "@/app/core/window/ComponentVue";
-import { HtmlOptionInfo } from "@/@types/window";
-import LifeCycle from "@/app/core/decorator/LifeCycle";
+import ComponentVue from "../../../../core/window/ComponentVue";
+import LifeCycle from "../../../../core/decorator/LifeCycle";
+import TaskProcessor from "../../../../core/task/TaskProcessor";
+import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
+import { HtmlOptionInfo } from "../../../../../@types/window";
+import LanguageManager from "../../../../../LanguageManager";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
@@ -55,7 +55,7 @@ export default class BorderStyleSelect extends Mixins<MultiMixin>(
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
       o.key = o.value;
-      o.text = o.value;
+      o.text = o.value!;
     });
     this.optionInfoList[0].text = LanguageManager.instance.getText(
       "label.border-style"

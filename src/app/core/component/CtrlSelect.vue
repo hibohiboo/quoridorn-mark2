@@ -8,7 +8,8 @@
     <select
       class="input"
       :class="{ pending: isPending }"
-      v-model="localValue"
+      :value="localValue === null ? 'null' : localValue"
+      @input="localValue = $event.target.value"
       :id="id || undefined"
       ref="component"
       :disabled="disabled || readonly"
@@ -43,11 +44,11 @@
 <script lang="ts">
 import { Prop, Watch } from "vue-property-decorator";
 import { Component } from "vue-mixin-decorator";
-import { HtmlOptionInfo } from "@/@types/window";
-import SelectMixin from "@/app/basic/common/components/select/base/SelectMixin";
-import VueEvent from "@/app/core/decorator/VueEvent";
-import { createRectangle } from "@/app/core/utility/CoordinateUtility";
 import { Rectangle } from "address";
+import { createRectangle } from "../utility/CoordinateUtility";
+import { HtmlOptionInfo } from "../../../@types/window";
+import SelectMixin from "../../basic/common/components/select/base/SelectMixin";
+import VueEvent from "../decorator/VueEvent";
 
 @Component
 export default class CtrlSelect extends SelectMixin {
@@ -66,7 +67,7 @@ export default class CtrlSelect extends SelectMixin {
 
   public getRect(): Rectangle {
     const elm: HTMLSelectElement = this.$refs.component as HTMLSelectElement;
-    const r = elm.getBoundingClientRect();
+    const r: any = elm.getBoundingClientRect();
     return createRectangle(r.x, r.y, r.width, r.height);
   }
 
@@ -87,8 +88,9 @@ export default class CtrlSelect extends SelectMixin {
   onChangeValue(value: string | string[]) {
     const optionInfo: HtmlOptionInfo | null =
       this.optionInfoList.find(optionInfo => {
+        if (value === null) return null;
         if (typeof value === "string") return optionInfo.value === value;
-        else return value.findIndex(v => v === optionInfo.value) > -1;
+        else return value.some(v => v === optionInfo.value);
       }) || null;
     this.fontColor = optionInfo && optionInfo.disabled ? "#999999" : "#000000";
   }

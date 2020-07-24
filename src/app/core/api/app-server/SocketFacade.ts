@@ -1,61 +1,58 @@
 import * as Socket from "socket.io-client";
 import SocketDriver from "nekostore/lib/driver/socket";
 import Nekostore from "nekostore/lib/Nekostore";
-import NekostoreCollectionController from "@/app/core/api/app-server/NekostoreCollectionController";
+import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
+import yaml from "js-yaml";
 import {
   PermissionNode,
   PermissionRule,
   StoreObj,
   StoreUseData
-} from "@/@types/store";
-import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
-import TaskManager from "@/app/core/task/TaskManager";
+} from "../../../../@types/store";
+import { compareVersion, getFileRow, TargetVersion } from "../Github";
+import {
+  ActorStatusStore,
+  ActorStore,
+  CardDeckBig,
+  CardDeckSmall,
+  CardMeta,
+  CardObject,
+  ChatPaletteStore,
+  InitiativeColumnStore,
+  PropertyFaceStore,
+  PropertySelectionStore,
+  PropertyStore,
+  ResourceMasterStore,
+  ResourceStore,
+  SceneObject,
+  TagNoteStore
+} from "../../../../@types/gameObject";
+import {
+  ActorGroup,
+  ChatInfo,
+  ChatTabInfo,
+  CutInDeclareInfo,
+  GroupChatTabInfo,
+  MediaInfo,
+  RoomData,
+  Scene,
+  SceneAndLayer,
+  SceneAndObject,
+  SceneLayer,
+  SocketUserData,
+  UserData
+} from "../../../../@types/room";
+import GameObjectManager from "../../../basic/GameObjectManager";
+import { ApplicationError } from "../../error/ApplicationError";
 import {
   DefaultServerInfo,
   GetVersionResponse,
   SendDataRequest,
   ServerTestResult
-} from "@/@types/socket";
-import { loadYaml } from "@/app/core/utility/FileUtility";
-import {
-  SceneAndLayer,
-  SceneLayer,
-  Scene,
-  RoomData,
-  UserData,
-  ActorGroup,
-  CutInDeclareInfo,
-  SceneAndObject,
-  SocketUserData,
-  ChatInfo,
-  ChatTabInfo,
-  GroupChatTabInfo,
-  MediaInfo
-} from "@/@types/room";
-import {
-  ActorStore,
-  SceneObject,
-  PropertyFaceStore,
-  PropertySelectionStore,
-  PropertyStore,
-  TagNoteStore,
-  ActorStatusStore,
-  CardMeta,
-  CardObject,
-  CardDeckBig,
-  CardDeckSmall,
-  ResourceMasterStore,
-  ResourceStore,
-  InitiativeColumnStore
-} from "@/@types/gameObject";
-import { ApplicationError } from "@/app/core/error/ApplicationError";
-import {
-  compareVersion,
-  getFileRow,
-  TargetVersion
-} from "@/app/core/api/Github";
-import yaml from "js-yaml";
-import GameObjectManager from "@/app/basic/GameObjectManager";
+} from "../../../../@types/socket";
+import NekostoreCollectionController from "./NekostoreCollectionController";
+import { loadYaml } from "../../utility/FileUtility";
+import TaskManager from "../../task/TaskManager";
 import { ModeInfo } from "mode";
 
 export type ConnectInfo = {
@@ -590,6 +587,10 @@ export default class SocketFacade {
     return this.roomCollectionController<CardDeckSmall>("card-deck-small-list");
   }
 
+  public chatPaletteListCC(): NekostoreCollectionController<ChatPaletteStore> {
+    return this.roomCollectionController<ChatPaletteStore>("chat-palette-list");
+  }
+
   public getCC(type: string): NekostoreCollectionController<any> {
     switch (type) {
       case "chat":
@@ -646,6 +647,8 @@ export default class SocketFacade {
         return this.cardDeckBigCC();
       case "card-deck-small":
         return this.cardDeckSmallCC();
+      case "chat-palette":
+        return this.chatPaletteListCC();
       default:
         throw new ApplicationError(`Invalid type error. type=${type}`);
     }

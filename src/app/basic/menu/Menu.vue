@@ -216,7 +216,7 @@
       </menu-boolean-item>
       <hr />
       <menu-boolean-item
-        @click="menuClick"
+        @click="openChatPaletteWindow"
         property="private.display.chatPaletteSettingWindow"
       >
         チャットパレット表示
@@ -244,12 +244,14 @@ import MenuBooleanItem from "./MenuBooleanItem.vue";
 
 import { Action } from "vuex-class";
 import { Component, Vue } from "vue-property-decorator";
-import { StoreUseData } from "@/@types/store";
-import { UserData } from "@/@types/room";
-import VueEvent from "@/app/core/decorator/VueEvent";
-import GameObjectManager from "@/app/basic/GameObjectManager";
-import App from "@/views/App.vue";
-import { someByStr } from "@/app/core/utility/Utility";
+import { StoreUseData } from "../../../@types/store";
+import TaskManager from "../../core/task/TaskManager";
+import { UserData } from "../../../@types/room";
+import GameObjectManager from "../GameObjectManager";
+import { WindowOpenInfo } from "../../../@types/window";
+import VueEvent from "../../core/decorator/VueEvent";
+import App from "../../../views/App.vue";
+import { someByStr } from "../../core/utility/Utility";
 
 @Component({
   components: {
@@ -294,6 +296,12 @@ export default class Menu extends Vue {
   private async openInitiativeWindow() {
     this.menuClick();
     await App.openSimpleWindow("initiative-window");
+  }
+
+  @VueEvent
+  private async openChatPaletteWindow() {
+    this.menuClick();
+    await App.openSimpleWindow("chat-palette-window");
   }
 
   isShow(...props: any[]): any {
@@ -473,7 +481,7 @@ export default class Menu extends Vue {
 
   /** オフィシャルサイトへ */
   clickOfficialSite(): void {
-    window.open("http://quoridorn.com/", "_blank");
+    window.open("https://quoridorn.com/", "_blank");
     this.menuClick();
   }
 

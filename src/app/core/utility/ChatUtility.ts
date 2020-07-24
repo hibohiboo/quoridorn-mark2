@@ -1,14 +1,10 @@
 import { all, create } from "mathjs";
-import { ChatInfo, CustomDiceBotInfo } from "@/@types/room";
-import SocketFacade from "@/app/core/api/app-server/SocketFacade";
-import GameObjectManager from "@/app/basic/GameObjectManager";
-import BcdiceManager from "@/app/core/api/bcdice/BcdiceManager";
-import { sum } from "@/app/core/utility/PrimaryDataUtility";
-import {
-  findById,
-  findRequireById,
-  someByStr
-} from "@/app/core/utility/Utility";
+import { ChatInfo, CustomDiceBotInfo } from "../../../@types/room";
+import GameObjectManager from "../../basic/GameObjectManager";
+import BcdiceManager from "../api/bcdice/BcdiceManager";
+import { sum } from "./PrimaryDataUtility";
+import SocketFacade from "../api/app-server/SocketFacade";
+import { findById, findRequireById, someByStr } from "./Utility";
 
 const config = {};
 const math = create(all, config);
@@ -41,14 +37,18 @@ const { borderStyleRegExp, styleRegExp, lineRegExp } = (() => {
   };
 })();
 
-export function transText(text: string): string {
-  text = text
+export function escapeHtml(text: string): string {
+  return text
     .replace(/\[\[quot]]/g, "&quot;")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/'/g, "&#39;")
     .replace(/\n/g, "<br />");
+}
+
+export function transText(text: string): string {
+  text = escapeHtml(text);
 
   const matchInfoList: any[] = [];
   let matchResult: RegExpExecArray | null;
@@ -125,7 +125,7 @@ export function transText(text: string): string {
 }
 
 type SendChatInfo = {
-  actorId: string;
+  actorId: string | null;
   text: string;
   tabId: string | null;
   statusId: string | null;
@@ -180,16 +180,16 @@ export async function sendChatLog(
     targetId,
     targetType: groupChatTabInfo ? "group" : "actor",
     tabId:
-      groupChatTabInfo && groupChatTabInfo.data!.outputChatTabId
+      payload.tabId ||
+      (groupChatTabInfo && groupChatTabInfo.data!.outputChatTabId
         ? groupChatTabInfo.data!.outputChatTabId
-        : payload.tabId || GameObjectManager.instance.chatPublicInfo.tabId,
+        : GameObjectManager.instance.chatPublicInfo.tabId),
     statusId: payload.statusId || actorStatus.id!,
     system: payload.system || GameObjectManager.instance.chatPublicInfo.system
   };
 
   const outputNormalChat = async (command: string) => {
     if (!/[@><+-/*=0-9a-zA-Z()"?^$]+/.test(command)) {
-      // とりあえずコマンドじゃなさそう
       await addChatLog(chatInfo);
       return;
     }

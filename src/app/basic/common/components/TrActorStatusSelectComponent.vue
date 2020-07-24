@@ -7,6 +7,7 @@
       <actor-status-select
         :actorId="actorId"
         v-model="localValue"
+        :nullable="nullable"
         :readonly="readonly"
       />
     </td>
@@ -15,36 +16,37 @@
 
 <script lang="ts">
 import { Prop } from "vue-property-decorator";
-import ComponentVue from "@/app/core/window/ComponentVue";
 import { Component, Mixins } from "vue-mixin-decorator";
-import ChatColorTypeSelect from "@/app/basic/common/components/select/ChatColorTypeSelect.vue";
-import SCheck from "@/app/basic/common/components/SCheck.vue";
-import ActorStatusSelect from "@/app/basic/common/components/select/ActorStatusSelect.vue";
+import ActorStatusSelect from "./select/ActorStatusSelect.vue";
+import ComponentVue from "../../../core/window/ComponentVue";
 
-@Component({ components: { ActorStatusSelect, SCheck, ChatColorTypeSelect } })
+@Component({ components: { ActorStatusSelect } })
 export default class TrActorStatusSelectComponent extends Mixins<ComponentVue>(
   ComponentVue
 ) {
   @Prop({ type: String, required: true })
   private labelName!: string;
 
-  @Prop({ type: String, required: true })
-  private actorId!: string;
+  @Prop({ type: String, default: null })
+  private actorId!: string | null;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, default: null })
   private value!: string;
 
   @Prop({ type: Boolean, default: false })
   private readonly!: boolean;
 
-  private input(value: string) {
+  @Prop({ type: Boolean, default: false })
+  private nullable!: boolean;
+
+  private input(value: string | null) {
     this.$emit("input", value);
   }
 
-  public get localValue(): string {
+  public get localValue(): string | null {
     return this.value;
   }
-  public set localValue(value: string) {
+  public set localValue(value: string | null) {
     this.input(value);
   }
 }

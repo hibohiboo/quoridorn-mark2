@@ -11,16 +11,15 @@
 <script lang="ts">
 import SelectMixin from "./base/SelectMixin";
 import { Component, Mixins } from "vue-mixin-decorator";
-import { HtmlOptionInfo } from "@/@types/window";
-import LifeCycle from "@/app/core/decorator/LifeCycle";
-import TaskProcessor from "@/app/core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
-import GameObjectManager from "@/app/basic/GameObjectManager";
-import LanguageManager from "@/LanguageManager";
-import CtrlSelect from "@/app/core/component/CtrlSelect.vue";
-import ComponentVue from "@/app/core/window/ComponentVue";
-import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
 import { Prop } from "vue-property-decorator";
+import ComponentVue from "../../../../core/window/ComponentVue";
+import LifeCycle from "../../../../core/decorator/LifeCycle";
+import TaskProcessor from "../../../../core/task/TaskProcessor";
+import { permissionCheck } from "../../../../core/api/app-server/SocketFacade";
+import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
+import { HtmlOptionInfo } from "../../../../../@types/window";
+import GameObjectManager from "../../../GameObjectManager";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
@@ -33,6 +32,9 @@ export default class ActorSelect extends Mixins<MultiMixin>(
 ) {
   @Prop({ type: String, default: "" })
   private userId!: string;
+
+  @Prop({ type: Boolean, default: false })
+  private nullable!: boolean;
 
   private optionInfoList: HtmlOptionInfo[] = [];
 
@@ -61,6 +63,14 @@ export default class ActorSelect extends Mixins<MultiMixin>(
         text: c.data!.name,
         disabled: false
       }));
+    if (this.nullable) {
+      this.optionInfoList.unshift({
+        key: null,
+        value: "null",
+        text: this.$t("label.non-select")!.toString(),
+        disabled: false
+      });
+    }
     this.optionInfoList.unshift({
       key: "",
       value: "",

@@ -1,48 +1,49 @@
 import SocketFacade from "../core/api/app-server/SocketFacade";
-import { Permission, StoreObj, StoreUseData } from "@/@types/store";
-import {
-  SceneAndLayer,
-  SceneLayer,
-  Scene,
-  UserData,
-  ActorGroup,
-  SceneAndObject,
-  RoomData,
-  SocketUserData,
-  CutInDeclareInfo,
-  PartialRoomData,
-  ChatInfo,
-  ChatTabInfo,
-  GroupChatTabInfo,
-  MediaInfo
-} from "@/@types/room";
-import { ApplicationError } from "@/app/core/error/ApplicationError";
-import {
-  ActorStore,
-  SceneObject,
-  PropertyFaceStore,
-  PropertySelectionStore,
-  PropertyStore,
-  TagNoteStore,
-  ActorStatusStore,
-  CardMeta,
-  CardObject,
-  CardDeckBig,
-  CardDeckSmall,
-  ResourceMasterStore,
-  ResourceStore,
-  InitiativeColumnStore
-} from "@/@types/gameObject";
+import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
+import { BgmStandByInfo } from "task-info";
+import { Permission, StoreObj, StoreUseData } from "../../@types/store";
 import {
   ClientRoomInfo,
   RoomInfoExtend,
   WindowSettings
-} from "@/@types/socket";
-import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
-import { BgmStandByInfo } from "task-info";
-import LanguageManager from "@/LanguageManager";
-import { findById, getSrc } from "@/app/core/utility/Utility";
-import { loadYaml } from "@/app/core/utility/FileUtility";
+} from "../../@types/socket";
+import {
+  ActorGroup,
+  ChatInfo,
+  ChatTabInfo,
+  CutInDeclareInfo,
+  GroupChatTabInfo,
+  MediaInfo,
+  PartialRoomData,
+  RoomData,
+  Scene,
+  SceneAndLayer,
+  SceneAndObject,
+  SceneLayer,
+  SocketUserData,
+  UserData
+} from "../../@types/room";
+import {
+  ActorStatusStore,
+  ActorStore,
+  CardDeckBig,
+  CardDeckSmall,
+  CardMeta,
+  CardObject,
+  ChatPaletteStore,
+  InitiativeColumnStore,
+  PropertyFaceStore,
+  PropertySelectionStore,
+  PropertyStore,
+  ResourceMasterStore,
+  ResourceStore,
+  SceneObject,
+  TagNoteStore
+} from "../../@types/gameObject";
+import { ApplicationError } from "../core/error/ApplicationError";
+import { findById, getSrc } from "../core/utility/Utility";
+import { loadYaml } from "../core/utility/FileUtility";
+import LanguageManager from "../../LanguageManager";
 
 export type ChatPublicInfo = {
   isUseAllTab: boolean;
@@ -119,7 +120,8 @@ export default class GameObjectManager {
       sf.groupChatTabListCC().getList(true, this.groupChatTabList),
       sf.sceneListCC().getList(true, this.sceneList),
       sf.userCC().getList(true, this.userList),
-      sf.cutInDataCC().getList(true, this.cutInList)
+      sf.cutInDataCC().getList(true, this.cutInList),
+      sf.chatPaletteListCC().getList(true, this.chatPaletteList)
     ]);
     // 個数の量が中規模のもの
     await Promise.all([
@@ -168,7 +170,7 @@ export default class GameObjectManager {
 
     await roomDataCC.setSnapshot(
       "GameObjectManager",
-      this.roomDataId,
+      this.roomDataId!,
       (snapshot: DocumentSnapshot<StoreObj<RoomData>>) => {
         if (snapshot.exists() && snapshot.data.status === "modified") {
           const d = snapshot.data.data!;
@@ -359,6 +361,7 @@ export default class GameObjectManager {
   public readonly cardObjectList: StoreUseData<CardObject>[] = [];
   public readonly cardDeckBigList: StoreUseData<CardDeckBig>[] = [];
   public readonly cardDeckSmallList: StoreUseData<CardDeckSmall>[] = [];
+  public readonly chatPaletteList: StoreUseData<ChatPaletteStore>[] = [];
 
   public get clientRoomInfo(): ClientRoomInfo {
     if (!this.__clientRoomInfo) {
@@ -503,6 +506,10 @@ export default class GameObjectManager {
         return this.cardDeckBigList;
       case "card-deck-small":
         return this.cardDeckSmallList;
+      case "cut-in":
+        return this.cutInList;
+      case "chat-palette":
+        return this.chatPaletteList;
     }
     return null;
   }
