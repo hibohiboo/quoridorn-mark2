@@ -1,19 +1,23 @@
 import urljoin from "url-join";
-import { Texture } from "../../../@types/room";
-import { StoreMetaData, StoreUseData } from "../../../@types/store";
+import { Texture } from "@/@types/room";
+import { StoreMetaData, StoreUseData } from "@/@types/store";
 import GameObjectManager from "../../basic/GameObjectManager";
 import LanguageManager from "../../../LanguageManager";
 import { ApplicationError } from "../error/ApplicationError";
+import * as jsonp from "jsonp";
 
-export function getSrc(path: string): string {
-  if (!path) return "";
-  if (path.startsWith("http")) return path;
-  if (path.startsWith("data:")) return path;
+export function getSrc(
+  path: string
+): { url: string; dataLocation: "server" | "direct" } {
+  if (!path) return { url: path, dataLocation: "direct" };
+  if (path.startsWith("http")) return { url: path, dataLocation: "direct" };
+  if (path.startsWith("data:")) return { url: path, dataLocation: "direct" };
   if (path.startsWith(".")) path = path.replace(/^\./, "");
   const protocol = window.location.protocol;
   const host = window.location.host;
   const baseUrl = process.env.BASE_URL;
-  return urljoin(protocol, host, baseUrl, path);
+  const url = urljoin(protocol, host, baseUrl, path);
+  return { url, dataLocation: "server" };
 }
 
 export function shuffleOrder(list: StoreUseData<any>[]): void {
@@ -31,7 +35,7 @@ export function shuffleOrder(list: StoreUseData<any>[]): void {
  * @param a
  */
 export function qLog(...a: any): void {
-  // window.console.log(...arguments)
+  // console.log(...arguments)
 
   let format = "";
   const logs = [];
@@ -83,8 +87,8 @@ export function qLog(...a: any): void {
         ))
       ) {
         // (\([^)]+\))|
-        // window.console.log(arg)
-        // window.console.log(m3)
+        // console.log(arg)
+        // console.log(m3)
         if (m3[1]) {
           format += `%c${format.endsWith("\n") ? indent : ""}${m3[1]}`;
           logs.push("");
@@ -127,7 +131,7 @@ export function qLog(...a: any): void {
       }
     }
   });
-  window.console.log(format, ...logs);
+  console.log(format, ...logs);
 }
 
 /**
@@ -174,7 +178,7 @@ export function getTextureStyle(texture: Texture) {
     const mediaList = GameObjectManager.instance.mediaList;
     const imageData = findById(mediaList, texture.imageId);
     if (imageData && imageData.data) {
-      style.backgroundImage = `url("${getSrc(imageData.data.url)}")`;
+      style.backgroundImage = `url('${imageData.data.url}')`;
     }
     if (texture.direction === "horizontal") style.transform = "scale(-1, 1)";
     if (texture.direction === "vertical") style.transform = "scale(1, -1)";
@@ -207,9 +211,10 @@ export function someByStr(list: string[], str: string | null): boolean {
 }
 
 export function findById<T extends StoreMetaData>(
-  list: T[],
+  list: T[] | null,
   id: string | null
 ): T | null {
+  if (!list) return null;
   return list.find(obj => obj.id === id) || null;
 }
 
@@ -219,7 +224,9 @@ export function findRequireById<T extends StoreMetaData>(
 ): T {
   const result = list.find(obj => obj.id === id);
   if (!result) {
-    throw new ApplicationError(``);
+    throw new ApplicationError(
+      `findRequireById ${JSON.stringify({ id }, null, "  ")}`
+    );
   }
   return result;
 }
@@ -251,4 +258,26 @@ export function findRequireByOwner<T extends { owner: string | null }>(
     throw new ApplicationError(``);
   }
   return result;
+}
+
+export async function getJson(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    jsonp(url, { name: "getJson" }, (err: any, result: any) => {
+      if (err) reject(err);
+      resolve(result);
+    });
+  });
+}
+
+export async function getJsonForTrpgSystemData<T>(
+  url: string,
+  regexpFrom: RegExp,
+  jsonUrlFormat: string
+): Promise<T | null> {
+  const matchResult = url.match(regexpFrom);
+  if (!matchResult) return null;
+  const key = matchResult[1];
+  // const editUrl = 'https://character-sheets.appspot.com/shinobigami/edit.html?key=' + key;
+  const jsonUrl = jsonUrlFormat.replace("{key}", key);
+  return (await getJson(jsonUrl)) as T;
 }

@@ -39,7 +39,7 @@ export default class LanguageManager {
     try {
       this.messages[langInfo.lang] = await loadYaml<any>(langInfo.path);
     } catch (err) {
-      window.console.error(err.toString());
+      console.error(err.toString());
     }
   }
 
@@ -67,7 +67,7 @@ export default class LanguageManager {
     const loadLanguages = async () => {
       // 読み込み必須のためthrowは伝搬させる
       const supportLangInfo = await loadYaml<SupportLangInfo[]>(
-        "/static/lang/support-lang-list.yaml"
+        "static/lang/support-lang-list.yaml"
       );
       listToEmpty(supportLangList);
       supportLangList.push(...supportLangInfo);
@@ -77,7 +77,7 @@ export default class LanguageManager {
         .map((langInfo: SupportLangInfo) => () =>
           this.loadLanguage({
             lang: langInfo.lang,
-            path: `/static/lang/${langInfo.lang}.yaml`
+            path: `static/lang/${langInfo.lang}.yaml`
           })
         )
         .reduce((prev, curr) => prev.then(curr), Promise.resolve());

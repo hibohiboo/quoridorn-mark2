@@ -1,12 +1,12 @@
 import { listToEmpty } from "../../utility/PrimaryDataUtility";
 import TaskManager from "../../task/TaskManager";
 import {
-  BcdiceDiceRollInfo,
+  BcdiceDiceRollResult,
   BcdiceSystemInfo,
   BcdiceVersionInfo,
   DiceSystem
-} from "../../../../@types/bcdice";
-import { CustomDiceBotInfo } from "../../../../@types/room";
+} from "@/@types/bcdice";
+import { CustomDiceBotInfo } from "@/@types/room";
 import SocketFacade from "../app-server/SocketFacade";
 import LanguageManager from "../../../../LanguageManager";
 import { loadYaml } from "../../utility/FileUtility";
@@ -87,8 +87,8 @@ export default class BcdiceManager {
       json = await jsonStr.json();
     } catch (err) {
       alert("BCDice-APIとの通信に失敗しました。");
-      window.console.error("[!!CAUTION!!] これは問題ですっ！🐧💦");
-      window.console.error(err);
+      console.error("[!!CAUTION!!] これは問題ですっ！🐧💦");
+      console.error(err);
       // TODO 対症療法
       return { diceSystemList: [], customDiceBotList: [] };
       // throw err;
@@ -110,7 +110,7 @@ export default class BcdiceManager {
 
     const customDiceBotList: CustomDiceBotInfo[] = [];
     const loadCustomDiceBotYaml = async (ds: DiceSystem): Promise<void> => {
-      const path = `/static/conf/system/${ds.system}/customDiceBot.yaml`;
+      const path = `static/conf/system/${ds.system}/customDiceBot.yaml`;
       try {
         // トライアンドエラー方式読み込みのため、throwは握りつぶす
         const list = await loadYaml<CustomDiceBotInfo[]>(path, true);
@@ -122,8 +122,14 @@ export default class BcdiceManager {
         // Nothing.
       }
     };
+    const modInfoList = await loadYaml<
+      { system: string; customDiceBot: boolean }[]
+    >("static/conf/system/mod-list.yaml");
     await diceSystemList
-      .map((ds: DiceSystem) => () => loadCustomDiceBotYaml(ds))
+      .filter(ds =>
+        modInfoList.some(mi => mi.system === ds.system && mi.customDiceBot)
+      )
+      .map(ds => () => loadCustomDiceBotYaml(ds))
       .reduce((prev, curr) => prev.then(curr), Promise.resolve());
 
     return { diceSystemList, customDiceBotList };
@@ -172,7 +178,7 @@ export default class BcdiceManager {
   }: {
     system: string;
     command: string;
-  }): Promise<BcdiceDiceRollInfo> {
+  }): Promise<BcdiceDiceRollResult> {
     const params: string = [
       `system=${system}`,
       `command=${encodeURIComponent(command)}`
@@ -183,6 +189,6 @@ export default class BcdiceManager {
     if (json.ok) {
       json.result = json.result.replace(/(^: )/g, "").replace(/＞/g, "→");
     }
-    return json as BcdiceDiceRollInfo;
+    return json as BcdiceDiceRollResult;
   }
 }

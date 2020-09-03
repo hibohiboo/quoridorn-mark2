@@ -12,6 +12,7 @@ declare module "socket.io";
 declare module "create-keyframe-animation";
 declare module "url-join";
 declare module "body-scroll-lock";
+declare module "jsonp";
 declare var swal: (
   ...pref: (
     | string
@@ -20,10 +21,11 @@ declare var swal: (
         text?: string;
         icon?: "warning" | "error" | "success" | "info";
         button?: string;
+        buttons?: string[];
         dangerMode?: boolean;
       }
   )[]
-) => void;
+) => Promise<boolean>;
 declare var YT: any;
 
 declare module "address" {
@@ -246,15 +248,18 @@ declare module "context" {
   interface ContextTaskInfo extends Point {
     type: string;
     target: string | null;
+    pieceId?: string;
   }
 
   // 項目(表示条件ありなし)
   type ContextTextItem<T> = {
-    taskName?: string;
     text: string;
-    taskArg: T;
+    isRawText?: boolean;
+    taskName?: string;
     isViewCompare?: CompareInfo;
     isDisabledCompare?: CompareInfo;
+    taskArg: T;
+    argRef?: string;
     children?: ContextItemDeclare[];
   };
 

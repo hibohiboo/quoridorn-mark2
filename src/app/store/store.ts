@@ -6,13 +6,14 @@ Vue.use(Vuex);
 const store = new Vuex.Store({
   state: {
     setting: {
+      // テキスト読み上げ機能を使うかどうか
       useReadAloud: false
     }
   },
   actions: {},
   mutations: {
     setUseReadAloud: (state, useReadAloud) => {
-      window.console.log(`store#setUseReadAloud: ${useReadAloud}`);
+      console.log(`store#setUseReadAloud: ${useReadAloud}`);
       state.setting.useReadAloud = useReadAloud;
     }
   },

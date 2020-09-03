@@ -2,37 +2,34 @@
   <ctrl-select
     v-model="localValue"
     :optionInfoList="optionInfoList"
+    :multiple="multiple"
+    :disabled="disabled"
     ref="component"
   />
 </template>
 
 <script lang="ts">
 import SelectMixin from "./base/SelectMixin";
-
 import { Component, Mixins } from "vue-mixin-decorator";
 import { Task, TaskResult } from "task";
+import ComponentVue from "../../../../core/window/ComponentVue";
 import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
-import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
+import GameObjectManager from "@/app/basic/GameObjectManager";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
 @Component({
   components: { CtrlSelect }
 })
-export default class PermissionNodeTypeSelect extends Mixins<MultiMixin>(
+export default class PipsSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
 ) {
-  private optionInfoList: HtmlOptionInfo[] = [
-    { value: "", key: "", text: "", disabled: true },
-    { value: "group", key: "", text: "", disabled: false },
-    { value: "user", key: "", text: "", disabled: false },
-    { value: "character", key: "", text: "", disabled: false },
-    { value: "owner", key: "", text: "", disabled: false }
-  ];
+  private diceTypeList = GameObjectManager.instance.diceTypeList;
+  private optionInfoList: HtmlOptionInfo[] = [];
 
   @LifeCycle
   private created() {
@@ -48,13 +45,25 @@ export default class PermissionNodeTypeSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    this.optionInfoList.forEach(o => {
-      if (o.value) o.text = this.$t(`label.${o.value}`)!.toString();
-      o.key = o.value;
+    const optionInfoList: HtmlOptionInfo[] = this.diceTypeList.map(dt => ({
+      key: dt.id!,
+      value: dt.id!,
+      text: `D${dt.data!.faceNum}-${dt.data!.label}`,
+      disabled: false
+    }));
+
+    if (!optionInfoList.some(o => o.value === this.localValue)) {
+      this.localValue = optionInfoList[0].value;
+    }
+
+    optionInfoList.unshift({
+      key: "",
+      value: "",
+      text: this.$t("label.dice-type")!.toString(),
+      disabled: true
     });
-    this.optionInfoList[0].text = this.$t(
-      "label.permission-node-type"
-    )!.toString();
+
+    this.optionInfoList = optionInfoList;
   }
 }
 </script>

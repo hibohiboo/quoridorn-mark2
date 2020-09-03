@@ -43,23 +43,24 @@
 <script lang="ts">
 import { Component, Watch } from "vue-property-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
-import { ChatPaletteStore } from "../../../@types/gameObject";
-import { CustomDiceBotInfo } from "../../../@types/room";
+import { ChatPaletteStore } from "@/@types/gameObject";
+import { CustomDiceBotInfo } from "@/@types/room";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
 import BaseInput from "../../core/component/BaseInput.vue";
 import TableComponent from "../../core/component/table/TableComponent.vue";
 import VueEvent from "../../core/decorator/VueEvent";
-import { StoreUseData } from "../../../@types/store";
+import { StoreUseData } from "@/@types/store";
 import TaskManager from "../../core/task/TaskManager";
 import ChatPaletteListComponent from "./ChatPaletteListComponent.vue";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import GameObjectManager from "../GameObjectManager";
-import { TabInfo, WindowOpenInfo } from "../../../@types/window";
+import { TabInfo, WindowOpenInfo } from "@/@types/window";
 import { sendChatLog } from "../../core/utility/ChatUtility";
-import { DataReference } from "../../../@types/data";
+import { DataReference } from "@/@types/data";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
 import { Mixins } from "vue-mixin-decorator";
+const uuid = require("uuid");
 
 @Component({
   components: {
@@ -121,6 +122,7 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
   @Watch("chatPaletteList", { immediate: true })
   private onChangeChatPaletteList() {
     this.targetTabList = this.chatPaletteList.map(cp => ({
+      key: uuid.v4(),
       target: cp.id!,
       text: cp.data!.name
     }));
@@ -132,7 +134,7 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
     if (!this.currentTargetTabInfo || !matchCurrent) {
       this.currentTargetTabInfo = this.targetTabList[0];
     }
-    window.console.log(JSON.stringify(this.currentTargetTabInfo, null, "  "));
+    console.log(JSON.stringify(this.currentTargetTabInfo, null, "  "));
   }
 
   @VueEvent
@@ -179,7 +181,7 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
     await sendChatLog(
       {
         actorId: this.actorId,
-        text: this.sendText.replace(/<[bB][rR] *\/?>/g, "\n"),
+        text: this.sendText.replace(/\\n/g, "\n"),
         tabId: this.outputTabId,
         statusId: this.statusId, // Actorに設定されているものを使う
         targetId: this.targetId,

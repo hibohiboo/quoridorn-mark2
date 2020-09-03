@@ -43,16 +43,16 @@
 <script lang="ts">
 import { Component, Prop, Vue } from "vue-property-decorator";
 import SButton from "@/app/basic/common/components/SButton.vue";
-import { StoreUseData } from "../../../../@types/store";
+import { StoreUseData } from "@/@types/store";
 import SocketFacade, {
   permissionCheck
 } from "../../../core/api/app-server/SocketFacade";
 import TaskManager from "../../../core/task/TaskManager";
 import GameObjectManager from "../../GameObjectManager";
-import { WindowOpenInfo } from "../../../../@types/window";
+import { WindowOpenInfo } from "@/@types/window";
 import LanguageManager from "../../../../LanguageManager";
-import { ChatTabInfo } from "../../../../@types/room";
-import { DataReference } from "../../../../@types/data";
+import { ChatTabInfo } from "@/@types/room";
+import { DataReference } from "@/@types/data";
 import VueEvent from "../../../core/decorator/VueEvent";
 
 @Component({
@@ -127,12 +127,11 @@ export default class ChatTabComponent extends Vue {
     if (!result) return;
 
     try {
-      await this.chatTabListCC.touchModify([tabInfo.id!]);
+      await this.chatTabListCC.deletePackage([tabInfo.id!]);
     } catch (err) {
       // TODO error message.
       return;
     }
-    await this.chatTabListCC.delete([tabInfo.id!]);
   }
 
   @VueEvent

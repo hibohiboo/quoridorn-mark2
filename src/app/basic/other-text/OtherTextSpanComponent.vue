@@ -1,7 +1,11 @@
 <template>
   <component v-bind:is="tag" v-bind="$attrs" v-on="listeners" class="line">
     <template v-for="(span, idx) in spans">
-      <span :key="idx" v-if="span.type === '.'">{{ span.value }}</span>
+      <span
+        :key="idx"
+        v-if="span.type === '.'"
+        v-html="span.value.replace(/\\n/g, '<br />')"
+      ></span>
       <i :key="idx" v-if="span.type === 'i'">{{ span.value }}</i>
       <b :key="idx" v-if="span.type === 'b'">{{ span.value }}</b>
       <b :key="idx" v-if="span.type === 'bi'">
@@ -14,12 +18,16 @@
         <input
           type="checkbox"
           class="input"
+          :disabled="disabled"
           :checked="span.value"
           @change="onChangeChecked(span.index, $event.target.checked)"
         />
       </label>
       <label :key="idx" v-if="span.type === 'select'">
-        <select @change="onChangeSelect(span.index, $event.target.value)">
+        <select
+          @change="onChangeSelect(span.index, $event.target.value)"
+          :disabled="disabled"
+        >
           <option value="" disabled v-if="span.title">{{ span.title }}</option>
           <option
             v-for="(optionValue, idx) in span.list"
@@ -46,6 +54,9 @@ export default class OtherTextSpanComponent extends Vue {
   @Prop({ type: String, required: true })
   private tag!: string;
 
+  @Prop({ type: Boolean, required: true })
+  private disabled!: boolean;
+
   @Prop({ type: Array, required: true })
   private spans!: any[];
 
@@ -67,14 +78,19 @@ export default class OtherTextSpanComponent extends Vue {
 }
 </script>
 
-<style lang="scss">
+<style scoped lang="scss">
 @import "../../../assets/common";
+
 .line {
   line-height: 1.5em;
+  vertical-align: middle;
 }
 pre {
   &.inline {
     display: inline;
   }
+}
+label {
+  @include inline-flex-box(row, flex-start, center);
 }
 </style>

@@ -48,19 +48,17 @@ import SocketFacade, {
 } from "../../core/api/app-server/SocketFacade";
 import NekostoreCollectionController from "../../core/api/app-server/NekostoreCollectionController";
 import VueEvent from "../../core/decorator/VueEvent";
-import PermissionNodeTypeSelect from "../common/components/select/PermissionNodeTypeSelect.vue";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import PermissionTypeSelect from "../common/components/select/PermissionTypeSelect.vue";
-import { Permission } from "../../../@types/store";
-import { TabInfo } from "../../../@types/window";
-import { DataReference } from "../../../@types/data";
+import { Permission } from "@/@types/store";
+import { TabInfo } from "@/@types/window";
+import { DataReference } from "@/@types/data";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
 
 @Component({
   components: {
     ChmodRuleEditComponent,
-    PermissionNodeTypeSelect,
     PermissionTypeSelect,
     SimpleTabComponent,
     CtrlButton
@@ -76,9 +74,9 @@ export default class ChmodWindow extends Mixins<
   private cc: NekostoreCollectionController<unknown> | null = null;
 
   private tabList: TabInfo[] = [
-    { target: "view", text: "" },
-    { target: "edit", text: "" },
-    { target: "chmod", text: "" }
+    { key: "1", target: "view", text: "" },
+    { key: "2", target: "edit", text: "" },
+    { key: "3", target: "chmod", text: "" }
   ];
   private currentTabInfo: TabInfo | null = this.tabList[0];
 
@@ -131,7 +129,7 @@ export default class ChmodWindow extends Mixins<
     try {
       await this.cc.touchModify([this.docId]);
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       this.isProcessed = true;
       await this.close();
     }
@@ -179,7 +177,7 @@ export default class ChmodWindow extends Mixins<
 
   @VueEvent
   private async updatePermission() {
-    window.console.log(this.permission);
+    console.log(this.permission);
   }
 }
 </script>

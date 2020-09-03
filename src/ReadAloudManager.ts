@@ -76,13 +76,13 @@ export default class ReadAloudManager {
 
     utterThis.onerror = function(event) {
       // エラーメッセージの出力
-      window.console.log(event.error);
+      console.log(event.error);
       swal({
         title: "自動音声に問題あり",
         text:
           "自動音声を許可するには\nchrome://settings/content/sound\nでこのページのURLを許可設定してください。",
         icon: "warning"
-      });
+      }).then();
     };
 
     // 発言を再生 (発言キューに発言を追加)

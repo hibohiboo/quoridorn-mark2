@@ -450,16 +450,16 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
         [{ continuous: true }]
       );
     } catch (err) {
-      window.console.log("==========");
-      window.console.log(err);
+      console.log("==========");
+      console.log(err);
     }
   }
 
   private tabList: TabInfo[] = [
-    { target: "map", text: "" },
-    { target: "margin", text: "" },
-    { target: "background", text: "" },
-    { target: "layer", text: "" }
+    { key: "1", target: "map", text: "" },
+    { key: "2", target: "margin", text: "" },
+    { key: "3", target: "background", text: "" },
+    { key: "4", target: "layer", text: "" }
   ];
   private currentTabInfo: TabInfo | null = this.tabList[0];
 
@@ -531,7 +531,7 @@ export default class EditSceneWindow extends Mixins<WindowVue<string, never>>(
         await this.cc.touchModify([this.sceneId]);
       } catch (err) {
         this.isProcessed = true;
-        window.console.warn(err);
+        console.warn(err);
         await this.close();
       }
     }

@@ -25,6 +25,8 @@ button:
   setting: 設定
   open-resource-master-list-window: リソース一覧
   clear: クリア
+  open-dice-roll-result: 結果公開
+  read-character-sheet: その他欄を参照先から生成
 
 type:
   map-mask: マップマスク
@@ -84,6 +86,11 @@ context:
   placement-reset: 配置リセット
   ref-url: データ参照先URLを開く
   edit-actor: コマのアクターを編集
+  add-dice-symbol: ダイスシンボル追加
+  dice-pips-change: 出目変更
+  dice-hide: 出目を隠す
+  dice-view: 出目を表示
+  dice-roll: ダイスロール
 
 label:
   terms-of-use: 利用規約
@@ -281,7 +288,7 @@ label:
   resource-type-text: 固定テキスト
   resource-type-input-text: 入力テキスト
   resource-type-number: 数値
-  resource-type-check: チェック
+  resource-type-check: チェックボックス
   resource-type-select: 選択肢
   resource-type-combo: コンボボックス
   resource-type-color: 色
@@ -317,6 +324,12 @@ label:
   non-secret: 公開
   scene-object: コマ
   non-select: 選択なし
+  dice-type: ダイス
+  pips: 出目
+  dice-roll: ダイスロール
+  tab: タブ
+  non-tab: タブ無し
+  input-tab: タブの文字を入力
 
 message:
   copy-to-clipboard: クリップボードにコピーしました。
@@ -327,12 +340,15 @@ message:
   add-preset-room: プリセットデータを登録しています！
   last-process-room: お部屋を表示するために頑張ってます！
   delete-deck: 山札を削除しますか？
-
-test-window:
-  window-title: テスト画面
-
-sample-window:
-  window-title: サンプル画面
+  change-pips-dice-symbol: ダイスシンボルの目を変更（{0}：{1} -> {2}）
+  change-pips-dice-symbol-hide: ダイスシンボル（秘匿）の目を変更
+  dice-roll-dice-symbol: ダイスシンボル（秘匿）の目を変更（ダイスロール）
+  dice-roll-dice-symbol-hide: ダイスシンボルの目を変更（ダイスロール）
+  hide-dice-symbol: ダイスシンボルを秘匿
+  view-dice-symbol: ダイスシンボルを公開（{0}：{1}）
+  view-dice-symbol-dice-roll: ダイスシンボルを公開（{0}：{1}）ダイスロール結果：{2}
+  dice-roll-secret-dice: シークレットダイスをロール
+  open-secret-dice: シークレットダイスを公開
 
 play-youtube-window:
   window-title: Youtube再生画面
@@ -448,6 +464,9 @@ edit-scene-window:
 chmod-window:
   window-title: 権限変更
 
+chmod-input-window:
+  window-title: 権限変更
+
 bgm-add-window:
   window-title: BGM追加
 
@@ -469,7 +488,7 @@ chat-window:
     select-output-tab: 送信先タブの選択
     select-target: 送信相手の選択
     select-chat-format: 部分フォーマット選択
-    select-is-secret: 秘匿チャットかどうかの選択
+    select-is-secret: 秘匿チャットかどうか
     selected-item: "[選択中]"
     goto-head: "[先頭へ]"
     goto-next: "[次へ]"
@@ -618,3 +637,20 @@ chat-palette-add-window:
 
 chat-palette-edit-window:
   window-title: チャットパレット編集
+
+dice-symbol-add-window:
+  window-title: ダイスシンボル追加
+  message-list:
+    drag-piece: マップにドラッグすると追加できます。
+
+dice-symbol-edit-window:
+  window-title: ダイスシンボル編集
+
+secret-dice-roll-window:
+  window-title: 隠しダイスロール結果
+
+simple-text-input-window:
+  window-title: テキスト入力（この文言は実際には表示されない）
+
+memo-tab-setting-window:
+  window-title: メモタブ設定

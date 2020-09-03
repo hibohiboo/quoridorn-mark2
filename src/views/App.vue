@@ -12,7 +12,7 @@
     <div id="back-scene"></div>
 
     <!-- 最も手前でドロップを受ける領域 (z-index: 100) -->
-    <drop-area :isDropping="isDropping" />
+    <drop-area @drop.prevent.stop="dropFile" :isDropping="isDropping" />
 
     <template v-if="roomInitialized">
       <!-- プレイマット (z-index: 1) -->
@@ -20,7 +20,9 @@
       <!-- メニュー (z-index: 5) -->
       <Menu />
       <!-- 右ペイン (z-index: 2) -->
+      <!-- 著しいレイアウト崩れが発生する環境があるようなので、一旦OFF
       <right-pane />
+      -->
       <!-- 右クリックメニュー (z-index: 4) -->
       <Context />
     </template>
@@ -28,6 +30,7 @@
     <window-area />
     <!-- その他欄 (z-index: 6) -->
     <other-text-frame
+      :windowKey="key"
       :otherTextViewInfo="otherTextViewInfo"
       @hide="otherTextHide"
       v-if="otherTextViewInfo"
@@ -63,12 +66,12 @@ import { ModeInfo } from "mode";
 import { disableBodyScroll } from "body-scroll-lock";
 import LifeCycle from "../app/core/decorator/LifeCycle";
 import TaskProcessor from "../app/core/task/TaskProcessor";
-import { OtherTextViewInfo } from "../@types/gameObject";
+import { OtherTextViewInfo } from "@/@types/gameObject";
 import {
   createPoint,
   createSize,
   getEventPoint
-} from "../app/core/utility/CoordinateUtility";
+} from "@/app/core/utility/CoordinateUtility";
 import {
   ClientRoomInfo,
   GetRoomListResponse,
@@ -76,26 +79,26 @@ import {
   RoomViewResponse,
   SendDataRequest,
   ServerTestResult
-} from "../@types/socket";
+} from "@/@types/socket";
 import {
   BgmPlayInfo,
   DropPieceInfo,
   TabMoveInfo,
   ThrowParabolaInfo
 } from "task-info";
-import { getDropFileList } from "../app/core/utility/DropFileUtility";
+import { getDropFileList } from "@/app/core/utility/DropFileUtility";
 import WindowManager from "../app/core/window/WindowManager";
-import { StoreUseData } from "../@types/store";
+import { StoreUseData } from "@/@types/store";
 import CssManager from "../app/core/css/CssManager";
 import GameObjectManager from "../app/basic/GameObjectManager";
-import { CutInDeclareInfo, MediaUploadInfo } from "../@types/room";
+import { CutInDeclareInfo, MediaUploadInfo } from "@/@types/room";
 import SocketFacade from "../app/core/api/app-server/SocketFacade";
 import VueEvent from "../app/core/decorator/VueEvent";
-import { convertNumberZero } from "../app/core/utility/PrimaryDataUtility";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
 import YoutubeManager from "../app/basic/cut-in/bgm/YoutubeManager";
 import TaskManager from "../app/core/task/TaskManager";
 import LanguageManager from "../LanguageManager";
-import { WindowOpenInfo } from "../@types/window";
+import { WindowOpenInfo } from "@/@types/window";
 import EventProcessor from "../app/core/event/EventProcessor";
 import BcdiceManager from "../app/core/api/bcdice/BcdiceManager";
 import BgmManager from "../app/basic/cut-in/bgm/BgmManager";
@@ -109,6 +112,7 @@ import OtherTextFrame from "../app/basic/other-text/OtherTextFrame.vue";
 import ThrowParabolaSimulator from "../app/core/throwParabola/ThrowParabolaSimulator.vue";
 import ThrowParabolaContainer from "../app/core/throwParabola/ThrowParabolaContainer.vue";
 import CardDeckBuilder from "../app/basic/card/builder/CardDeckBuilder.vue";
+
 @Component({
   components: {
     CardDeckBuilder,
@@ -183,7 +187,7 @@ export default class App extends Vue {
     const durationMs = performance.getEntriesByName("app-init-time")[0]
       .duration;
     const durationS = Math.round(durationMs / 100) / 10;
-    window.console.log(`アプリのセットアップにかかった時間：${durationS}秒`);
+    console.log(`アプリのセットアップにかかった時間：${durationS}秒`);
 
     disableBodyScroll();
     document.documentElement.style.setProperty(
@@ -288,7 +292,7 @@ export default class App extends Vue {
     try {
       resp = await SocketFacade.instance.testServer(url);
     } catch (err) {
-      window.console.warn(`${err}. url:${url}`);
+      console.warn(`${err}. url:${url}`);
       return;
     }
 
@@ -339,7 +343,6 @@ export default class App extends Vue {
 
     // ファイルをドロップインしている場合
     const resultList = await getDropFileList(event.dataTransfer!);
-
     await TaskManager.instance.ignition<WindowOpenInfo<MediaUploadInfo>, never>(
       {
         type: "window-open",
@@ -462,7 +465,7 @@ export default class App extends Vue {
       return;
     }
     if (event.key === "Enter") {
-      window.console.log("GLOBAL enter");
+      console.log("GLOBAL enter");
       await TaskManager.instance.ignition<never, never>({
         type: "global-enter",
         owner: "Quoridorn",
@@ -483,7 +486,7 @@ export default class App extends Vue {
       });
       return;
     }
-    // window.console.log(event.key);
+    // console.log(event.key);
   }
 
   // @EventProcessor("keyup")
@@ -577,7 +580,7 @@ export default class App extends Vue {
   private async socketConnectFinished(
     task: Task<never, never>
   ): Promise<TaskResult<never> | void> {
-    window.console.log("socket-connect-finished");
+    console.log("socket-connect-finished");
     task.resolve();
   }
 
@@ -594,13 +597,11 @@ export default class App extends Vue {
     this.otherTextViewInfo = null;
   }
 
-  public static async openSimpleWindow(type: string) {
+  public static async openSimpleWindow(type: string): Promise<void> {
     await TaskManager.instance.ignition<WindowOpenInfo<void>, null>({
       type: "window-open",
       owner: "Quoridorn",
-      value: {
-        type
-      }
+      value: { type }
     });
   }
 
@@ -612,6 +613,15 @@ export default class App extends Vue {
     this.roomInitialized = true;
     await App.openSimpleWindow("chat-window");
     await App.openSimpleWindow("initiative-window");
+    if (
+      GameObjectManager.instance.keepBcdiceDiceRollResultList.some(
+        kbdrr =>
+          kbdrr.data!.type === "secret-dice-roll" &&
+          kbdrr.owner === GameObjectManager.instance.mySelfUserId
+      )
+    ) {
+      await App.openSimpleWindow("secret-dice-roll-window");
+    }
 
     task.resolve();
   }
@@ -654,7 +664,7 @@ export default class App extends Vue {
       this.progressAll = all;
       this.progressCurrent = current;
       this.progressMessage = taskValue.value.message;
-      if (all) window.console.log(`PROGRESS: (${current} / ${all})`);
+      if (all) console.log(`PROGRESS: (${current} / ${all})`);
       task.resolve();
     }
   }
@@ -663,7 +673,7 @@ export default class App extends Vue {
   private async socketConnectErrorFinished(
     task: Task<never, never>
   ): Promise<TaskResult<never> | void> {
-    window.console.warn("socket-connect-error-finished");
+    console.warn("socket-connect-error-finished");
     task.resolve();
   }
 
@@ -671,7 +681,7 @@ export default class App extends Vue {
   private async socketReconnectingFinished(
     task: Task<never, never>
   ): Promise<TaskResult<never> | void> {
-    window.console.warn("socket-reconnecting-finished");
+    console.warn("socket-reconnecting-finished");
     task.resolve();
   }
 

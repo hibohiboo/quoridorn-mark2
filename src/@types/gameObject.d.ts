@@ -1,5 +1,7 @@
 import { Address, Point, Rectangle } from "address";
 import { Direction, Texture } from "./room";
+import { BcdiceDiceRollResult } from "@/@types/bcdice";
+import { StoreUseData } from "@/@types/store";
 
 type SceneObjectType =
   | "character"
@@ -30,16 +32,15 @@ type SceneObject = Address & {
   isHideBorder: boolean;
   isHideHighlight: boolean;
   isLock: boolean;
-  otherText: string;
   place: Place;
   layerId: string;
   textures: Texture[];
   textureIndex: number;
   angle: number;
   url: string; // character
-  subType: string; // サイコロの色など
-  pips: number; // 出目
-  faceNum: number; // 出目の最大数
+  subTypeId: string; // サイコロの種類など
+  subTypeValue: string; // 出目など
+  isHideSubType: boolean; // 出目を隠すかどうか
 };
 
 type ActorStore = {
@@ -96,11 +97,10 @@ type TagNoteStore = {
   text: string;
 };
 
-type PropertyFaceStore = {
-  owner: string;
-  label: string;
-  permissionType: "ALL" | "OK" | "NG";
-  targets: string[];
+type MemoStore = {
+  // 所有者はownerで表現(characterだとその他欄, publicMemoだと共有メモといった具合)
+  tab: string;
+  text: string;
 };
 
 // リソース定義
@@ -161,27 +161,6 @@ type ResourceStore = {
   value: string;
 };
 
-type PropertyStore = {
-  label: string;
-  type:
-    | "title"
-    | "subTitle"
-    | "text"
-    | "input-text"
-    | "number"
-    | "check"
-    | "radio"
-    | "select"
-    | "combo"
-    | "image"
-    | "color";
-  min?: number;
-  max?: number;
-  interval?: number;
-  selection?: string;
-  value: string;
-};
-
 type PropertySelectionStore = {
   selection: string;
   label: string;
@@ -191,7 +170,7 @@ type PropertySelectionStore = {
 type OtherTextViewInfo = {
   type: string;
   docId: string;
-  text: string;
+  dataList: StoreUseData<MemoStore>[];
   rect: Rectangle;
   isFix: boolean;
 };
@@ -296,4 +275,18 @@ type CardYamlInfo = {
     }[];
   };
   cards: InputCardInfo[];
+};
+
+type DiceInfo = {
+  type: string;
+  label: string;
+  pips: { [P: string]: string };
+};
+type DiceMaterial = { [P: string]: DiceInfo[] };
+
+type KeepBcdiceDiceRollResult = {
+  type: "secret-dice-roll" | "hide-dice-symbol-roll";
+  text: string;
+  targetId: string;
+  bcdiceDiceRollResult: BcdiceDiceRollResult;
 };

@@ -49,13 +49,12 @@ export default class CtrlRadio extends Vue {
 
   private get localValue(): string | null {
     if (this.test)
-      window.console.log("set '" + this.value + "'", this.constructor.name);
+      console.log("set '" + this.value + "'", this.constructor.name);
     return this.value || "";
   }
 
   private set localValue(value: string | null) {
-    if (this.test)
-      window.console.log("return '" + value + "'", this.constructor.name);
+    if (this.test) console.log("return '" + value + "'", this.constructor.name);
     this.input(value);
   }
 
@@ -70,10 +69,10 @@ export default class CtrlRadio extends Vue {
 @import "../../../assets/common";
 
 .ctrl-radio {
-  @include inline-flex-box(row, flex-start, center);
+  @include flex-box(row, flex-start, center);
 
   label {
-    @include inline-flex-box(row, flex-start, center);
+    @include flex-box(row, flex-start, center);
     height: 2em;
 
     &:not(:first-child) {

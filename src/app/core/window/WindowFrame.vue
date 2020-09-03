@@ -49,11 +49,13 @@
       />
 
       <!-- 右ペイン格納 -->
+      <!--
       <title-icon
         className="icon-arrow-right"
         @emit="storeRightPane"
         v-if="windowInfo.declare.paneContainable"
       />
+      -->
 
       <!-- 閉じる -->
       <title-icon
@@ -209,7 +211,7 @@ export default class WindowFrame extends Vue {
 
   @LifeCycle
   private destroyed() {
-    // window.console.log(`WindowFrame destroyed: ${this.windowInfo.key}`);
+    // console.log(`WindowFrame destroyed: ${this.windowInfo.key}`);
   }
 
   private get key(): string {
@@ -432,7 +434,7 @@ export default class WindowFrame extends Vue {
 
   @VueEvent
   private async closeWindow(): Promise<void> {
-    window.console.log("##### CLOSE WINDOW #####");
+    console.log("##### CLOSE WINDOW #####");
     await TaskManager.instance.ignition<string, never>({
       type: "window-close",
       owner: "Quoridorn",
@@ -535,7 +537,7 @@ export default class WindowFrame extends Vue {
             // コンテキストメニュー防止
             if (!bodyElm.oncontextmenu) bodyElm.oncontextmenu = () => false;
           } catch (error) {
-            // window.console.warn(error);
+            // console.warn(error);
             /* nothing */
           }
         };

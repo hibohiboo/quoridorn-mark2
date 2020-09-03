@@ -145,7 +145,8 @@ export default class MediaListWindow extends Mixins<WindowVue<void, never>>(
       .filter(m => permissionCheck(m, "view"))
       .map(m => m.data!.tag)
       .filter((tag, idx, list) => list.indexOf(tag) === idx)
-      .map(tag => ({
+      .map((tag, idx) => ({
+        key: idx.toString(),
         target: tag,
         text: tag || LanguageManager.instance.getText("label.non-tag")
       }));
@@ -190,12 +191,11 @@ export default class MediaListWindow extends Mixins<WindowVue<void, never>>(
     if (!result) return;
 
     try {
-      await this.mediaCC.touchModify([media.id!]);
+      await this.mediaCC.deletePackage([media.id!]);
     } catch (err) {
       // TODO error message.
       return;
     }
-    await this.mediaCC.delete([media.id!]);
 
     await SocketFacade.instance.socketCommunication<DeleteFileRequest, void>(
       "delete-file",

@@ -1,6 +1,8 @@
 import { Address, Point } from "address";
 import { PartialRoomInfoExtend, RoomInfoExtend, UserType } from "./socket";
 import { DiceResult } from "./bcdice";
+import { IconClass, UrlType } from "@/app/core/utility/FileUtility";
+import { DiceMaterial } from "@/@types/gameObject";
 
 export type PlayBgmInfo =
   | {
@@ -225,10 +227,13 @@ type StandImageInfo = Point & {
 };
 
 type MediaInfo = {
-  tag: string;
   name: string;
+  tag: string;
   url: string;
-  type: string;
+  urlType: UrlType;
+  iconClass: IconClass;
+  imageSrc: string;
+  dataLocation: "server" | "direct";
 };
 
 export type ActorRef = {
@@ -276,13 +281,6 @@ export type CutInDeclareInfo = {
   duration?: number; // 長さ（再生することで得られる）
 };
 
-/**
- * playListCCのデータ定義
- */
-type CutInPlayingInfo = {
-  duration: number;
-};
-
 type YoutubeVolumeChangeInfo = {
   tag: string;
   windowStatus: string;
@@ -306,16 +304,17 @@ type CustomDiceBotInfo = {
 };
 
 type ChatInfo = {
-  actorId: string;
-  statusId: string;
+  chatType: "chat" | "system-message";
+  actorId: string | null;
+  statusId: string | null;
   tabId: string;
   targetId: string;
-  targetType: "group" | "actor";
+  targetType: "group" | "actor" | null;
   text: string;
   diceRollResult: string | null;
   customDiceBotResult: string | null;
-  isSecret: boolean;
-  isSecretDice: boolean;
+  isSecret: boolean; // 秘匿チャット
+  isSecretDice: boolean; // BCDiceのシークレットダイス
   dices: DiceResult[];
   system: string;
 };
@@ -328,8 +327,7 @@ type ChatTabInfo = {
 };
 
 type AddRoomPresetDataRequest = {
-  mediaDataList: MediaInfo[];
-  backgroundMediaIndex: number;
+  diceMaterial: DiceMaterial,
   cutInDataList: CutInDeclareInfo[];
   sceneData: Scene;
   roomExtendInfo: RoomInfoExtend;

@@ -37,7 +37,7 @@
             <tr-resource-type-select-component
               labelName="resource-type"
               width="100%"
-              :readonly="systemColumnType"
+              :readonly="!!systemColumnType"
               v-model="resourceTypeVolatile"
             />
           </tr>
@@ -46,7 +46,7 @@
               v-if="
                 resourceType === 'ref-normal' || resourceType === 'ref-owner'
               "
-              :readonly="systemColumnType"
+              :readonly="!!systemColumnType"
               labelName="ref-property"
               width="100%"
               v-model="refPropertyVolatile"
@@ -411,8 +411,8 @@ export default class ResourceMasterInfoForm extends Mixins<ComponentVue>(
   }
 
   private tabList: TabInfo[] = [
-    { target: "basic", text: "" },
-    { target: "icon", text: "" }
+    { key: "1", target: "basic", text: "" },
+    { key: "2", target: "icon", text: "" }
   ];
   private currentTabInfo: TabInfo = this.tabList[0];
 

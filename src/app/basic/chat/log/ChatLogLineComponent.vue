@@ -1,18 +1,24 @@
 <template>
   <div class="chat-log-line-component">
-    <div class="chat-line">
+    <div
+      class="chat-line"
+      :class="{ system: chat.data.chatType === 'system-message' }"
+    >
       <span class="sender">{{ getSender(chat.data) }}：</span>
       <span class="text" v-html="transText(chat.data.text)"></span>
       <div class="icon-container">
-        <template v-if="isEditable(chat)">
+        <span class="edited-message" v-if="isEdited">{{ editedMessage }}</span>
+        <template v-if="isEditable(chat) && chat.data.chatType === 'chat'">
           <span class="icon icon-pencil" @click="$emit('edit', chat.id)"></span>
           <span class="icon icon-bin" @click="$emit('delete', chat.id)"></span>
         </template>
         <span class="update-time">{{ getDateStr(chat.updateTime) }}</span>
-        <span class="edited-message" v-if="isEdited">{{ editedMessage }}</span>
       </div>
     </div>
-    <div class="chat-line dice-roll-result" v-if="chat.data.diceRollResult">
+    <div
+      class="chat-line dice-roll-result"
+      v-if="!chat.data.isSecretDice && chat.data.diceRollResult"
+    >
       <span class="sender">{{ chat.data.system }}</span>
       <span>：</span>
       <span>{{ chat.data.diceRollResult }}</span>
@@ -25,16 +31,16 @@ import Vue from "vue";
 import { Prop, Watch } from "vue-property-decorator";
 import { Component } from "vue-mixin-decorator";
 import moment from "moment/moment";
-import { StoreUseData } from "../../../../@types/store";
-import { permissionCheck } from "../../../core/api/app-server/SocketFacade";
-import { ChatInfo, GroupChatTabInfo, UserData } from "../../../../@types/room";
-import { transText } from "../../../core/utility/ChatUtility";
-import { ActorStore } from "../../../../@types/gameObject";
+import { StoreUseData } from "@/@types/store";
+import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
+import { ChatInfo, GroupChatTabInfo, UserData } from "@/@types/room";
+import { transText } from "@/app/core/utility/ChatUtility";
+import { ActorStore } from "@/@types/gameObject";
 import TabsComponent from "../../common/components/tab-component/TabsComponent.vue";
-import { UserType } from "../../../../@types/socket";
+import { UserType } from "@/@types/socket";
 import VueEvent from "../../../core/decorator/VueEvent";
 import LifeCycle from "../../../core/decorator/LifeCycle";
-import { findRequireById } from "../../../core/utility/Utility";
+import { findById, findRequireById } from "@/app/core/utility/Utility";
 
 @Component({
   components: { TabsComponent }
@@ -106,13 +112,14 @@ export default class ChatLogLineComponent extends Vue {
     return actorName + (targetName ? delimiter + targetName : "");
   }
 
-  private getName(id: string, type: "group" | "actor") {
+  private getName(id: string | null, type: "group" | "actor" | null) {
     if (type === "group") {
       const gct = findRequireById(this.groupChatTabList, id);
       if (gct.data!.isSystem) return "";
       return gct.data!.name;
     } else {
-      const actor = findRequireById(this.actorList, id);
+      const actor = findById(this.actorList, id);
+      if (!actor) return "Quoridorn";
       const user = findRequireById(this.userList, actor.owner);
       const userType = this.userTypeLanguageMap[user.data!.type];
       const userTypeStr = actor.data!.type !== "user" ? "" : `(${userType})`;
@@ -139,6 +146,10 @@ export default class ChatLogLineComponent extends Vue {
   min-height: 2em;
   line-height: 1.7em;
   white-space: pre-wrap;
+
+  &.system {
+    background-color: var(--uni-color-light-green);
+  }
 
   &:hover {
     background-color: var(--uni-color-light-skyblue);

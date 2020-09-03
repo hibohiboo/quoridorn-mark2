@@ -9,7 +9,7 @@
     <label class="view-type-select">
       <span class="label-input" v-t="'label.view-type'"></span>
       <player-box-view-type-radio v-model="viewType" />
-      <input
+      <base-input
         type="text"
         class="search-input"
         :value="searchText"
@@ -167,9 +167,11 @@ import ChitPieceComponent from "../chit/ChitPieceComponent.vue";
 import CharacterPieceComponent from "../character/CharacterPieceComponent.vue";
 import { findRequireById } from "../../../core/utility/Utility";
 import App from "../../../../views/App.vue";
+import BaseInput from "@/app/core/component/BaseInput.vue";
 
 @Component({
   components: {
+    BaseInput,
     CharacterPieceComponent,
     ChitPieceComponent,
     MapMaskPieceComponent,
@@ -258,8 +260,8 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   }
 
   private actorTabList: TabInfo[] = [
-    { target: "actor", text: "" },
-    { target: "piece", text: "" }
+    { key: "1", target: "actor", text: "" },
+    { key: "2", target: "piece", text: "" }
   ];
   private currentActorTabInfo: TabInfo | null = this.actorTabList[0];
 
@@ -283,7 +285,8 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
       .filter(
         (tag: string, idx: number, list: string[]) => list.indexOf(tag) === idx
       )
-      .map(tag => ({
+      .map((tag, idx) => ({
+        key: idx.toString(),
         target: tag,
         text: tag || this.$t("label.non-tag")!.toString()
       }));
@@ -364,12 +367,11 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
     if (!result) return;
 
     try {
-      await this.actorCC.touchModify([actor.id!]);
+      await this.actorCC.deletePackage([actor.id!]);
     } catch (err) {
       // TODO error message.
       return;
     }
-    await this.actorCC.delete([actor.id!]);
   }
 
   private static getDialogMessage(target: string) {
@@ -421,21 +423,23 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
 }
 
 .view-area {
-  height: calc(100% - 6em);
+  @include flex-box(column, stretch, flex-start);
+  height: calc(100% - 4em - 0.5rem);
+}
+
+.simple-tab-component {
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .tab-container {
-  border: 1px solid gray;
+  @include flex-box(column, stretch, flex-start);
   flex: 1;
+  border: 1px solid gray;
+  box-sizing: border-box;
   overflow-y: scroll;
   background-color: var(--uni-color-white);
   margin-top: -1px;
-}
-
-.tab-component {
-  @include flex-box(column, stretch, flex-start);
-  align-self: stretch;
-  flex: 1;
 }
 
 .actor-info {

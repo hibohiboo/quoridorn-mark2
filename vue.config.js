@@ -1,5 +1,5 @@
 const CompressionWebpackPlugin = require("compression-webpack-plugin");
-const productionGzipExtensions = ["js", "eot", "ttf"];
+const productionGzipExtensions = ["yaml", "js", "eot", "ttf"];
 
 const BundleAnalyzerPlugin = require("webpack-bundle-analyzer")
   .BundleAnalyzerPlugin;
@@ -11,6 +11,11 @@ module.exports = {
       entry: "src/main.ts", // エントリーポイントとなるjs
       template: "public/index.html", // テンプレートのHTML
       filename: "index.html" // build時に出力されるファイル名
+    },
+    admin: {
+      entry: "src/main.ts", // エントリーポイントとなるjs
+      template: "public/index.html", // テンプレートのHTML
+      filename: "web-api-tool.html" // build時に出力されるファイル名
     },
     chatLog: {
       entry: "src/chatLog.ts",
@@ -24,6 +29,10 @@ module.exports = {
         {
           from: new RegExp(`${process.env.VUE_APP_BASE_URL}/chatLog.html`),
           to: "chatLog.html"
+        },
+        {
+          from: new RegExp(`${process.env.VUE_APP_BASE_URL}/web-api-tool.html`),
+          to: "web-api-tool.html"
         },
         {
           from: new RegExp(`${process.env.VUE_APP_BASE_URL}`),

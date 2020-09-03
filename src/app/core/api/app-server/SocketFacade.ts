@@ -8,7 +8,7 @@ import {
   PermissionRule,
   StoreObj,
   StoreUseData
-} from "../../../../@types/store";
+} from "@/@types/store";
 import { compareVersion, getFileRow, TargetVersion } from "../Github";
 import {
   ActorStatusStore,
@@ -17,16 +17,16 @@ import {
   CardDeckSmall,
   CardMeta,
   CardObject,
+  KeepBcdiceDiceRollResult,
   ChatPaletteStore,
   InitiativeColumnStore,
-  PropertyFaceStore,
   PropertySelectionStore,
-  PropertyStore,
   ResourceMasterStore,
   ResourceStore,
   SceneObject,
-  TagNoteStore
-} from "../../../../@types/gameObject";
+  TagNoteStore,
+  MemoStore
+} from "@/@types/gameObject";
 import {
   ActorGroup,
   ChatInfo,
@@ -41,19 +41,22 @@ import {
   SceneLayer,
   SocketUserData,
   UserData
-} from "../../../../@types/room";
+} from "@/@types/room";
 import GameObjectManager from "../../../basic/GameObjectManager";
 import { ApplicationError } from "../../error/ApplicationError";
 import {
   DefaultServerInfo,
+  DiceAndPips,
+  DiceType,
   GetVersionResponse,
   SendDataRequest,
   ServerTestResult
-} from "../../../../@types/socket";
+} from "@/@types/socket";
 import NekostoreCollectionController from "./NekostoreCollectionController";
 import { loadYaml } from "../../utility/FileUtility";
 import TaskManager from "../../task/TaskManager";
 import { ModeInfo } from "mode";
+import MemoryStore from "nekostore/lib/store/MemoryStore";
 
 export type ConnectInfo = {
   quoridornServer: string | string[];
@@ -87,11 +90,13 @@ export function getStoreObj<T>(
  * パーミッションチェックを行う。
  * @param data
  * @param type
+ * @param ownerLevel
  * @return 許可されているならtrue
  */
 export function permissionCheck(
   data: StoreObj<unknown>,
-  type: "view" | "edit" | "chmod"
+  type: "view" | "edit" | "chmod",
+  ownerLevel: number = 0
 ): boolean {
   if (!data!.permission) return true;
 
@@ -128,7 +133,11 @@ export function permissionCheck(
         if (pn.id === GameObjectManager.instance.mySelfActorId) return true;
       }
       if (pn.type === "owner") {
-        if (data.owner === SocketFacade.instance.userId) return true;
+        let obj = data;
+        for (let i = 0; i < ownerLevel; i++) {
+          obj = GameObjectManager.instance.getOwner(obj)!;
+        }
+        if (obj.owner === SocketFacade.instance.userId) return true;
       }
       return false;
     };
@@ -180,7 +189,7 @@ export default class SocketFacade {
   public async init() {
     // 読み込み必須のためthrowは伝搬させる
     this.__connectInfo = await loadYaml<ConnectInfo>(
-      "/static/conf/connect.yaml"
+      "static/conf/connect.yaml"
     );
 
     // 相互運用性チェック
@@ -215,7 +224,7 @@ export default class SocketFacade {
     await this.setDefaultServerUrlList();
     const serverInfo = this.appServerUrlList[0];
     if (!serverInfo) {
-      swal({
+      await swal({
         title: "通信エラー",
         text: "有効なアプリケーションサーバに接続できませんでした。",
         icon: "error"
@@ -266,7 +275,7 @@ export default class SocketFacade {
       });
     });
     this.socket.on("connect_timeout", async (timeout: any) => {
-      window.console.log("connect_timeout", timeout);
+      console.log("connect_timeout", timeout);
     });
   }
 
@@ -286,7 +295,7 @@ export default class SocketFacade {
     try {
       resp = await this.testServer(url);
     } catch (err) {
-      window.console.error(`${err}. url:${url}`);
+      console.error(`${err}. url:${url}`);
       return;
     }
     this.appServerUrlList.push({
@@ -373,7 +382,7 @@ export default class SocketFacade {
       const timeoutId = window.setTimeout(() => {
         socket.off("result-get-version");
         socket.disconnect();
-        window.console.warn("timeout");
+        console.warn("timeout");
         reject("not-quoridorn");
       }, this.__connectInfo!.socketTimeout + 100);
       socket.once(
@@ -389,14 +398,14 @@ export default class SocketFacade {
           // タイトルチェック（サーバ側で必ず値は設定してくる）
           const title: string = result.title;
           if (!title) {
-            window.console.warn("title-check");
+            console.warn("title-check");
             reject("not-quoridorn");
             return;
           }
 
           const serverVersion: string = result.version;
           if (!serverVersion || !serverVersion.startsWith("Quoridorn ")) {
-            window.console.warn("version format");
+            console.warn("version format");
             reject("not-quoridorn");
             return;
           }
@@ -437,7 +446,7 @@ export default class SocketFacade {
   ): void {
     if (!this.socket) return;
     this.socket.on(event, (err: any, result: T) => {
-      if (err) window.console.error(err);
+      if (err) console.error(err);
       callback(err, result);
     });
   }
@@ -525,10 +534,6 @@ export default class SocketFacade {
     return this.roomCollectionController<SocketUserData>("socket-user-list");
   }
 
-  public propertyCC(): NekostoreCollectionController<PropertyStore> {
-    return this.roomCollectionController<PropertyStore>("property-list");
-  }
-
   public resourceMasterCC(): NekostoreCollectionController<
     ResourceMasterStore
   > {
@@ -554,12 +559,6 @@ export default class SocketFacade {
   > {
     return this.roomCollectionController<PropertySelectionStore>(
       "property-selection-list"
-    );
-  }
-
-  public propertyFaceCC(): NekostoreCollectionController<PropertyFaceStore> {
-    return this.roomCollectionController<PropertyFaceStore>(
-      "property-face-list"
     );
   }
 
@@ -591,6 +590,26 @@ export default class SocketFacade {
     return this.roomCollectionController<ChatPaletteStore>("chat-palette-list");
   }
 
+  public diceTypeListCC(): NekostoreCollectionController<DiceType> {
+    return this.roomCollectionController<DiceType>("dice-type-list");
+  }
+
+  public diceAndPipsListCC(): NekostoreCollectionController<DiceAndPips> {
+    return this.roomCollectionController<DiceAndPips>("dice-and-pips-list");
+  }
+
+  public memoCC(): NekostoreCollectionController<MemoStore> {
+    return this.roomCollectionController<MemoStore>("memo-list");
+  }
+
+  public keepBcdiceDiceRollResultListCC(): NekostoreCollectionController<
+    KeepBcdiceDiceRollResult
+  > {
+    return this.roomCollectionController<KeepBcdiceDiceRollResult>(
+      "chat-bcdice-dice-roll-result-list"
+    );
+  }
+
   public getCC(type: string): NekostoreCollectionController<any> {
     switch (type) {
       case "chat":
@@ -611,8 +630,6 @@ export default class SocketFacade {
         return this.cutInDataCC();
       case "user":
         return this.userCC();
-      case "property":
-        return this.propertyCC();
       case "resource-master":
         return this.resourceMasterCC();
       case "resource":
@@ -621,8 +638,6 @@ export default class SocketFacade {
         return this.initiativeColumnCC();
       case "property-selection":
         return this.propertySelectionCC();
-      case "property-face":
-        return this.propertyFaceCC();
       case "character":
       case "dice-symbol":
       case "floor-tile":
@@ -649,6 +664,14 @@ export default class SocketFacade {
         return this.cardDeckSmallCC();
       case "chat-palette":
         return this.chatPaletteListCC();
+      case "dice-type":
+        return this.diceTypeListCC();
+      case "dice-and-pips":
+        return this.diceAndPipsListCC();
+      case "chat-bcdice-dice-roll-result":
+        return this.keepBcdiceDiceRollResultListCC();
+      case "memo":
+        return this.memoCC();
       default:
         throw new ApplicationError(`Invalid type error. type=${type}`);
     }

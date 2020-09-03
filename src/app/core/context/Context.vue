@@ -27,8 +27,9 @@
           ]"
           @click.left.stop="emitEvent(item)"
           @mouseenter="onHoverItem(level, idx)"
-          v-t="item.text"
-        ></div>
+        >
+          {{ item.isRawText ? item.text : $t(item.text) }}
+        </div>
       </template>
     </div>
   </div>
@@ -53,10 +54,12 @@ import VueEvent from "../decorator/VueEvent";
 import { createPoint } from "../utility/CoordinateUtility";
 import GameObjectManager from "../../basic/GameObjectManager";
 import { clone } from "../utility/PrimaryDataUtility";
-import { DataReference } from "../../../@types/data";
+import { DataReference } from "@/@types/data";
 import LifeCycle from "../decorator/LifeCycle";
 import LanguageManager from "../../../LanguageManager";
 import { findById } from "../utility/Utility";
+import { StoreUseData } from "@/@types/store";
+import { SceneObject } from "@/@types/gameObject";
 
 const contextInfo: ContextDeclare = require("../context.yaml");
 const contextItemInfo: ContextItemDeclareBlock = require("../context-item.yaml");
@@ -65,6 +68,7 @@ type Item = {
   type: string;
   idx: number;
   text?: string;
+  isRawText?: boolean;
   taskName?: string;
   arg?: any;
   disabled?: boolean;
@@ -77,6 +81,7 @@ type Item = {
 export default class Context extends Vue {
   private type: string | null = null;
   private target: string | null = null;
+  private pieceId: string | undefined = undefined;
   private x: number | null = null;
   private y: number | null = null;
   private title: string = "";
@@ -147,6 +152,7 @@ export default class Context extends Vue {
   ): Promise<TaskResult<never> | void> {
     this.type = task.value!.type;
     this.target = task.value!.target;
+    this.pieceId = task.value!.pieceId;
     this.x = task.value!.x - 10;
     this.y = task.value!.y - 10;
 
@@ -163,9 +169,7 @@ export default class Context extends Vue {
       `type.${this.type}`
     )})${name}`;
 
-    window.console.log(
-      `【CONTEXT OPEN】 type: ${this.type} target: ${this.target}`
-    );
+    console.log(`【CONTEXT OPEN】 type: ${this.type} target: ${this.target}`);
 
     // 表示項目をリセット
     this.itemList.splice(0, this.itemList.length);
@@ -222,6 +226,7 @@ export default class Context extends Vue {
 
     const type = this.type!;
     const target = this.target!;
+    const pieceId = this.pieceId;
     const isViewCompare = contextItem.isViewCompare;
 
     // 項目を表示するかどうかの判定
@@ -234,9 +239,10 @@ export default class Context extends Vue {
       // 非活性の判定
       const disabled = !(await judgeCompare(isDisabledCompare, type, target));
 
-      const argObj: DataReference = {
+      const argObj: DataReference & { pieceId?: string } = {
         type,
-        docId: target
+        docId: target,
+        pieceId
       };
       if (!contextItem.taskArg) {
         contextItem.taskArg = {
@@ -246,6 +252,23 @@ export default class Context extends Vue {
       if (!contextItem.taskArg.arg) {
         contextItem.taskArg.args = argObj;
       }
+
+      if (contextItem.argRef === "dice-pips-select") {
+        const list = GameObjectManager.instance.getList(this.type!)!;
+        const obj: StoreUseData<SceneObject> | null = findById(list, target);
+        const diceTypeId = obj!.data!.subTypeId;
+        const diceAndPipsList = GameObjectManager.instance.diceAndPipsList;
+        const pipsList = diceAndPipsList
+          .filter(dap => dap.data!.diceTypeId === diceTypeId)
+          .map(dap => dap.data!.pips);
+        contextItem.children = pipsList.map(pips => ({
+          text: pips,
+          isRawText: true,
+          taskName: "dice-pips-change",
+          taskArg: { value: pips }
+        }));
+      }
+
       this.itemList.push({
         type: "item",
         level,
@@ -253,6 +276,7 @@ export default class Context extends Vue {
         idx: ++levelIdxList[1],
         taskName: contextItem.taskName || "default",
         text: contextItem.text || "default",
+        isRawText: contextItem.isRawText,
         arg: contextItem.taskArg,
         disabled,
         hasChild: !!contextItem.children

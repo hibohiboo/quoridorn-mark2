@@ -5,7 +5,7 @@ import CollectionReference from "nekostore/src/CollectionReference";
 import DocumentReference from "nekostore/src/DocumentReference";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
 import Query from "nekostore/lib/Query";
-import { StoreObj, StoreUseData } from "../../../../@types/store";
+import { StoreObj, StoreUseData } from "@/@types/store";
 import {
   AddDirectRequest,
   CreateDataRequest,
@@ -14,8 +14,10 @@ import {
   TouchModifyRequest,
   TouchRequest,
   UpdateDataRequest
-} from "../../../../@types/data";
-import SocketFacade, { getStoreObj } from "./SocketFacade";
+} from "@/@types/data";
+import SocketFacade, {
+  getStoreObj
+} from "@/app/core/api/app-server/SocketFacade";
 
 export default class NekostoreCollectionController<T> {
   constructor(
@@ -92,7 +94,7 @@ export default class NekostoreCollectionController<T> {
               if (i1[sortColumn] > i2[sortColumn]) return 1;
               return 0;
             });
-            // window.console.log("sorted", argList!);
+            // console.log("sorted", argList!);
           }
         });
       }
@@ -240,6 +242,16 @@ export default class NekostoreCollectionController<T> {
     });
     await SocketFacade.instance.socketCommunication<DeleteDataRequest, never>(
       "delete-data",
+      {
+        collection: this.collectionName,
+        idList
+      }
+    );
+  }
+
+  public async deletePackage(idList: string[]): Promise<void> {
+    await SocketFacade.instance.socketCommunication<DeleteDataRequest, never>(
+      "delete-data-package",
       {
         collection: this.collectionName,
         idList

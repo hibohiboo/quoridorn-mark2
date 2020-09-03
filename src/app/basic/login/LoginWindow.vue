@@ -118,6 +118,7 @@ import LifeCycle from "../../core/decorator/LifeCycle";
 import TaskProcessor from "../../core/task/TaskProcessor";
 import {
   convertNumberNull,
+  getExt,
   getUrlParam,
   listToEmpty
 } from "../../core/utility/PrimaryDataUtility";
@@ -138,34 +139,37 @@ import {
   RoomViewResponse,
   ServerTestResult,
   TouchRequest,
+  UploadMediaInfo,
   UserLoginInput,
   UserLoginRequest,
   UserLoginResponse,
   UserLoginWindowInput
-} from "../../../@types/socket";
-import { PermissionNode, StoreObj, StoreUseData } from "../../../@types/store";
+} from "@/@types/socket";
+import { StoreObj, StoreUseData } from "@/@types/store";
 import TableComponent from "../../core/component/table/TableComponent.vue";
 import {
   AddRoomPresetDataRequest,
   CutInDeclareInfo,
   MediaInfo,
-  RoomData,
-  Scene,
-  SceneLayerType
-} from "../../../@types/room";
+  Scene
+} from "@/@types/room";
 import WindowVue from "../../core/window/WindowVue";
 import GameObjectManager from "../GameObjectManager";
-import { ResourceMasterStore } from "../../../@types/gameObject";
 import VersionInfoComponent from "./VersionInfoComponent.vue";
-import { extname, getUrlType, loadYaml } from "../../core/utility/FileUtility";
-import { getSrc } from "../../core/utility/Utility";
+import {
+  loadYaml,
+  mediaUpload,
+  raw2UploadMediaInfoList
+} from "../../core/utility/FileUtility";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
 import VueEvent from "../../core/decorator/VueEvent";
 import LanguageSelect from "../common/components/select/LanguageSelect.vue";
 import TaskManager from "../../core/task/TaskManager";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import LanguageManager from "../../../LanguageManager";
-import { WindowOpenInfo } from "../../../@types/window";
+import { WindowOpenInfo } from "@/@types/window";
+import { sendSystemChatLog } from "@/app/core/utility/ChatUtility";
+import { DiceMaterial } from "@/@types/gameObject";
 
 @Component({
   components: {
@@ -353,11 +357,11 @@ export default class LoginWindow extends Mixins<
           type: "app-server-setting-window"
         }
       });
-      window.console.log(appServerSettingInputList);
+      console.log(appServerSettingInputList);
       appServerSettingInput = appServerSettingInputList[0];
       this.isInputtingServerSetting = false;
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       this.isInputtingServerSetting = false;
       return;
     }
@@ -406,7 +410,7 @@ export default class LoginWindow extends Mixins<
       try {
         resp = await SocketFacade.instance.testServer(url);
       } catch (err) {
-        window.console.warn(`${err}. url:${url}`);
+        console.warn(`${err}. url:${url}`);
         return;
       }
       this.serverTestResult = resp;
@@ -423,7 +427,7 @@ export default class LoginWindow extends Mixins<
       }
       this.message = serverInfo.message;
     } catch (err) {
-      window.console.error(err);
+      console.error(err);
     }
   }
 
@@ -493,7 +497,7 @@ export default class LoginWindow extends Mixins<
       });
       confirmResult = confirmResultList[0];
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       await this.releaseTouchRoom(order);
       this.roomStatus = "normal";
       return;
@@ -521,7 +525,7 @@ export default class LoginWindow extends Mixins<
       });
       deleteRoomInput = deleteRoomInputList[0];
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       await this.releaseTouchRoom(order);
       this.roomStatus = "normal";
       return;
@@ -546,7 +550,7 @@ export default class LoginWindow extends Mixins<
         ...deleteRoomInput
       });
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       await this.releaseTouchRoom(order);
       this.roomStatus = "normal";
       return;
@@ -582,7 +586,7 @@ export default class LoginWindow extends Mixins<
       );
       return true;
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       return false;
     }
   }
@@ -628,7 +632,7 @@ export default class LoginWindow extends Mixins<
       });
       createRoomInput = roomInfoList[0];
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       await this.releaseTouchRoom();
       this.roomStatus = "normal";
       return;
@@ -671,7 +675,7 @@ export default class LoginWindow extends Mixins<
         return;
       }
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       await this.releaseTouchRoom();
       this.roomStatus = "normal";
       return;
@@ -702,7 +706,7 @@ export default class LoginWindow extends Mixins<
         ...createRoomInput
       });
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
 
       await LoginWindow.viewProcessView("");
 
@@ -737,7 +741,7 @@ export default class LoginWindow extends Mixins<
         UserLoginResponse
       >("user-login", userLoginInput);
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       alert("ログイン失敗");
 
       await LoginWindow.viewProcessView("");
@@ -790,6 +794,8 @@ export default class LoginWindow extends Mixins<
     params.append("player", userLoginInput.name);
     window.history.replaceState("", "", `?${params.toString()}`);
 
+    await sendSystemChatLog(`${userLoginInput.name} が入室しました。`);
+
     await TaskManager.instance.ignition<ClientRoomInfo, void>({
       type: "room-initialize",
       owner: "Quoridorn",
@@ -822,7 +828,7 @@ export default class LoginWindow extends Mixins<
       if (this.urlPlayerName) {
         // const roomId = this.roomList.filter(r => r.order === no)[0].id;
         // const cookieToken = Cookies.get(`${roomId}/${this.urlPlayerName}`);
-        // window.console.log(`token: ${cookieToken}`);
+        // console.log(`token: ${cookieToken}`);
       } else {
         if (!this.disabledLogin) await this.login();
       }
@@ -875,7 +881,7 @@ export default class LoginWindow extends Mixins<
           return;
         }
       } catch (err) {
-        window.console.warn(err);
+        console.warn(err);
         await this.releaseTouchRoom();
         this.roomStatus = "normal";
         return;
@@ -897,7 +903,7 @@ export default class LoginWindow extends Mixins<
         ...loginRoomInput
       });
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       alert("ログイン失敗");
       this.roomStatus = "normal";
       return;
@@ -934,7 +940,7 @@ export default class LoginWindow extends Mixins<
         return;
       }
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       this.roomStatus = "normal";
       return;
     }
@@ -949,7 +955,7 @@ export default class LoginWindow extends Mixins<
         UserLoginResponse
       >("user-login", userLoginInput);
     } catch (err) {
-      window.console.warn(err);
+      console.warn(err);
       alert("ログイン失敗");
       this.roomStatus = "normal";
       SocketFacade.instance.roomCollectionPrefix = null;
@@ -978,6 +984,8 @@ export default class LoginWindow extends Mixins<
     params.append("player", userLoginInput.name);
     window.history.replaceState("", "", `?${params.toString()}`);
 
+    await sendSystemChatLog(`${userLoginInput.name} が入室しました。`);
+
     await TaskManager.instance.ignition<ClientRoomInfo, void>({
       type: "room-initialize",
       owner: "Quoridorn",
@@ -995,46 +1003,12 @@ export default class LoginWindow extends Mixins<
      * メディアデータを用意する
      */
     // 読み込み必須のためthrowは伝搬させる
-    const mediaDataList = await loadYaml<MediaInfo[]>(
-      "./static/conf/media.yaml"
+    const mediaDataList = await loadYaml<Partial<MediaInfo>[]>(
+      "static/conf/media.yaml"
     );
-    let firstImageIdx: number = -1;
 
-    mediaDataList.forEach((media: MediaInfo, idx: number) => {
+    mediaDataList.forEach((media: Partial<MediaInfo>) => {
       if (!media.tag) media.tag = "";
-      media.url = getSrc(media.url);
-
-      const type = getUrlType(media.url);
-      media.type = type;
-      if (type === "youtube") {
-        if (!media.name)
-          media.name = LanguageManager.instance.getText("label.no-target");
-      } else {
-        if (type === "image") {
-          if (firstImageIdx === -1) firstImageIdx = idx;
-        }
-        if (!media.name) {
-          // ファイル名を名前とする
-          media.name = media.url.replace(/^https?:\/\/.+\//, "");
-        }
-      }
-      // if (image.standImageInfo) {
-      //   // 立ち絵パラメータの値を正しく設定
-      //   const si = image.standImageInfo;
-      //   if (!si.status) si.status = "";
-      //   if (si.type !== "pile" && si.type !== "replace") si.type = "pile";
-      //   if (
-      //     si.viewStart === undefined ||
-      //     si.viewStart < 0 ||
-      //     si.viewStart > 100
-      //   )
-      //     si.viewStart = 0;
-      //   if (si.viewEnd === undefined || si.viewEnd < 0 || si.viewEnd > 100)
-      //     si.viewEnd = 100;
-      // } else {
-      //   // 立ち絵パラメータを推測＆設定
-      //   image.standImageInfo = getFileNameArgList(image.data) || null;
-      // }
     });
 
     /* --------------------------------------------------
@@ -1042,29 +1016,74 @@ export default class LoginWindow extends Mixins<
      */
     // 読み込み必須のためthrowは伝搬させる
     const cutInDataList = await loadYaml<CutInDeclareInfo[]>(
-      "/static/conf/bgm.yaml"
+      "static/conf/bgm.yaml"
     );
     cutInDataList.forEach(cutIn => {
       cutIn.duration = 0;
-      cutIn.url = getSrc(cutIn.url);
 
       const mediaInfo = mediaDataList.find(m => m.url === cutIn.url);
       if (mediaInfo) {
         // 上書き
-        mediaInfo.name = cutIn.title;
-        mediaInfo.tag = cutIn.tag;
+        if (cutIn.title !== undefined) mediaInfo.name = cutIn.title;
+        if (cutIn.tag !== undefined) mediaInfo.name = cutIn.tag;
       } else {
         // 追加
         if (cutIn.url) {
           mediaDataList.push({
             name: cutIn.title,
-            url: cutIn.url,
             tag: cutIn.tag,
-            type: getUrlType(cutIn.url)
+            url: cutIn.url
           });
         }
       }
     });
+
+    // ダイスデータを用意する
+    const diceMaterial = await loadYaml<DiceMaterial>("static/conf/dice.yaml");
+    Object.keys(diceMaterial).forEach(faceNum => {
+      const diceSetList = diceMaterial[faceNum];
+      diceSetList.forEach(diceSet => {
+        const diceSetType = diceSet.type;
+        const diceSetPips = diceSet.pips;
+        Object.keys(diceSetPips).forEach(pips => {
+          const url = diceSetPips[pips];
+          mediaDataList.push({
+            name: `dice-${faceNum}-${diceSetType}-${pips}.${getExt(url)}`,
+            tag: "dice",
+            url
+          });
+        });
+      });
+    });
+
+    const uploadMediaInfoList = await raw2UploadMediaInfoList(
+      mediaDataList.map(md => md.url!)
+    );
+    uploadMediaInfoList.forEach((umi: UploadMediaInfo, idx: number) => {
+      const mediaData = mediaDataList[idx];
+      if (mediaData.name !== undefined) umi.name = mediaData.name;
+      if (mediaData.tag !== undefined) umi.tag = mediaData.tag;
+    });
+
+    const uploadMediaResponse = await mediaUpload({
+      uploadMediaInfoList,
+      option: { ownerType: null, owner: null }
+    });
+
+    uploadMediaResponse.forEach(umr => {
+      if (umr.tag === "dice" && umr.urlType === "image") {
+        const nameSplit = umr.name.split("-");
+        if (nameSplit.length < 4) return;
+        if (nameSplit.shift() !== "dice") return;
+        const faceNum = nameSplit.shift()!;
+        const pips = nameSplit.pop()!;
+        const diceType = nameSplit.join("-");
+        diceMaterial[faceNum].find(dm => dm.type === diceType)!.pips[pips] =
+          umr.docId;
+      }
+    });
+
+    const imageInfo = uploadMediaResponse.find(umr => umr.urlType === "image")!;
 
     /* --------------------------------------------------
      * マップデータのプリセットデータを用意する
@@ -1088,16 +1107,16 @@ export default class LoginWindow extends Mixins<
       shapeType: "square",
       texture: {
         type: "image",
-        imageTag: "", // サーバサイドで自動投入
-        imageId: "", // サーバサイドで自動投入
+        imageTag: imageInfo.tag,
+        imageId: imageInfo.docId,
         direction: "none",
         backgroundSize: "100%"
       },
       background: {
         texture: {
           type: "image",
-          imageTag: "", // サーバサイドで自動投入
-          imageId: "", // サーバサイドで自動投入
+          imageTag: imageInfo.tag,
+          imageId: imageInfo.docId,
           direction: "none",
           backgroundSize: "100%"
         },
@@ -1107,8 +1126,8 @@ export default class LoginWindow extends Mixins<
         useTexture: "original",
         texture: {
           type: "image",
-          imageTag: "", // サーバサイドで自動投入
-          imageId: "", // サーバサイドで自動投入
+          imageTag: imageInfo.tag,
+          imageId: imageInfo.docId,
           direction: "none",
           backgroundSize: "100%"
         },
@@ -1136,8 +1155,7 @@ export default class LoginWindow extends Mixins<
       AddRoomPresetDataRequest,
       void
     >("add-room-preset-data", {
-      mediaDataList,
-      backgroundMediaIndex: firstImageIdx,
+      diceMaterial,
       cutInDataList,
       sceneData: scene,
       roomExtendInfo: createRoomInput.extend,

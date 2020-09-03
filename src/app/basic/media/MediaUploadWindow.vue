@@ -66,23 +66,22 @@ import LifeCycle from "../../core/decorator/LifeCycle";
 import { Task, TaskResult } from "task";
 import MediaUploadItemComponent from "./MediaUploadItemComponent.vue";
 import TaskProcessor from "../../core/task/TaskProcessor";
-import SocketFacade from "../../core/api/app-server/SocketFacade";
 import SButton from "../common/components/SButton.vue";
-import { getYoutubeThunbnail } from "../cut-in/bgm/YoutubeManager";
 import BaseInput from "../../core/component/BaseInput.vue";
 import VueEvent from "../../core/decorator/VueEvent";
 import DropBoxManager from "../../core/api/drop-box/DropBoxManager";
-import { MediaUploadInfo } from "../../../@types/room";
+import { MediaUploadInfo } from "@/@types/room";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import SCheck from "../common/components/SCheck.vue";
 import {
-  createUploadMediaInfoList,
-  mediaUpload,
-  UploadMediaInfo
+  raw2UploadMediaInfoList,
+  mediaUpload
 } from "../../core/utility/FileUtility";
 import LanguageManager from "../../../LanguageManager";
-import { TabInfo } from "../../../@types/window";
+import { TabInfo } from "@/@types/window";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
+import GameObjectManager from "@/app/basic/GameObjectManager";
+import { UploadMediaInfo } from "@/@types/socket";
 
 @Component({
   components: {
@@ -109,8 +108,8 @@ export default class MediaUploadWindow extends Mixins<
   }
 
   private tabList: TabInfo[] = [
-    { target: "local", text: "" },
-    { target: "dropbox", text: "" }
+    { key: "1", target: "local", text: "" },
+    { key: "2", target: "dropbox", text: "" }
   ];
   private currentTabInfo: TabInfo | null = this.tabList[0];
 
@@ -146,7 +145,7 @@ export default class MediaUploadWindow extends Mixins<
       "media-upload-window.dialog.input-tag"
     );
     const tag = window.prompt(msg, "");
-    window.console.log(tag);
+    console.log(tag);
     if (tag === null || tag === undefined) return;
     this.useLocalResultList.forEach(result => {
       result.tag = tag;
@@ -189,9 +188,8 @@ export default class MediaUploadWindow extends Mixins<
   @LifeCycle
   private async mounted() {
     await this.init();
-    this.localResultList = await createUploadMediaInfoList(
-      this.windowInfo.args!.resultList
-    );
+    const rawList: (string | File)[] = this.windowInfo.args!.resultList;
+    this.localResultList = await raw2UploadMediaInfoList(rawList);
   }
 
   @Watch("dropBoxAccessKey")
@@ -200,14 +198,14 @@ export default class MediaUploadWindow extends Mixins<
     if (this.dropBoxAccessKey) {
       // TODO 疎通確認してから
       const links = await DropBoxManager.instance.getListSharedLinks("");
-      window.console.log(JSON.stringify(links, null, "  "));
+      console.log(JSON.stringify(links, null, "  "));
     }
   }
 
   @VueEvent
   private preview(fileInfo: UploadMediaInfo) {
     // TODO プレビュー
-    window.console.log("preview", JSON.stringify(fileInfo, null, "  "));
+    console.log("preview", JSON.stringify(fileInfo, null, "  "));
   }
 
   @VueEvent
@@ -220,7 +218,10 @@ export default class MediaUploadWindow extends Mixins<
 
   @VueEvent
   private async commit() {
-    await mediaUpload(this.localResultList);
+    await mediaUpload({
+      uploadMediaInfoList: this.localResultList,
+      option: { permission: GameObjectManager.PERMISSION_OWNER_VIEW }
+    });
     await this.close();
   }
 }

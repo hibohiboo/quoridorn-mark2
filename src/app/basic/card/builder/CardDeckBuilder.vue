@@ -153,6 +153,7 @@
 
     <text-frame
       class="text-frame"
+      :windowKey="key"
       :otherTextViewInfo="otherTextViewInfo"
       @hide="otherTextHide"
       v-if="otherTextViewInfo"
@@ -175,17 +176,17 @@ import {
   CardYamlInfo,
   InputCardInfo,
   OtherTextViewInfo
-} from "../../../../@types/gameObject";
+} from "@/@types/gameObject";
 import {
   createAddress,
   createPoint
-} from "../../../core/utility/CoordinateUtility";
-import { createEmptyStoreUseData, getSrc } from "../../../core/utility/Utility";
+} from "@/app/core/utility/CoordinateUtility";
+import { createEmptyStoreUseData, getSrc } from "@/app/core/utility/Utility";
 import SocketFacade from "../../../core/api/app-server/SocketFacade";
 import { CardCountInfo } from "./CardChooserComponent.vue";
-import { loadYaml } from "../../../core/utility/FileUtility";
+import { loadYaml } from "@/app/core/utility/FileUtility";
 import VueEvent from "../../../core/decorator/VueEvent";
-import { StoreUseData } from "../../../../@types/store";
+import { StoreUseData } from "@/@types/store";
 import TaskManager from "../../../core/task/TaskManager";
 import GameObjectManager from "../../GameObjectManager";
 import CardDeckChooserComponent from "./CardDeckChooserComponent.vue";
@@ -195,6 +196,7 @@ import CardDeckCreateCardComponent from "./CardDeckCreateCardComponent.vue";
 import CardChooserComponent from "./CardChooserComponent.vue";
 import CardDeckFrameSettingComponent from "./CardDeckFrameSettingComponent.vue";
 import TextFrame from "./TextFrame.vue";
+const uuid = require("uuid");
 
 type DeckInfo = {
   cardDeckBig: StoreUseData<CardDeckBig>;
@@ -303,8 +305,8 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
       }))
     );
 
-    window.console.log(JSON.stringify(cardMetaList, null, "  "));
-    window.console.log(JSON.stringify(cardMetaIdList, null, "  "));
+    console.log(JSON.stringify(cardMetaList, null, "  "));
+    console.log(JSON.stringify(cardMetaIdList, null, "  "));
 
     const cardObjectList: CardObject[] = this.selectedCardList
       .filter(ccInfo => ccInfo.count)
@@ -372,7 +374,12 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
       this.otherTextViewInfo = {
         type: "card-meta",
         docId: card.id!,
-        text,
+        dataList: [
+          createEmptyStoreUseData(uuid.v4(), {
+            tab: "",
+            text
+          })
+        ],
         rect,
         isFix: true
       };
@@ -413,7 +420,7 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
     // プリセットデッキの読み込み
     // 読み込み必須でないためthrowは伝搬しないで警告だけ表示
     try {
-      (await loadYaml<CardYamlInfo[]>("/static/conf/deck.yaml")).forEach(
+      (await loadYaml<CardYamlInfo[]>("static/conf/deck.yaml")).forEach(
         (presetDeck: CardYamlInfo, deckIdx: number) => {
           const name = presetDeck.title;
           const id = `preset-deck-${name}-${deckIdx}`;
@@ -430,13 +437,13 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
                 padBottom: presetDeck.padBottom || 0,
                 radius: presetDeck.radius || 0,
                 frontImage: c.imagePath
-                  ? `url(${getSrc(urljoin(basePath, c.imagePath))})`
+                  ? `url(${getSrc(urljoin(basePath, c.imagePath)).url})`
                   : "",
                 frontBackgroundColor: c.backgroundColor || "#ffffff",
                 backImage: presetDeck.back.imagePath
-                  ? `url(${getSrc(
-                      urljoin(basePath, presetDeck.back.imagePath)
-                    )})`
+                  ? `url(${
+                      getSrc(urljoin(basePath, presetDeck.back.imagePath)).url
+                    })`
                   : "",
                 backBackgroundColor:
                   presetDeck.back.backgroundColor || "#ffffff",
@@ -461,7 +468,7 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
         }
       );
     } catch (err) {
-      window.console.warn(err.toString());
+      console.warn(err.toString());
     }
   }
 

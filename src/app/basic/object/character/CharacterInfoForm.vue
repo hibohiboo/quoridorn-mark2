@@ -6,7 +6,7 @@
         class="object"
         :class="{ 'type-add': isAdd }"
         ref="object"
-        :draggable="isAdd && imageDocId"
+        :draggable="isAdd && imageDocId ? 'true' : 'false'"
         @dragstart="dragStart"
         @dragend="dragEnd"
       ></div>
@@ -96,15 +96,23 @@
               v-model="urlVolatile"
             />
           </tr>
+          <tr v-if="characterSheetType">
+            <th></th>
+            <td>
+              <ctrl-button @click.stop="readCharacterSheet()">
+                <span v-t="'button.read-character-sheet'"></span>
+              </ctrl-button>
+            </td>
+          </tr>
         </table>
       </div>
 
       <!-- その他欄タブ -->
-      <textarea
-        class="input"
+      <other-text-edit-component
         v-if="currentTabInfo.target === 'other-text'"
-        v-model="otherTextVolatile"
-      ></textarea>
+        v-model="otherTextListVolatile"
+        :windowKey="windowKey"
+      />
     </simple-tab-component>
   </div>
 </template>
@@ -116,10 +124,9 @@ import { Task, TaskResult } from "task";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import ComponentVue from "../../../core/window/ComponentVue";
-import { BackgroundSize, Direction } from "../../../../@types/room";
-import { getSrc } from "../../../core/utility/Utility";
+import { BackgroundSize, Direction } from "@/@types/room";
 import GameObjectManager from "../../GameObjectManager";
-import { TabInfo } from "../../../../@types/window";
+import { TabInfo } from "@/@types/window";
 import VueEvent from "../../../core/decorator/VueEvent";
 import TrStringInputComponent from "../../common/components/TrStringInputComponent.vue";
 import TrNumberInputComponent from "../../common/components/TrNumberInputComponent.vue";
@@ -127,9 +134,25 @@ import BackgroundLocationSelect from "../../common/components/select/BackgroundL
 import SimpleTabComponent from "../../../core/component/SimpleTabComponent.vue";
 import ImagePickerComponent from "../../../core/component/ImagePickerComponent.vue";
 import SceneLayerSelect from "../../common/components/select/SceneLayerSelect.vue";
+import OtherTextEditComponent from "@/app/basic/other-text/OtherTextEditComponent.vue";
+import CtrlButton from "@/app/core/component/CtrlButton.vue";
+import {
+  createShinobigamiChatPalette,
+  isShinobigamiUrl
+} from "@/app/core/utility/trpg_system/shinobigami";
+import {
+  createNechronicaChatPalette,
+  isNechronicaUrl
+} from "@/app/core/utility/trpg_system/nechronica";
+import { StoreUseData } from "@/@types/store";
+import { MemoStore } from "@/@types/gameObject";
+import { createEmptyStoreUseData } from "@/app/core/utility/Utility";
+const uuid = require("uuid");
 
 @Component({
   components: {
+    CtrlButton,
+    OtherTextEditComponent,
     SceneLayerSelect,
     ImagePickerComponent,
     SimpleTabComponent,
@@ -153,6 +176,8 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   private mediaList = GameObjectManager.instance.mediaList;
   private isMounted: boolean = false;
   private imageSrc: string = "";
+
+  private characterSheetType: "シノビガミ" | "ネクロニカ" | null = null;
 
   @Prop({ type: String, required: true })
   private name!: string;
@@ -193,17 +218,16 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
     this.$emit("update:url", value);
   }
 
-  @Prop({ type: String, required: true })
-  private otherText!: string;
-
-  private otherTextVolatile: string = "";
-  @Watch("otherText", { immediate: true })
-  private onChangeOtherText(value: string) {
-    this.otherTextVolatile = value;
+  @Prop({ type: Array, required: true })
+  private otherTextList!: StoreUseData<MemoStore>[];
+  private otherTextListVolatile: StoreUseData<MemoStore>[] = [];
+  @Watch("otherTextList", { immediate: true })
+  private onChangeOtherTextList(value: StoreUseData<MemoStore>[]) {
+    this.otherTextListVolatile = value;
   }
-  @Watch("otherTextVolatile")
-  private onChangeOtherTextVolatile(value: string) {
-    this.$emit("update:otherText", value);
+  @Watch("otherTextListVolatile")
+  private onChangeOtherTextListVolatile(value: StoreUseData<MemoStore>[]) {
+    this.$emit("update:otherTextList", value);
   }
 
   @Prop({ type: Number, required: true })
@@ -285,9 +309,9 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   }
 
   private tabList: TabInfo[] = [
-    { target: "image", text: "" },
-    { target: "additional-info", text: "" },
-    { target: "other-text", text: "" }
+    { key: "1", target: "image", text: "" },
+    { key: "2", target: "additional-info", text: "" },
+    { key: "3", target: "other-text", text: "" }
   ];
   private currentTabInfo: TabInfo = this.tabList[0];
 
@@ -328,7 +352,7 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
       obj => obj.id === this.imageDocId
     )[0];
     if (!imageObj) return;
-    this.imageSrc = getSrc(imageObj.data!.url);
+    this.imageSrc = imageObj.data!.url;
     this.objectElm.style.setProperty("--imageSrc", `url(${this.imageSrc})`);
     let direction = "";
     if (this.direction === "horizontal") direction = "scale(-1, 1)";
@@ -390,6 +414,35 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
       "--image-background-position",
       backgroundPosition
     );
+  }
+
+  @Watch("urlVolatile", { immediate: true })
+  private async onChangeUrlVolatile2(value: string) {
+    if (await isShinobigamiUrl(value)) {
+      this.characterSheetType = "シノビガミ";
+    } else if (await isNechronicaUrl(value)) {
+      this.characterSheetType = "ネクロニカ";
+    } else {
+      this.characterSheetType = null;
+    }
+  }
+
+  @VueEvent
+  private async readCharacterSheet() {
+    if (this.characterSheetType === "シノビガミ") {
+      const resultList = await createShinobigamiChatPalette(this.urlVolatile);
+      if (!resultList) return;
+      this.otherTextListVolatile.push(
+        ...resultList.map(r => createEmptyStoreUseData(uuid.v4(), r))
+      );
+    }
+    if (this.characterSheetType === "ネクロニカ") {
+      const resultList = await createNechronicaChatPalette(this.urlVolatile);
+      if (!resultList) return;
+      this.otherTextListVolatile.push(
+        ...resultList.map(r => createEmptyStoreUseData(uuid.v4(), r))
+      );
+    }
   }
 }
 </script>
@@ -458,12 +511,6 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
     box-sizing: border-box;
     padding: 0.2rem;
   }
-
-  textarea {
-    resize: none;
-    padding: 0;
-    box-sizing: border-box;
-  }
 }
 
 .object-cell {
@@ -476,6 +523,7 @@ table {
   grid-row: 2 / 3;
   grid-column: 1 / 2;
   table-layout: fixed;
+  align-self: flex-end;
 
   th,
   td {
@@ -498,10 +546,6 @@ table {
   td {
     text-align: left;
     padding: 0;
-
-    input {
-      margin: 0;
-    }
   }
 }
 </style>

@@ -1,10 +1,14 @@
 import { all, create } from "mathjs";
-import { ChatInfo, CustomDiceBotInfo } from "../../../@types/room";
+import { ChatInfo, CustomDiceBotInfo } from "@/@types/room";
 import GameObjectManager from "../../basic/GameObjectManager";
 import BcdiceManager from "../api/bcdice/BcdiceManager";
 import { sum } from "./PrimaryDataUtility";
 import SocketFacade from "../api/app-server/SocketFacade";
-import { findById, findRequireById, someByStr } from "./Utility";
+import { findById, someByStr } from "./Utility";
+import { BcdiceDiceRollResult, DiceResult } from "@/@types/bcdice";
+import LanguageManager from "@/LanguageManager";
+import App from "@/views/App.vue";
+import WindowManager from "@/app/core/window/WindowManager";
 
 const config = {};
 const math = create(all, config);
@@ -124,19 +128,23 @@ export function transText(text: string): string {
   return resultTexts.join("");
 }
 
-type SendChatInfo = {
-  actorId: string | null;
+export type SendChatInfo = {
+  chatType?: "chat" | "system-message";
+  actorId?: string | null;
   text: string;
   tabId: string | null;
   statusId: string | null;
   targetId: string | null;
   system: string | null;
   isSecret: boolean;
+  diceRollResult?: string;
+  isSecretDice?: boolean;
+  dices?: DiceResult[];
 };
 
-async function addChatLog(chatInfo: ChatInfo) {
-  window.console.log(JSON.stringify(chatInfo, null, "  "));
-  await SocketFacade.instance.chatListCC().addDirect(
+async function addChatLog(chatInfo: ChatInfo): Promise<string> {
+  console.log(JSON.stringify(chatInfo, null, "  "));
+  const idList = await SocketFacade.instance.chatListCC().addDirect(
     [chatInfo],
     [
       {
@@ -148,35 +156,56 @@ async function addChatLog(chatInfo: ChatInfo) {
       }
     ]
   );
+  return idList[0];
+}
+
+export async function sendSystemChatLog(text: string) {
+  await sendChatLog(
+    {
+      chatType: "system-message",
+      actorId: null,
+      text,
+      tabId: null,
+      statusId: null,
+      targetId: null,
+      system: null,
+      isSecret: false
+    },
+    []
+  );
 }
 
 export async function sendChatLog(
   payload: SendChatInfo,
   subCustomDiceBotList: CustomDiceBotInfo[]
-) {
+): Promise<BcdiceDiceRollResult | null> {
   const actorList = GameObjectManager.instance.actorList;
   const actorStatusList = GameObjectManager.instance.actorStatusList;
   const groupChatTabList = GameObjectManager.instance.groupChatTabList;
 
   const actorId =
-    payload.actorId || GameObjectManager.instance.chatPublicInfo.actorId;
+    payload.actorId === undefined
+      ? GameObjectManager.instance.chatPublicInfo.actorId
+      : payload.actorId;
   const targetId =
     payload.targetId || groupChatTabList.find(gct => gct.data!.isSystem)!.id!;
 
-  const actorStatus = findRequireById(
+  const actor = findById(actorList, actorId);
+  const actorStatus = findById(
     actorStatusList,
-    findRequireById(actorList, actorId).data!.statusId
+    actor ? actor.data!.statusId : null
   );
   const groupChatTabInfo = findById(groupChatTabList, targetId);
 
   const chatInfo: ChatInfo = {
+    chatType: payload.chatType || "chat",
     actorId,
     text: payload.text,
-    diceRollResult: null,
     customDiceBotResult: null,
     isSecret: payload.isSecret,
-    isSecretDice: false,
-    dices: [],
+    diceRollResult: payload.diceRollResult || null,
+    isSecretDice: payload.isSecretDice || false,
+    dices: payload.dices || [],
     targetId,
     targetType: groupChatTabInfo ? "group" : "actor",
     tabId:
@@ -184,14 +213,21 @@ export async function sendChatLog(
       (groupChatTabInfo && groupChatTabInfo.data!.outputChatTabId
         ? groupChatTabInfo.data!.outputChatTabId
         : GameObjectManager.instance.chatPublicInfo.tabId),
-    statusId: payload.statusId || actorStatus.id!,
+    statusId:
+      payload.statusId !== undefined
+        ? payload.statusId
+        : actorStatus
+        ? actorStatus.id!
+        : null,
     system: payload.system || GameObjectManager.instance.chatPublicInfo.system
   };
 
-  const outputNormalChat = async (command: string) => {
+  const outputNormalChat = async (
+    command: string
+  ): Promise<BcdiceDiceRollResult | null> => {
     if (!/[@><+-/*=0-9a-zA-Z()"?^$]+/.test(command)) {
       await addChatLog(chatInfo);
-      return;
+      return null;
     }
     const resultJson = await BcdiceManager.sendBcdiceServer({
       system: chatInfo.system,
@@ -207,13 +243,35 @@ export async function sendChatLog(
       // bcdiceとして結果は取れなかった
     }
 
-    // TODO ダイス結果を画面から非表示にする
+    const oldText = chatInfo.text;
+    if (chatInfo.isSecretDice) {
+      chatInfo.chatType = "system-message";
+      chatInfo.text = LanguageManager.instance.getText(
+        "message.dice-roll-secret-dice"
+      );
+    }
 
-    await addChatLog(chatInfo);
+    const chatId = await addChatLog(chatInfo);
 
     if (chatInfo.isSecretDice) {
-      // TODO シークレットダイスの画面表示処理
+      const keepBcdiceDiceRollResultListCC = SocketFacade.instance.keepBcdiceDiceRollResultListCC();
+      await keepBcdiceDiceRollResultListCC.addDirect([
+        {
+          type: "secret-dice-roll",
+          text: oldText,
+          targetId: chatId!,
+          bcdiceDiceRollResult: resultJson
+        }
+      ]);
+      const windowInfoList = WindowManager.instance.windowInfoList;
+      if (!windowInfoList.some(w => w.type === "secret-dice-roll")) {
+        // 開いてなかったら開く
+        // @ts-ignore
+        await App.openSimpleWindow("secret-dice-roll-window");
+      }
     }
+
+    return resultJson.ok ? resultJson : null;
   };
 
   // -------------------
@@ -236,7 +294,7 @@ export async function sendChatLog(
   const useCustomDiceBotObj = customDiceBotObj || customDiceBotRoomSysObj;
   if (!useCustomDiceBotObj) {
     // 独自ダイスボットが見つからなかったので通常のチャット処理
-    await outputNormalChat(commandStr);
+    return await outputNormalChat(commandStr);
   } else {
     // 独自ダイスボットが見つかった
     const diceRoll = useCustomDiceBotObj.diceRoll;
@@ -273,8 +331,11 @@ export async function sendChatLog(
         customDiceBotResult || `該当値なし\n${diceRollResult}`;
 
       await addChatLog(chatInfo);
+
+      return resultJson;
     } else {
       // bcdiceとして結果は取れなかった
+      return null;
     }
   }
 }
@@ -421,7 +482,7 @@ export function conversion(
   const base = filteredUnit.base;
   const name = filteredUnit.name[0];
 
-  // window.console.log(num, unitName, base, name);
+  // console.log(num, unitName, base, name);
 
   return (
     convertTable
@@ -429,12 +490,12 @@ export function conversion(
       .map(targetUnit => targetUnit.name[0])
       .map((unit: string) => `${num}${name} to ${unit}`)
       // .map((unit: string) => {
-      //   window.console.log(unit);
+      //   console.log(unit);
       //   return unit;
       // })
       .map((unit: string) => math.eval(unit).format())
       .map((result: string) => {
-        // window.console.log(result);
+        // console.log(result);
         const mr: any = result.match(/([^ ]+) (.+)/);
         const floatValue: number = parseFloat(mr[1]);
         const unitStr: string = mr[2];
