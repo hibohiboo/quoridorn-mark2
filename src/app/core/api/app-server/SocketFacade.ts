@@ -56,7 +56,6 @@ import NekostoreCollectionController from "./NekostoreCollectionController";
 import { loadYaml } from "../../utility/FileUtility";
 import TaskManager from "../../task/TaskManager";
 import { ModeInfo } from "mode";
-import MemoryStore from "nekostore/lib/store/MemoryStore";
 
 export type ConnectInfo = {
   quoridornServer: string | string[];

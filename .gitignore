@@ -6,8 +6,13 @@ node_modules
 .vagrant
 
 # local env files
+.env
 .env.local
 .env.*.local
+
+# config files
+/public/static/conf/*.yaml
+/public/static/conf/*.txt
 
 # Log files
 npm-debug.log*
