@@ -7,7 +7,7 @@ cd /vagrant/virtual-environment/provision/docker
 docker-compose build
 
 # コリドーンをビルド
-# docker-compose run node-cli npm run build --dest=dist/quoridorn2
+docker-compose run node-cli npm run build --dest=dist/quoridorn2
 
 # バックグラウンドで起動
 docker-compose up -d
