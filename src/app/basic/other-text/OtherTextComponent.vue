@@ -7,13 +7,13 @@
       :v-if="currentTabInfo"
     >
       <div class="html" :class="{ useScroll }">
-        <template v-for="(block, blockIdx) in json">
+        <template v-for="(block, blockIndex) in json">
           <!-- RAW-BLOCK -->
           <template v-if="block.type === 'RAW-BLOCK'">
-            <template v-for="(line, lineIdx) in block.value">
+            <template v-for="(line, lineIndex) in block.value">
               <template v-if="line.type === 'line'">
                 <other-text-span-component
-                  :key="`${blockIdx}-${lineIdx}`"
+                  :key="`${blockIndex}-${lineIndex}`"
                   tag="div"
                   :spans="line.value"
                   :disabled="!isEditable"
@@ -22,23 +22,41 @@
                 />
               </template>
               <pre
-                :key="`${blockIdx}-${lineIdx}`"
+                :key="`${blockIndex}-${lineIndex}`"
                 class="block"
                 v-else-if="line.type === '```'"
                 >{{ line.value }}</pre
               >
+              <textarea
+                :key="`${blockIndex}-${lineIndex}`"
+                v-else-if="line.type === ':::'"
+                :style="{ width: line.width, height: line.height }"
+                :value="line.value"
+                :data-index="line.index"
+                @input.stop.prevent="onChangeInput(line.index)"
+                @change.stop.prevent
+                ref="textareas"
+              >
+              </textarea>
+              <button
+                :key="`${blockIndex}-${lineIndex}`"
+                v-else-if="line.type === '@@@'"
+                @click="onClickButton(line.value)"
+              >
+                {{ getButtonText(line.value) }}
+              </button>
               <hr
-                :key="`${blockIdx}-${lineIdx}`"
+                :key="`${blockIndex}-${lineIndex}`"
                 v-else-if="line.type === 'hr'"
               />
               <div
-                :key="`${blockIdx}-${lineIdx}`"
+                :key="`${blockIndex}-${lineIndex}`"
                 v-else-if="line.type === 'nl'"
               >
                 <br />
               </div>
               <blockquote
-                :key="`${blockIdx}-${lineIdx}`"
+                :key="`${blockIndex}-${lineIndex}`"
                 v-else-if="line.type === '>'"
               >
                 <other-text-span-component
@@ -49,8 +67,24 @@
                   @select="onChangeSelect"
                 />
               </blockquote>
+              <div
+                :key="`${blockIndex}-${lineIndex}`"
+                v-else-if="/h[1-6]/.test(line.type)"
+              >
+                <component v-bind:is="line.type">
+                  <other-text-span-component
+                    tag="div"
+                    v-if="typeof line.value !== 'string'"
+                    :spans="line.value"
+                    :disabled="!isEditable"
+                    @check="onChangeCheck"
+                    @select="onChangeSelect"
+                  />
+                  <template v-else>{{ line.value }}</template>
+                </component>
+              </div>
               <component
-                :key="`${blockIdx}-${lineIdx}`"
+                :key="`${blockIndex}-${lineIndex}`"
                 v-bind:is="line.type"
                 v-else
               >
@@ -65,7 +99,7 @@
                 <template v-else>{{ line.value }}</template>
               </component>
               <div
-                :key="`${blockIdx}-${lineIdx}-space`"
+                :key="`${blockIndex}-${lineIndex}-space`"
                 v-if="line.nlCount > 1"
                 v-html="new Array(line.nlCount).fill().join('<br />')"
               ></div>
@@ -74,10 +108,10 @@
 
           <!-- UL-BLOCK -->
           <template v-if="block.type === 'UL-BLOCK'">
-            <ul :key="blockIdx">
-              <template v-for="(line, lineIdx) in block.value">
+            <ul :key="blockIndex">
+              <template v-for="(line, lineIndex) in block.value">
                 <other-text-span-component
-                  :key="lineIdx"
+                  :key="lineIndex"
                   tag="li"
                   :spans="line.value"
                   :disabled="!isEditable"
@@ -87,7 +121,7 @@
               </template>
             </ul>
             <div
-              :key="`${blockIdx}-space`"
+              :key="`${blockIndex}-space`"
               v-if="block.nlCount > 1"
               v-html="new Array(block.nlCount).fill().join('<br>')"
             ></div>
@@ -95,10 +129,10 @@
 
           <!-- OL-BLOCK -->
           <template v-if="block.type === 'OL-BLOCK'">
-            <ol :key="blockIdx">
-              <template v-for="(line, lineIdx) in block.value">
+            <ol :key="blockIndex">
+              <template v-for="(line, lineIndex) in block.value">
                 <other-text-span-component
-                  :key="lineIdx"
+                  :key="lineIndex"
                   tag="li"
                   :spans="line.value"
                   :disabled="!isEditable"
@@ -108,7 +142,7 @@
               </template>
             </ol>
             <div
-              :key="`${blockIdx}-space`"
+              :key="`${blockIndex}-space`"
               v-if="block.nlCount > 1"
               v-html="new Array(block.nlCount).fill().join('<br>')"
             ></div>
@@ -116,12 +150,12 @@
 
           <!-- TABLE-BLOCK -->
           <template v-if="block.type === 'TABLE-BLOCK'">
-            <table :key="blockIdx">
-              <thead>
+            <table :key="blockIndex">
+              <thead v-if="isEmptyTh(block.value[0].value)">
                 <tr>
                   <other-text-span-component
-                    v-for="(cell, cellIdx) in block.value[0].value"
-                    :key="cellIdx"
+                    v-for="(cell, cellIndex) in block.value[0].value"
+                    :key="cellIndex"
                     tag="th"
                     :spans="cell.value"
                     :disabled="!isEditable"
@@ -132,11 +166,11 @@
                 </tr>
               </thead>
               <tbody>
-                <template v-for="(tr, trIdx) in block.value">
-                  <tr v-if="trIdx > 0" :key="trIdx">
+                <template v-for="(tr, trIndex) in block.value">
+                  <tr v-if="trIndex > 0" :key="trIndex">
                     <other-text-span-component
-                      v-for="(cell, cellIdx) in tr.value"
-                      :key="cellIdx"
+                      v-for="(cell, cellIndex) in tr.value"
+                      :key="cellIndex"
                       tag="td"
                       :spans="cell.value"
                       :disabled="!isEditable"
@@ -149,7 +183,7 @@
               </tbody>
             </table>
             <div
-              :key="`${blockIdx}-space`"
+              :key="`${blockIndex}-space`"
               v-if="block.nlCount > 1"
               v-html="new Array(block.nlCount).fill().join('<br>')"
             ></div>
@@ -161,26 +195,40 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from "vue-property-decorator";
+import { Component, Prop, Watch } from "vue-property-decorator";
 import VueEvent from "../../core/decorator/VueEvent";
-import { StoreUseData } from "@/@types/store";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
-import { MemoStore } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import { markdown } from "@/app/core/markdown/markdown";
 import OtherTextSpanComponent from "@/app/basic/other-text/OtherTextSpanComponent.vue";
 import { TabInfo } from "@/@types/window";
 import SimpleTabComponent from "@/app/core/component/SimpleTabComponent.vue";
 import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
+import TaskManager from "@/app/core/task/TaskManager";
+import { OtherTextUpdateInfo } from "task-info";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
+import ResizeObserver from "resize-observer-polyfill";
+import { getCssPxNum } from "@/app/core/css/Css";
 
 @Component({
   components: { SimpleTabComponent, OtherTextSpanComponent }
 })
-export default class OtherTextComponent extends Vue {
+export default class OtherTextComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
+  @Prop({ type: String, required: true })
+  private docType!: string;
+
+  @Prop({ type: String, required: true })
+  private docKey!: string;
+
   @Prop({ type: String, required: true })
   private windowKey!: string;
 
   @Prop({ type: Array, required: true })
-  private value!: StoreUseData<MemoStore>[];
+  private value!: StoreData<MemoStore>[];
 
   @Prop({ type: Boolean, default: false })
   private useScroll!: boolean;
@@ -189,39 +237,167 @@ export default class OtherTextComponent extends Vue {
     "\\[[ x]](\\([^\\r\\n]*\\))?",
     "g"
   );
-  private readonly selectRegExp: RegExp = new RegExp(
-    "(\\[[^\\r\\n]+])\\([^\\r\\n]*\\)",
+  private readonly selectRegExp: RegExp = /\[([^\]]+?)\]\(([^)]*?)\)/g;
+  private readonly textareaRegExp: RegExp = new RegExp(
+    ":::([0-9]+px):([0-9]+px)\\r?\\n((?:(?!\:\:\:END\;\;\;).|\\s)*):::END;;;",
     "g"
   );
+  private resizeObserver: ResizeObserver | null = null;
 
   private tabList: TabInfo[] = [];
   private currentTabInfo: TabInfo | null = null;
+
+  @VueEvent
+  private isEmptyTh(block: any[]) {
+    return block.some(b => (b.value as any[]).length);
+  }
 
   @LifeCycle
   private async created() {
     this.createTabInfoList();
   }
 
+  @LifeCycle
+  private async mounted() {
+    this.remakeResizeObserver();
+  }
+
+  @Watch("currentTabInfo", { deep: true })
+  private onChangeCurrentTabInfo() {
+    this.remakeResizeObserver();
+  }
+
+  private remakeResizeObserver() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    this.resizeObserver = new ResizeObserver((entries: any) => {
+      entries.forEach(
+        ({
+          target,
+          contentRect
+        }: {
+          target: HTMLElement;
+          contentRect: { width: number; height: number };
+        }) => {
+          const currentValue = this.value.find(
+            lv => lv.key === this.currentTabInfo!.target
+          )!;
+          if (!permissionCheck(currentValue, "edit", 1)) return;
+
+          let { width, height } = contentRect;
+          const scrollBarWidth = getCssPxNum("--scroll-bar-width");
+          const w = Math.max(width, 50);
+          const h = Math.max(height, 30);
+
+          let index: number = convertNumberZero(target.dataset.index || "");
+          currentValue.data!.text = currentValue.data!.text.replace(
+            this.textareaRegExp,
+            (m, p1, p2, p3) =>
+              index-- ? m : `:::${w + scrollBarWidth}px:${h}px\n${p3}:::END;;;`
+          );
+        }
+      );
+    });
+    const textareaElmList: HTMLElement[] = this.$refs
+      .textareas as HTMLElement[];
+    if (!textareaElmList) return;
+    setTimeout(() => {
+      textareaElmList.forEach(elm => this.resizeObserver!.observe(elm));
+    });
+  }
+
+  @VueEvent
+  private async onClickButton(type: string): Promise<void> {
+    switch (type) {
+      case "RELOAD-CHARACTER-SHEET":
+        await TaskManager.instance.ignition<OtherTextUpdateInfo, never>({
+          type: "other-text-update",
+          owner: "Quoridorn",
+          value: {
+            docType: this.docType,
+            docKey: this.docKey,
+            target: this.currentTabInfo!.target.toString()
+          }
+        });
+        break;
+      case "RELOAD-CHARACTER-SHEET-ALL":
+        await TaskManager.instance.ignition<OtherTextUpdateInfo, never>({
+          type: "other-text-update",
+          owner: "Quoridorn",
+          value: {
+            docType: this.docType,
+            docKey: this.docKey,
+            target: null
+          }
+        });
+        break;
+      default:
+    }
+  }
+
+  @VueEvent
+  private getButtonText(type: string): string {
+    switch (type) {
+      case "RELOAD-CHARACTER-SHEET":
+        return "Reload";
+      case "RELOAD-CHARACTER-SHEET-ALL":
+        return "Reload(All)";
+      default:
+    }
+    return "UNKNOWN";
+  }
+
+  @VueEvent
+  private onChangeInput(index: number) {
+    this.$emit("inputTextArea");
+    const textareaElmList: HTMLTextAreaElement[] = this.$refs
+      .textareas as HTMLTextAreaElement[];
+    if (!textareaElmList) return;
+    const value = textareaElmList[index].value;
+    const currentValue = this.value.find(
+      lv => lv.key === this.currentTabInfo!.target
+    )!;
+    if (!permissionCheck(currentValue, "edit", 1)) return;
+    currentValue.data!.text = currentValue.data!.text.replace(
+      this.textareaRegExp,
+      (m, p1, p2) => (index-- ? m : `:::${p1}:${p2}\n${value}:::END;;;`)
+    );
+  }
+
+  @LifeCycle
+  private beforeDestroy() {
+    const textareaElmList: HTMLElement[] = this.$refs
+      .textareas as HTMLElement[];
+    if (!textareaElmList) return;
+    textareaElmList.forEach(elm => {
+      this.resizeObserver!.unobserve(elm);
+      this.resizeObserver!.disconnect();
+    });
+  }
+
   private createTabInfoList() {
     this.tabList = this.value
       .filter(lv => permissionCheck(lv, "view", 1))
       .map(lv => ({
-        key: lv.id!,
-        target: lv.id!,
-        text: lv.data!.tab || this.$t("label.non-tab").toString()
+        key: lv.key,
+        target: lv.key,
+        text: lv.data!.tab || this.$t("label.non-name").toString()
       }));
     this.currentTabInfo = this.tabList[0] || null;
   }
 
-  public input(value: StoreUseData<MemoStore>[]) {
+  public input(value: StoreData<MemoStore>[]) {
     this.$emit("input", value);
   }
 
   @VueEvent
-  private get json() {
+  private get json(): any[] {
     const currentValue = this.value.find(
-      lv => lv.id === this.currentTabInfo!.target
+      lv => lv.key === this.currentTabInfo!.target
     )!;
+    if (!currentValue) return [];
     const text = currentValue.data!.text;
     return markdown(text);
   }
@@ -229,7 +405,7 @@ export default class OtherTextComponent extends Vue {
   @VueEvent
   private onChangeCheck(index: number, value: boolean) {
     const currentValue = this.value.find(
-      lv => lv.id === this.currentTabInfo!.target
+      lv => lv.key === this.currentTabInfo!.target
     )!;
     if (!permissionCheck(currentValue, "edit", 1)) return;
     currentValue.data!.text = currentValue.data!.text.replace(
@@ -242,23 +418,25 @@ export default class OtherTextComponent extends Vue {
   }
 
   @VueEvent
-  private get isEditable(): boolean {
-    const otherText = this.value.find(
-      v => v.id === this.currentTabInfo!.target
-    )!;
-    return permissionCheck(otherText, "edit", 1);
-  }
-
-  @VueEvent
   private onChangeSelect(index: number, value: string) {
     const currentValue = this.value.find(
-      lv => lv.id === this.currentTabInfo!.target
+      lv => lv.key === this.currentTabInfo!.target
     )!;
     if (!permissionCheck(currentValue, "edit", 1)) return;
     currentValue.data!.text = currentValue.data!.text.replace(
       this.selectRegExp,
-      (m, p1) => (index-- ? m : `${p1}(${value})`)
+      (m, p1) => {
+        return index-- ? m : `[${p1}](${value})`;
+      }
     );
+  }
+
+  @VueEvent
+  private get isEditable(): boolean {
+    const otherText = this.value.find(
+      v => v.key === this.currentTabInfo!.target
+    )!;
+    return permissionCheck(otherText, "edit", 1);
   }
 }
 </script>
@@ -324,6 +502,11 @@ export default class OtherTextComponent extends Vue {
     .center {
       text-align: center;
     }
+  }
+
+  button {
+    @include inline-flex-box(row, center, center);
+    margin-right: 0.5em;
   }
 
   h1,
@@ -396,5 +579,12 @@ blockquote {
   border-left: 3px solid darkgray;
   color: #555;
   margin: 0;
+}
+
+textarea {
+  display: block;
+  overflow-y: scroll;
+  margin-right: 10px !important;
+  margin-bottom: 10px !important;
 }
 </style>

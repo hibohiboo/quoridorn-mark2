@@ -1,8 +1,8 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
-    :id="id"
     ref="component"
   />
 </template>
@@ -16,7 +16,7 @@ import ComponentVue from "../../../../core/window/ComponentVue";
 import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
@@ -51,8 +51,8 @@ export default class BackgroundLocationSelect extends Mixins<MultiMixin>(
 
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
-      const suffix = o.value ? `-${o.value}` : "";
-      o.text = this.$t(`label.background-location${suffix}`)!.toString();
+      const suffix = o.value || "label";
+      o.text = this.$t(`selection.background-location.${suffix}`)!.toString();
       o.key = o.value;
     });
   }

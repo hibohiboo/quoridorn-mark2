@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     ref="component"
@@ -16,14 +17,11 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
-import LanguageManager from "../../../../../LanguageManager";
+import { HtmlOptionInfo } from "@/@types/window";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class ThrowCharSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -47,16 +45,16 @@ export default class ThrowCharSelect extends Mixins<MultiMixin>(
   }
 
   private createOptionInfoList() {
-    this.optionInfoList = this.chars.map((c: string, idx: number) => ({
+    this.optionInfoList = this.chars.map((c: string, index: number) => ({
       value: c,
-      key: idx.toString(10),
+      key: index.toString(10),
       text: c,
       disabled: false
     }));
     this.optionInfoList.splice(0, 0, {
       value: "",
       key: "",
-      text: LanguageManager.instance.getText("label.char"),
+      text: this.$t("label.char")!.toString(),
       disabled: true
     });
   }

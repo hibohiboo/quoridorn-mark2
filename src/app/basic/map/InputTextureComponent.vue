@@ -3,16 +3,16 @@
     <background-type-radio v-model="type" />
     <image-picker-component
       v-if="type === 'image'"
-      v-model="imageId"
+      v-model="imageKey"
       :windowKey="windowKey"
-      :imageTag.sync="imageTag"
+      :mediaTag.sync="mediaTag"
       :direction.sync="direction"
     />
     <div v-else>
       <table>
         <tr>
           <tr-string-input-component
-            labelName="text"
+            labelName="label.text"
             width="100%"
             v-model="text"
           />
@@ -20,7 +20,7 @@
         <tr v-if="isMounted">
           <tr-color-picker-component
             class="value-color"
-            labelName="background-color"
+            labelName="label.background-color"
             v-model="color"
           />
         </tr>
@@ -30,13 +30,12 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Watch, Vue } from "vue-property-decorator";
+import { Component, Prop, Watch } from "vue-property-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
 import SeekBarComponent from "../cut-in/bgm/SeekBarComponent.vue";
 import ColorPickerComponent from "../../core/component/ColorPickerComponent.vue";
 import TrColorPickerComponent from "../common/components/TrColorPickerComponent.vue";
 import BaseInput from "../../core/component/BaseInput.vue";
-import { BackgroundSize, Direction, Texture } from "../../../@types/room";
 import { parseColor } from "../../core/utility/ColorUtility";
 import ImagePickerComponent from "../../core/component/ImagePickerComponent.vue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
@@ -44,6 +43,13 @@ import TrStringInputComponent from "../common/components/TrStringInputComponent.
 import BackgroundTypeRadio from "../common/components/radio/BackgroundTypeRadio.vue";
 import SceneLayerSelect from "../common/components/select/SceneLayerSelect.vue";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
+import {
+  BackgroundSize,
+  Direction,
+  Texture
+} from "@/@types/store-data-optional";
 
 @Component({
   components: {
@@ -59,7 +65,9 @@ import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
     CtrlButton
   }
 })
-export default class InputTextureComponent extends Vue {
+export default class InputTextureComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: String, required: true })
   private windowKey!: string;
 
@@ -72,8 +80,8 @@ export default class InputTextureComponent extends Vue {
   private isMounted: boolean = false;
 
   private type: "image" | "color" | null = null;
-  private imageId: string = "";
-  private imageTag: string = "";
+  private imageKey: string = "";
+  private mediaTag: string = "";
   private direction: Direction = "none";
   private backgroundSize: BackgroundSize = "contain";
 
@@ -84,8 +92,8 @@ export default class InputTextureComponent extends Vue {
   private async mounted() {
     this.type = this.localValue.type;
     if (this.localValue.type === "image") {
-      this.imageTag = this.localValue.imageTag;
-      this.imageId = this.localValue.imageId;
+      this.mediaTag = this.localValue.mediaTag;
+      this.imageKey = this.localValue.mediaKey;
       this.direction = this.localValue.direction;
       this.backgroundSize = this.localValue.backgroundSize;
     } else {
@@ -111,11 +119,11 @@ export default class InputTextureComponent extends Vue {
   private onChangeType(newValue: string | null, oldValue: string | null) {
     if (!newValue || !oldValue) return;
     if (newValue === "image") {
-      if (!this.imageTag) this.imageTag = this.defaultTag;
+      if (!this.mediaTag) this.mediaTag = this.defaultTag;
       this.localValue = {
         type: "image",
-        imageTag: this.imageTag,
-        imageId: this.imageId,
+        mediaTag: this.mediaTag,
+        mediaKey: this.imageKey,
         direction: this.direction,
         backgroundSize: this.backgroundSize
       };
@@ -132,17 +140,17 @@ export default class InputTextureComponent extends Vue {
     }
   }
 
-  @Watch("imageId")
-  private onChangeImageId() {
+  @Watch("imageKey")
+  private onChangeImageKey() {
     if (this.localValue.type === "image") {
-      this.localValue.imageId = this.imageId;
+      this.localValue.mediaKey = this.imageKey;
     }
   }
 
-  @Watch("imageTag")
+  @Watch("mediaTag")
   private onChangeImageTag() {
     if (this.localValue.type === "image") {
-      this.localValue.imageTag = this.imageTag;
+      this.localValue.mediaTag = this.mediaTag;
     }
   }
 

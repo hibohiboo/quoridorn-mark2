@@ -103,8 +103,12 @@ function fixSpans(spans, isRow) {
                            return lex.call(this, 'i', 'SPAN');
 <INITIAL,SPAN>'`'[^\r\n`]+?'`'
                            return lex.call(this, '`', 'SPAN');
+<INITIAL>'@@@'((?!\@\@\@).+?)'@@@'(\r?\n)?
+                           return lex.call(this, '@@@');
 <INITIAL>'```'(\s|.)+?'```'\r?\n
                            return lex.call(this, '```');
+<INITIAL>':::'[0-9]+((px)|(em))':'[0-9]+((px)|(em))\r?\n((?:(?!\:\:\:END\;\;\;).|\s)*)':::END;;;'(\r?\n)?
+                           return lex.call(this, ':::');
 <SPAN>\r?\n                return lex.call(this, 'nl', '');
 <SPAN>.                    return lex.call(this, '.');
 <INITIAL>\r?\n             return lex.call(this, 'nl');
@@ -117,6 +121,8 @@ function fixSpans(spans, isRow) {
 
 %left '.'
 %left '```'
+%left ':::'
+%left '@@@'
 %left 'hr' 'ul' 'ol' '>'
 %left 'bi' 'b' 'i' '`'
 %left '|' '<->'
@@ -142,10 +148,12 @@ expressions
         }
         let checkCount = 0;
         let selectCount = 0;
+        let textareaCount = 0;
         $1.forEach(block => {
           const blockType = block.type;
           block.value.forEach(line => {
             delete line.raw;
+            if (line.type === ':::') line.index = textareaCount++;
             if (line.value && Array.isArray(line.value)) {
               line.value.forEach(span => {
                 if (span.type === 'check') span.index = checkCount++;
@@ -161,7 +169,7 @@ expressions
           });
           if (blockType === 'TABLE-BLOCK') {
             // 両端の区切りは削除
-            block.value.forEach((line, idx) => {
+            block.value.forEach((line, index) => {
               const list = line.value;
               if (list[0].type === '|') list.splice(0, 1);
               if (list[list.length - 1].type === '|') list.splice(list.length - 1, 1);
@@ -178,21 +186,19 @@ expressions
             });
             block.value.splice(1, 1);
             const table = [];
-            block.value.forEach((line, idx) => {
+            block.value.forEach((line, index) => {
               const decCopy = dec.concat();
               const decItem = decCopy.shift();
-              table.push({ type: 'tr', value: [{ type: idx ? 'td' : 'th', value: [], align: decItem }] });
+              table.push({ type: 'tr', value: [{ type: index ? 'td' : 'th', value: [], align: decItem }] });
               const list = line.value;
-              isLastDev = true;
               list.forEach((span) => {
                 if (span.type === '|') {
                   const decItem = decCopy.shift();
-                  table[table.length - 1].value.push({ type: idx ? 'td' : 'th', value: [], align: decItem });
+                  table[table.length - 1].value.push({ type: index ? 'td' : 'th', value: [], align: decItem });
                 } else {
                   const lastCellList = table[table.length - 1].value;
                   lastCellList[lastCellList.length - 1].value.push(span);
                 }
-                isLastDev = span.type === '|';
               });
             });
             block.value = table;
@@ -324,17 +330,22 @@ line
     | '#' { $$ = { type: `h${$1.match(/^#{1,6}/)[0].length}`, value: $1.replace(/^#{1,6} *(.+)\r?\n$/, (m, p1) => p1), raw: $1, nlCount: 1 }; }
     | 'hr' { $$ = { type: 'hr', raw: $1, nlCount: 1 }; }
     | '```' { $$ = { type: '```', value: $1.replace(/^```((?:.|\s)+?)```\r?\n$/, (m, p1) => p1), raw: $1, nlCount: 1 }; }
+    | ':::'
+      { let res = $1.match(/^:::([0-9]+px):([0-9]+px)\r?\n((?:(?!\:\:\:END\;\;\;).|\s)*):::END;;;(\r?\n)?$/);
+        $$ = { type: ':::', width: res[1], height: res[2], value: res[3], raw: $1, nlCount: 1 };
+      }
+    | '@@@' { $$ = { type: '@@@', value: $1.match(/@@@(.+)@@@(\r?\n)?/)[1], raw: $1, nlCount: 1 }; }
     | spans 'nl'
       { $$ = { type: 'line', value: fixSpans($1, 0), raw: spansRaw($1), nlCount: 1 };
         let nonCountDev = 0;
         let rawCount = 0;
         let devCount = 0;
         let aroCount = 0;
-        $$.value.forEach((s, idx) => {
+        $$.value.forEach((s, index) => {
           if (!s.isTableSpan) rawCount++;
           if (s.type === '|') {
             devCount++;
-            if (idx === 0 || idx === $$.value.length - 1) nonCountDev++;
+            if (index === 0 || index === $$.value.length - 1) nonCountDev++;
           }
           if (s.type === '<->') aroCount++;
         });
@@ -353,15 +364,14 @@ line
 spans
     : spans span
       {
+        const last = $1[$1.length - 1];
         if (
-          $1[$1.length - 1].type === $2.type &&
-          $1[$1.length - 1].connectable &&
-          $2.connectable
+          last.type === $2.type &&
+          last.connectable && $2.connectable
         ) {
-          $1[$1.length - 1].value += $2.value;
-          $1[$1.length - 1].raw += $2.raw;
+          last.value += $2.value;
+          last.raw += $2.raw;
         } else {
-          const last = $1[$1.length - 1];
           if (last.type === '<->' && $2.type !== '|') {
             $1.splice($1.length - 1, 1, parseTableLine(last), $2);
             arrangeTableLineList($1);

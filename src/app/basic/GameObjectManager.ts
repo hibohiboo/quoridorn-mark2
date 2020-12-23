@@ -1,57 +1,57 @@
 import SocketFacade from "../core/api/app-server/SocketFacade";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
-import { BgmStandByInfo } from "task-info";
-import { Permission, StoreObj, StoreUseData } from "@/@types/store";
-import {
-  ClientRoomInfo,
-  DiceAndPips,
-  DiceType,
-  RoomInfoExtend,
-  WindowSettings
-} from "@/@types/socket";
-import {
-  ActorGroup,
-  ChatInfo,
-  ChatTabInfo,
-  CutInDeclareInfo,
-  GroupChatTabInfo,
-  MediaInfo,
-  PartialRoomData,
-  RoomData,
-  Scene,
-  SceneAndLayer,
-  SceneAndObject,
-  SceneLayer,
-  SocketUserData,
-  UserData
-} from "@/@types/room";
+import { ClientRoomInfo } from "@/@types/socket";
 import {
   ActorStatusStore,
   ActorStore,
-  CardDeckBig,
-  CardDeckSmall,
-  CardMeta,
-  CardObject,
-  KeepBcdiceDiceRollResult,
+  CardDeckBigStore,
+  CardDeckSmallStore,
+  CardMetaStore,
+  CardObjectStore,
+  KeepBcdiceDiceRollResultStore,
   ChatPaletteStore,
   InitiativeColumnStore,
-  PropertySelectionStore,
   ResourceMasterStore,
   ResourceStore,
-  SceneObject,
-  TagNoteStore,
-  MemoStore
-} from "@/@types/gameObject";
+  SceneObjectStore,
+  MemoStore,
+  PublicMemoStore,
+  LikeStore,
+  ActorGroupStore,
+  ChatStore,
+  ChatTabStore,
+  CutInStore,
+  GroupChatTabStore,
+  MediaStore,
+  RoomDataStore,
+  SceneStore,
+  SceneAndLayerStore,
+  SceneAndObjectStore,
+  SceneLayerStore,
+  SocketUserStore,
+  UserStore,
+  DiceTypeStore,
+  DiceAndPipsStore
+} from "@/@types/store-data";
 import { ApplicationError } from "../core/error/ApplicationError";
-import { findById } from "../core/utility/Utility";
+import {
+  errorDialog,
+  findByKey,
+  findRequireByKey
+} from "../core/utility/Utility";
 import { loadYaml } from "../core/utility/FileUtility";
 import LanguageManager from "../../LanguageManager";
+import {
+  PartialRoomData,
+  RoomInfoExtend,
+  WindowSettings
+} from "@/@types/store-data-optional";
 
 export type ChatPublicInfo = {
   isUseAllTab: boolean;
-  actorId: string;
-  tabId: string;
-  targetId: string;
+  actorKey: string;
+  tabKey: string;
+  targetKey: string;
   system: string;
   bcdiceUrl: string;
 };
@@ -111,7 +111,7 @@ export default class GameObjectManager {
       sf.cardDeckBigCC().getList(true, this.cardDeckBigList),
       sf.cardMetaCC().getList(true, this.cardMetaList),
       sf.socketUserCC().getList(true, this.socketUserList),
-      sf.tagNoteCC().getList(true, this.tagNoteList)
+      sf.publicMemoListCC().getList(true, this.publicMemoList)
     ]);
     // Block 2
     await Promise.all([
@@ -133,7 +133,6 @@ export default class GameObjectManager {
     await Promise.all([
       sf.actorStatusCC().getList(true, this.actorStatusList),
       sf.sceneAndLayerCC().getList(true, this.sceneAndLayerList),
-      sf.propertySelectionCC().getList(true, this.propertySelectionList),
       sf.sceneListCC().getList(true, this.sceneList),
       sf
         .keepBcdiceDiceRollResultListCC()
@@ -152,12 +151,13 @@ export default class GameObjectManager {
       sf.sceneObjectCC().getList(true, this.sceneObjectList),
       sf.sceneLayerCC().getList(true, this.sceneLayerList),
       sf.initiativeColumnCC().getList(true, this.initiativeColumnList),
-      sf.groupChatTabListCC().getList(true, this.groupChatTabList)
+      sf.groupChatTabListCC().getList(true, this.groupChatTabList),
+      sf.likeListCC().getList(true, this.likeList)
     ]);
 
     const roomDataCC = sf.roomDataCC();
     const roomData = (await roomDataCC.getList(false))[0];
-    this.roomDataId = roomData.id!;
+    this.roomDataKey = roomData.key;
 
     // Object.assign()
     const writeSettings = (from: RoomInfoExtend, to: RoomInfoExtend) => {
@@ -177,17 +177,17 @@ export default class GameObjectManager {
       to.windowSettings.counterRemocon = from.windowSettings.counterRemocon;
     };
     this.roomData.name = roomData.data!.name;
-    this.roomData.sceneId = roomData.data!.sceneId;
+    this.roomData.sceneKey = roomData.data!.sceneKey;
     writeSettings(roomData.data!.settings, this.roomData.settings);
 
     await roomDataCC.setSnapshot(
       "GameObjectManager",
-      this.roomDataId!,
-      (snapshot: DocumentSnapshot<StoreObj<RoomData>>) => {
+      this.roomDataKey!,
+      (snapshot: DocumentSnapshot<StoreData<RoomDataStore>>) => {
         if (snapshot.exists() && snapshot.data.status === "modified") {
           const d = snapshot.data.data!;
           // Object.assign()
-          this.roomData.sceneId = d.sceneId;
+          this.roomData.sceneKey = d.sceneKey;
           writeSettings(d.settings, this.roomData.settings);
         }
       }
@@ -214,25 +214,27 @@ export default class GameObjectManager {
     }
 
     // チャット設定の初期化
-    this.chatPublicInfo.actorId = this.mySelfActorId;
-    this.chatPublicInfo.tabId = this.chatTabList.find(
+    this.chatPublicInfo.actorKey = this.mySelfActorKey;
+    this.chatPublicInfo.tabKey = this.chatTabList.find(
       ct => ct.data!.isSystem
-    )!.id!;
-    this.chatPublicInfo.targetId = this.groupChatTabList.find(
+    )!.key;
+    this.chatPublicInfo.targetKey = this.groupChatTabList.find(
       gct => gct.data!.isSystem
-    )!.id!;
+    )!.key;
     this.chatPublicInfo.system = this.clientRoomInfo.system;
     this.chatPublicInfo.bcdiceUrl = this.clientRoomInfo.bcdiceServer;
   }
 
   /**
    * ユーザー名を取得する
-   * @param userId
+   * @param userKey
    */
-  public getUserName(userId: string | null) {
-    const user = findById(this.userList, userId);
+  public getUserName(userKey: string | null) {
+    const user = findByKey(this.userList, userKey);
     if (!user) return LanguageManager.instance.getText("label.system");
-    const type = LanguageManager.instance.getText(`label.${user.data!.type}`);
+    const type = LanguageManager.instance.getText(
+      `selection.user-type.${user.data!.type}`
+    );
     return `${user.data!.name}(${type})`;
   }
 
@@ -241,12 +243,12 @@ export default class GameObjectManager {
    * @param data
    */
   public async updateRoomData(data: PartialRoomData): Promise<void> {
-    if (!this.roomDataId)
-      throw new ApplicationError("Illegal timing error(roomDataId is null).");
+    if (!this.roomDataKey)
+      throw new ApplicationError("Illegal timing error(roomDataKey is null).");
     const cc = SocketFacade.instance.roomDataCC();
 
     try {
-      await cc.touchModify([this.roomDataId]);
+      await cc.touchModify([this.roomDataKey]);
     } catch (err) {
       // nothing.
       console.error(err);
@@ -255,7 +257,7 @@ export default class GameObjectManager {
 
     // Object.assign()
     if (data.name !== undefined) this.roomData.name = data.name;
-    if (data.sceneId !== undefined) this.roomData.sceneId = data.sceneId;
+    if (data.sceneKey !== undefined) this.roomData.sceneKey = data.sceneKey;
     const settings = data.settings;
     if (settings) {
       const copyParam = <T extends keyof RoomInfoExtend>(param: T) => {
@@ -286,33 +288,34 @@ export default class GameObjectManager {
         copyWindow("counterRemocon");
       }
     }
-    await cc.update([this.roomDataId], [this.roomData]);
+    await cc.update([
+      {
+        key: this.roomDataKey,
+        data: this.roomData
+      }
+    ]);
   }
 
   private __clientRoomInfo: ClientRoomInfo | null = null;
 
   public readonly chatPublicInfo: ChatPublicInfo = {
     isUseAllTab: false,
-    actorId: "",
-    tabId: "",
-    targetId: "",
+    actorKey: "",
+    tabKey: "",
+    targetKey: "",
     system: "",
     bcdiceUrl: ""
   };
 
-  public get selfActors(): StoreUseData<ActorStore>[] {
-    return this.actorList.filter(a => a.owner === this.mySelfUserId);
-  }
-
   // シーンの編集中にシーンの切り替えが行われたとき、その追従を行うための変数
   public isSceneEditing: boolean = false;
-  public sceneEditingUpdateSceneId: string | null = null;
+  public sceneEditingUpdateSceneKey: string | null = null;
 
   // 部屋の設定情報
-  private roomDataId: string | null = null;
-  public readonly roomData: RoomData = {
+  private roomDataKey: string | null = null;
+  public readonly roomData: RoomDataStore = {
     name: "",
-    sceneId: "",
+    sceneKey: "",
     settings: {
       visitable: true,
       isFitGrid: true,
@@ -337,48 +340,44 @@ export default class GameObjectManager {
 
   // 再生中のBGMの一覧
   public readonly playingBgmList: {
-    targetId: string | null;
+    targetKey: string | null;
     tag: string;
     windowKey: string;
   }[] = [];
 
-  public readonly chatList: StoreUseData<ChatInfo>[] = [];
-  public readonly chatTabList: StoreUseData<ChatTabInfo>[] = [];
-  public readonly groupChatTabList: StoreUseData<GroupChatTabInfo>[] = [];
-  public readonly sceneList: StoreUseData<Scene>[] = [];
-  public readonly cutInList: StoreUseData<CutInDeclareInfo>[] = [];
-  public readonly bgmStandByList: StoreUseData<BgmStandByInfo>[] = [];
-  public readonly mediaList: StoreUseData<MediaInfo>[] = [];
-  public readonly imageTagList: StoreUseData<string>[] = [];
-  public readonly userList: StoreUseData<UserData>[] = [];
-  public readonly socketUserList: StoreUseData<SocketUserData>[] = [];
+  public readonly chatList: StoreUseData<ChatStore>[] = [];
+  public readonly chatTabList: StoreUseData<ChatTabStore>[] = [];
+  public readonly groupChatTabList: StoreUseData<GroupChatTabStore>[] = [];
+  public readonly sceneList: StoreUseData<SceneStore>[] = [];
+  public readonly cutInList: StoreUseData<CutInStore>[] = [];
+  public readonly mediaList: StoreUseData<MediaStore>[] = [];
+  public readonly userList: StoreUseData<UserStore>[] = [];
+  public readonly socketUserList: StoreUseData<SocketUserStore>[] = [];
   public readonly actorList: StoreUseData<ActorStore>[] = [];
-  public readonly sceneLayerList: StoreUseData<SceneLayer>[] = [];
-  public readonly sceneAndLayerList: StoreUseData<SceneAndLayer>[] = [];
-  public readonly sceneAndObjectList: StoreUseData<SceneAndObject>[] = [];
-  public readonly sceneObjectList: StoreUseData<SceneObject>[] = [];
+  public readonly sceneLayerList: StoreUseData<SceneLayerStore>[] = [];
+  public readonly sceneAndLayerList: StoreUseData<SceneAndLayerStore>[] = [];
+  public readonly sceneAndObjectList: StoreUseData<SceneAndObjectStore>[] = [];
+  public readonly sceneObjectList: StoreUseData<SceneObjectStore>[] = [];
   public readonly actorStatusList: StoreUseData<ActorStatusStore>[] = [];
   public readonly resourceMasterList: StoreUseData<ResourceMasterStore>[] = [];
   public readonly resourceList: StoreUseData<ResourceStore>[] = [];
   public readonly initiativeColumnList: StoreUseData<
     InitiativeColumnStore
   >[] = [];
-  public readonly propertySelectionList: StoreUseData<
-    PropertySelectionStore
-  >[] = [];
-  public readonly tagNoteList: StoreUseData<TagNoteStore>[] = [];
-  public readonly actorGroupList: StoreUseData<ActorGroup>[] = [];
-  public readonly cardMetaList: StoreUseData<CardMeta>[] = [];
-  public readonly cardObjectList: StoreUseData<CardObject>[] = [];
-  public readonly cardDeckBigList: StoreUseData<CardDeckBig>[] = [];
-  public readonly cardDeckSmallList: StoreUseData<CardDeckSmall>[] = [];
+  public readonly actorGroupList: StoreUseData<ActorGroupStore>[] = [];
+  public readonly cardMetaList: StoreUseData<CardMetaStore>[] = [];
+  public readonly cardObjectList: StoreUseData<CardObjectStore>[] = [];
+  public readonly cardDeckBigList: StoreUseData<CardDeckBigStore>[] = [];
+  public readonly cardDeckSmallList: StoreUseData<CardDeckSmallStore>[] = [];
   public readonly chatPaletteList: StoreUseData<ChatPaletteStore>[] = [];
-  public readonly diceTypeList: StoreUseData<DiceType>[] = [];
-  public readonly diceAndPipsList: StoreUseData<DiceAndPips>[] = [];
+  public readonly diceTypeList: StoreUseData<DiceTypeStore>[] = [];
+  public readonly diceAndPipsList: StoreUseData<DiceAndPipsStore>[] = [];
   public readonly keepBcdiceDiceRollResultList: StoreUseData<
-    KeepBcdiceDiceRollResult
+    KeepBcdiceDiceRollResultStore
   >[] = [];
   public readonly memoList: StoreUseData<MemoStore>[] = [];
+  public readonly publicMemoList: StoreUseData<PublicMemoStore>[] = [];
+  public readonly likeList: StoreUseData<LikeStore>[] = [];
 
   public get clientRoomInfo(): ClientRoomInfo {
     if (!this.__clientRoomInfo) {
@@ -389,18 +388,18 @@ export default class GameObjectManager {
     return this.__clientRoomInfo;
   }
 
-  public getExclusionOwnerId(socketId: string | null): string | null {
+  public getExclusionOwnerKey(socketId: string | null): string | null {
     const socketUserInfo = this.socketUserList.find(
       su => su.data!.socketId === socketId
     );
     if (!socketUserInfo) return null;
-    return socketUserInfo.data!.userId;
+    return socketUserInfo.data!.userKey;
   }
 
   public getExclusionOwnerName(socketId: string): string {
-    const userId = this.getExclusionOwnerId(socketId);
-    if (!userId) return "";
-    const userInfo = findById(this.userList, userId);
+    const userKey = this.getExclusionOwnerKey(socketId);
+    if (!userKey) return "";
+    const userInfo = findByKey(this.userList, userKey);
     return !userInfo
       ? LanguageManager.instance.getText("label.unknown")
       : userInfo.data!.name;
@@ -410,17 +409,20 @@ export default class GameObjectManager {
     try {
       await SocketFacade.instance.sceneObjectCC()!.deletePackage([id]);
     } catch (err) {
-      const msg =
-        "Failure to delete object.\nAny data is locked.\nPlease try again latter.";
-      alert(msg);
+      await errorDialog({
+        title: LanguageManager.instance.getText("message.error"),
+        text:
+          "Failure to delete object.\nAny data is locked.\nPlease try again latter."
+      });
     }
   }
 
-  public get mySelfUser(): StoreUseData<UserData> | null {
-    return this.userList.find(p => p.id === this.mySelfUserId) || null;
+  public get mySelfUser(): StoreUseData<UserStore> | null {
+    return findByKey(this.userList, SocketFacade.instance.userKey) || null;
   }
 
   public get isGm(): boolean {
+    if (!SocketFacade.instance.userKey) return false;
     return (
       !!this.mySelfUser &&
       !!this.mySelfUser.data &&
@@ -428,133 +430,118 @@ export default class GameObjectManager {
     );
   }
 
-  public get mySelfUserId(): string {
-    const userId = SocketFacade.instance.userId;
-    if (!userId) throw new ApplicationError(`Illegal timing error.`);
-    return userId;
-  }
-
-  public get mySelfActorId(): string {
+  public get mySelfActorKey(): string {
     return this.actorList.find(
-      a => a.data!.type === "user" && a.owner === this.mySelfUserId
-    )!.id!;
+      a => a.data!.type === "user" && a.owner === SocketFacade.instance.userKey
+    )!.key;
   }
 
   public async updateMemoList(
-    dataList: StoreUseData<MemoStore>[],
+    dataList: StoreData<MemoStore>[],
     ownerType: string,
     owner: string
   ): Promise<void> {
     const memoCC = SocketFacade.instance.memoCC();
-    const deleteIdList = GameObjectManager.instance.memoList
+    const deleteKeyList = GameObjectManager.instance.memoList
       .filter(
         m =>
           m.ownerType === ownerType &&
           m.owner === owner &&
-          !dataList.some(d => d.id === m.id)
+          !dataList.some(d => d.key === m.key)
       )
-      .map(m => m.id!);
+      .map(m => m.key);
     await memoCC.updatePackage(
-      dataList.filter(ot => ot.owner).map(ot => ot.id!),
-      dataList.filter(ot => ot.owner).map(ot => ot.data!),
       dataList
-        .map(
-          (ot, idx: number): Partial<StoreObj<any>> => ({
-            order: ot.owner ? idx : -1,
-            permission: ot.permission
-          })
-        )
+        .map((ot, index) => ({
+          key: ot.key,
+          order: ot.owner ? index : -1,
+          permission: ot.permission,
+          data: ot.data!
+        }))
         .filter(data => data.order !== undefined && data.order > -1)
     );
-    if (dataList.filter(ot => !ot.owner).length) {
-      await memoCC.addDirect(
-        dataList.filter(ot => !ot.owner).map(ot => ot.data!),
-        dataList
-          .map(
-            (ot, idx: number): Partial<StoreObj<any>> => ({
-              ownerType,
-              owner,
-              order: ot.owner ? -1 : idx,
-              permission: ot.permission
-            })
-          )
-          .filter(data => data.order !== undefined && data.order > -1)
-      );
+    if (dataList.filter(ot => ot.collection === "volatile").length) {
+      const addDataList = dataList
+        .map((ot, index: number) => ({
+          ownerType,
+          owner,
+          order: ot.collection === "volatile" ? index : -1,
+          permission: ot.permission,
+          data: ot.data!
+        }))
+        .filter(data => data.order > -1);
+      await memoCC.addDirect(addDataList);
     }
-    if (deleteIdList.length) {
-      await memoCC.deletePackage(deleteIdList);
+    if (deleteKeyList.length) {
+      await memoCC.deletePackage(deleteKeyList);
     }
   }
 
-  public getOwner<T>(data: StoreObj<T>): StoreObj<T> | null {
+  public getOwner<T>(data: StoreData<T>): StoreData<T> | null {
     const ownerType = data.ownerType;
     const owner = data.owner;
     if (!ownerType) return null;
-    return GameObjectManager.instance
-      .getList(ownerType!)!
-      .find(o => o.id === owner) as StoreObj<T>;
+    return findRequireByKey(
+      GameObjectManager.instance.getList(ownerType!)!,
+      owner
+    );
   }
 
-  public getList(type: string): StoreUseData<any>[] | null {
+  public getList(type: string): StoreData<any>[] | null {
     switch (type) {
-      case "chat":
+      case "chat-list":
         return this.chatList;
-      case "chatTab":
+      case "chat-tab-list":
         return this.chatTabList;
-      case "groupChatTab":
+      case "group-chat-tab-list":
         return this.groupChatTabList;
-      case "scene":
+      case "scene-list":
         return this.sceneList;
-      case "media":
+      case "media-list":
         return this.mediaList;
-      case "bgm-stand-by":
-        return this.bgmStandByList;
-      case "user":
+      case "user-list":
         return this.userList;
-      case "socket-user":
+      case "socket-user-list":
         return this.socketUserList;
-      case "scene-object":
+      case "scene-object-list":
       case "map-mask":
+      case "map-marker":
       case "chit":
       case "floor-tile":
       case "dice-symbol":
       case "character":
         return this.sceneObjectList;
-      case "actor-status":
+      case "actor-status-list":
         return this.actorStatusList;
-      case "actor":
+      case "actor-list":
         return this.actorList;
-      case "scene-layer":
+      case "scene-layer-list":
         return this.sceneLayerList;
-      case "scene-and-layer":
+      case "scene-and-layer-list":
         return this.sceneAndLayerList;
-      case "scene-and-object":
+      case "scene-and-object-list":
         return this.sceneAndObjectList;
-      case "resource-master":
+      case "resource-master-list":
         return this.resourceMasterList;
-      case "resource":
+      case "resource-list":
         return this.resourceList;
-      case "initiative-column":
+      case "initiative-column-list":
         return this.initiativeColumnList;
-      case "property-selection":
-        return this.propertySelectionList;
-      case "tag-note":
-        return this.tagNoteList;
-      case "actor-group":
+      case "actor-group-list":
         return this.actorGroupList;
-      case "card-meta":
+      case "card-meta-list":
         return this.cardMetaList;
-      case "card-object":
+      case "card-object-list":
         return this.cardObjectList;
-      case "card-deck-big":
+      case "card-deck-big-list":
         return this.cardDeckBigList;
-      case "card-deck-small":
+      case "card-deck-small-list":
         return this.cardDeckSmallList;
-      case "cut-in":
+      case "cut-in-list":
         return this.cutInList;
-      case "chat-palette":
+      case "chat-palette-list":
         return this.chatPaletteList;
-      case "dice-type":
+      case "dice-type-list":
         return this.diceTypeList;
       case "dice-and-pips":
         return this.diceAndPipsList;
@@ -562,6 +549,10 @@ export default class GameObjectManager {
         return this.keepBcdiceDiceRollResultList;
       case "memo":
         return this.memoList;
+      case "public-memo":
+        return this.publicMemoList;
+      case "like":
+        return this.likeList;
     }
     return null;
   }

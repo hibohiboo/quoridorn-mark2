@@ -2,32 +2,30 @@ import Nekostore from "nekostore/lib/Nekostore";
 import QuerySnapshot from "nekostore/src/QuerySnapshot";
 import Unsubscribe from "nekostore/src/Unsubscribe";
 import CollectionReference from "nekostore/src/CollectionReference";
-import DocumentReference from "nekostore/src/DocumentReference";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
 import Query from "nekostore/lib/Query";
-import { StoreObj, StoreUseData } from "@/@types/store";
 import {
   AddDirectRequest,
-  CreateDataRequest,
   DeleteDataRequest,
   ReleaseTouchRequest,
   TouchModifyRequest,
-  TouchRequest,
   UpdateDataRequest
 } from "@/@types/data";
-import SocketFacade, {
-  getStoreObj
-} from "@/app/core/api/app-server/SocketFacade";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 
 export default class NekostoreCollectionController<T> {
   constructor(
     private readonly socket: any,
     private readonly nekostore: Nekostore,
-    public readonly collectionName: string
+    public readonly collectionName: string,
+    public readonly collectionNameSuffix: string
   ) {}
 
-  private touchList: string[] = [];
+  private touchKeyList: string[] = [];
 
+  /*****************************************************************************
+   * 破棄時には全ての全ての監視を解除する
+   */
   public async destroy() {
     Object.values(this.snapshotMap).forEach(unsubscribe => {
       unsubscribe();
@@ -37,22 +35,21 @@ export default class NekostoreCollectionController<T> {
     });
 
     // releaseTouchを直列の非同期で全部実行する
-    await this.releaseTouch(this.touchList);
+    await this.releaseTouch(this.touchKeyList);
   }
 
   private snapshotMap: { [ownerKey in string]: Unsubscribe } = {};
 
   private getCollection() {
-    return this.nekostore.collection<StoreObj<T>>(this.collectionName);
+    return this.nekostore.collection<StoreData<T>>(this.collectionName);
   }
 
-  // private async getDocSnap(
-  //   id: string,
-  //   collection?: CollectionReference<StoreObj<T>>
-  // ): Promise<DocumentSnapshot<StoreObj<T>>> {
-  //   return await (collection || this.getCollection()).doc(id).get();
-  // }
-
+  /*****************************************************************************
+   * データ一覧を取得する
+   * @param isSync 返却リストの中身を変更に伴って自動更新するかどうか
+   * @param argList 返却リスト
+   * @param column リスト内のソートに用いるカラム（パス指定）
+   */
   public async getList(
     isSync: boolean,
     argList?: StoreUseData<T>[],
@@ -63,211 +60,198 @@ export default class NekostoreCollectionController<T> {
     if (!argList) argList = [];
     const list = (await c.orderBy(sortColumn).get()).docs
       .filter(doc => doc.exists() && doc.data.data)
-      .map(doc => getStoreObj<T>(doc)!);
+      .map(doc => ({
+        id: doc.ref.id,
+        ...doc.data!
+      }));
     argList.push(...list);
     await this.setCollectionSnapshot(
       "NekostoreCollectionController",
-      (snapshot: QuerySnapshot<StoreObj<T>>) => {
-        snapshot.docs.forEach(() => {
-          let wantSort = false;
-          snapshot.docs.forEach(doc => {
-            const index = argList!.findIndex(p => p.id === doc.ref.id);
-            if (doc.type === "removed") {
-              argList!.splice(index, 1);
-            } else {
-              const status = doc.data!.status;
-              if (
-                (status !== "initial-touched" && index === -1) ||
-                status === "added" ||
-                status === "modified" ||
-                status === "modify-touched"
-              ) {
-                const obj = getStoreObj(doc)!;
-                argList!.splice(index, index < 0 ? 0 : 1, obj);
-                wantSort = true;
-              }
+      (snapshot: QuerySnapshot<StoreData<T>>) => {
+        let wantSort = false;
+        snapshot.docs.forEach(doc => {
+          const index = argList!.findIndex(p => p.id === doc.ref.id);
+          if (doc.type === "removed" && index >= 0) {
+            argList!.splice(index, 1);
+          } else {
+            const status = doc.data!.status;
+            if (
+              (status !== "initial-touched" && index === -1) ||
+              status === "added" ||
+              status === "modified" ||
+              status === "modify-touched"
+            ) {
+              argList!.splice(index, index < 0 ? 0 : 1, {
+                id: doc.ref.id,
+                ...doc.data!
+              });
+              wantSort = true;
             }
-          });
-          if (wantSort) {
-            argList!.sort((i1: any, i2: any) => {
-              if (i1[sortColumn] < i2[sortColumn]) return -1;
-              if (i1[sortColumn] > i2[sortColumn]) return 1;
-              return 0;
-            });
-            // console.log("sorted", argList!);
           }
         });
+        if (wantSort) {
+          argList!.sort((i1: any, i2: any) => {
+            if (i1[sortColumn] < i2[sortColumn]) return -1;
+            if (i1[sortColumn] > i2[sortColumn]) return 1;
+            return 0;
+          });
+          // console.log("sorted", argList!);
+        }
       }
     );
     return argList!;
   }
 
-  public async getData(id: string): Promise<StoreUseData<T> | null> {
-    const c = this.getCollection();
-    const docSnap = await c.doc(id).get();
-    if (!docSnap || !docSnap.data || !docSnap.exists()) return null;
-    return getStoreObj<T>(docSnap);
-  }
-
-  public async find(
+  /*****************************************************************************
+   * データを複数件検索する
+   * @param options 検索条件
+   */
+  public async findList(
     options: { property: string; operand: "=="; value: any }[]
-  ): Promise<StoreUseData<T>[] | null> {
-    let c: Query<StoreObj<T>> = this.getCollection();
+  ): Promise<DocumentSnapshot<StoreData<T>>[] | null> {
+    let c: Query<StoreData<T>> = this.getCollection();
     options.forEach(o => {
       c = c.where(o.property, o.operand, o.value);
     });
     const docs = (await c.get()).docs;
     if (!docs) return null;
-    return docs
-      .filter(item => item && item.exists())
-      .map(item => getStoreObj(item)!);
+    return docs.filter(doc => doc && doc.exists());
   }
 
-  public async touch(
-    idList?: string[],
-    optionList?: Partial<StoreUseData<any>>[]
-  ): Promise<string[]> {
-    const docIdList = await SocketFacade.instance.socketCommunication<
-      TouchRequest,
-      string[]
-    >("touch-data", {
-      collection: this.collectionName,
-      idList,
-      optionList
-    });
-    this.touchList.push(...docIdList);
-    return docIdList;
+  /*****************************************************************************
+   * データを１件取得する
+   * @param property 検索プロパティ
+   * @param value 検索値
+   */
+  public async findSingle(
+    property: string,
+    value: any
+  ): Promise<DocumentSnapshot<StoreData<T>> | null> {
+    const list = await this.findList([{ property, operand: "==", value }]);
+    return list ? list[0] : null;
   }
 
-  public async touchModify(idList: string[]): Promise<string[]> {
-    const docIdList = await SocketFacade.instance.socketCommunication<
-      TouchModifyRequest,
+  /*****************************************************************************
+   * 更新のための排他制御
+   * @param keyList キーのリスト
+   */
+  public async touchModify(keyList: string[]): Promise<string[]> {
+    const touchKeyList = await SocketFacade.instance.socketCommunication<
+      TouchModifyRequest<any>,
       string[]
     >("touch-data-modify", {
       collection: this.collectionName,
-      idList
+      list: keyList.map(key => ({ key }))
     });
-    this.touchList.push(...docIdList);
-    return docIdList;
+    this.touchKeyList.push(...touchKeyList);
+    return touchKeyList;
   }
 
-  public async releaseTouch(idList: string[]): Promise<void> {
-    idList.forEach(id => {
-      const index = this.touchList.findIndex(listId => listId === id);
-      this.touchList.splice(index, 1);
+  /*****************************************************************************
+   * 更新のための排他制御の解除
+   * @param keyList キーのリスト
+   */
+  public async releaseTouch(keyList: string[]): Promise<void> {
+    keyList.forEach(k => {
+      const index = this.touchKeyList.findIndex(tk => tk === k);
+      this.touchKeyList.splice(index, 1);
     });
-    await SocketFacade.instance.socketCommunication<ReleaseTouchRequest, never>(
-      "release-touch-data",
-      {
-        collection: this.collectionName,
-        idList
-      }
-    );
-  }
-
-  public async add(
-    idList: string[],
-    dataList: T[],
-    optionList?: Partial<StoreObj<any>>[]
-  ): Promise<string[]> {
-    idList.forEach(id => {
-      const index = this.touchList.findIndex(listId => listId === id);
-      this.touchList.splice(index, 1);
-    });
-    return await SocketFacade.instance.socketCommunication<
-      CreateDataRequest,
-      string[]
-    >("create-data", {
+    await SocketFacade.instance.socketCommunication<
+      ReleaseTouchRequest<any>,
+      void
+    >("release-touch-data", {
       collection: this.collectionName,
-      idList,
-      dataList,
-      optionList
+      list: keyList.map(key => ({ key }))
     });
   }
 
+  /*****************************************************************************
+   * 更新のための排他制御
+   * @param list データリスト
+   */
   public async addDirect(
-    dataList: T[],
-    optionList?: Partial<StoreObj<any>>[]
+    list: (Partial<StoreData<any>> & { data: any })[]
   ): Promise<string[]> {
     return await SocketFacade.instance.socketCommunication<
       AddDirectRequest,
       string[]
     >("add-direct", {
       collection: this.collectionName,
-      dataList,
-      optionList
+      list
     });
   }
 
+  /*****************************************************************************
+   * データを複数件検索する
+   * list
+   */
   public async update(
-    idList: string[],
-    dataList: T[],
-    optionList?: (Partial<StoreObj<unknown>> & { continuous?: boolean })[]
+    list: (Partial<StoreData<T>> & {
+      key: string;
+      continuous?: boolean;
+    })[]
   ) {
-    idList.forEach(id => {
-      const index = this.touchList.findIndex(listId => listId === id);
-      this.touchList.splice(index, 1);
+    list.forEach(l => {
+      const index = this.touchKeyList.findIndex(tk => tk === l.key);
+      if (index < 0) return;
+      this.touchKeyList.splice(index, 1);
     });
-    await SocketFacade.instance.socketCommunication<UpdateDataRequest, never>(
+    await SocketFacade.instance.socketCommunication<UpdateDataRequest<T>, void>(
       "update-data",
       {
         collection: this.collectionName,
-        idList,
-        dataList,
-        optionList
+        list
       }
     );
   }
 
   public async updatePackage(
-    idList: string[],
-    dataList: T[],
-    optionList?: (Partial<StoreObj<unknown>> & { continuous?: boolean })[]
+    list: (Partial<StoreData<T>> & {
+      key: string;
+      data: T;
+      continuous?: boolean;
+    })[]
   ) {
-    await SocketFacade.instance.socketCommunication<UpdateDataRequest, never>(
-      "update-data-package",
-      {
-        collection: this.collectionName,
-        idList,
-        dataList,
-        optionList
-      }
-    );
-  }
-
-  public async delete(idList: string[]): Promise<void> {
-    idList.forEach(id => {
-      const index = this.touchList.findIndex(listId => listId === id);
-      this.touchList.splice(index, 1);
+    await SocketFacade.instance.socketCommunication<
+      UpdateDataRequest<T>,
+      never
+    >("update-data-package", {
+      collection: this.collectionName,
+      list
     });
-    await SocketFacade.instance.socketCommunication<DeleteDataRequest, never>(
-      "delete-data",
-      {
-        collection: this.collectionName,
-        idList
-      }
-    );
   }
 
-  public async deletePackage(idList: string[]): Promise<void> {
-    await SocketFacade.instance.socketCommunication<DeleteDataRequest, never>(
-      "delete-data-package",
-      {
-        collection: this.collectionName,
-        idList
-      }
-    );
+  public async delete(keyList: string[]): Promise<void> {
+    keyList.forEach(k => {
+      const index = this.touchKeyList.findIndex(tk => tk === k);
+      this.touchKeyList.splice(index, 1);
+    });
+    await SocketFacade.instance.socketCommunication<
+      DeleteDataRequest<any>,
+      void
+    >("delete-data", {
+      collection: this.collectionName,
+      list: keyList.map(key => ({ key }))
+    });
+  }
+
+  public async deletePackage(keyList: string[]): Promise<void> {
+    await SocketFacade.instance.socketCommunication<
+      DeleteDataRequest<any>,
+      never
+    >("delete-data-package", {
+      collection: this.collectionName,
+      list: keyList.map(key => ({ key }))
+    });
   }
 
   public async setSnapshot(
     ownerKey: string,
-    docId: string,
-    onNext: (snapshot: DocumentSnapshot<StoreObj<T>>) => void
+    key: string,
+    onNext: (snapshot: DocumentSnapshot<StoreData<T>>) => void
   ): Promise<Unsubscribe> {
-    let target: DocumentReference<StoreObj<T>> = this.getCollection().doc(
-      docId
-    );
-    const unsubscribe = await target.onSnapshot(onNext);
+    const doc = (await this.findSingle("key", key))!;
+    const unsubscribe = await doc.ref.onSnapshot(onNext);
     if (this.snapshotMap[ownerKey]) this.snapshotMap[ownerKey]();
     this.snapshotMap[ownerKey] = unsubscribe;
     return async () => {
@@ -278,9 +262,9 @@ export default class NekostoreCollectionController<T> {
 
   public async setCollectionSnapshot(
     ownerKey: string,
-    onNext: (snapshot: QuerySnapshot<StoreObj<T>>) => void
+    onNext: (snapshot: QuerySnapshot<StoreData<T>>) => void
   ): Promise<Unsubscribe> {
-    let target: CollectionReference<StoreObj<T>> = this.getCollection();
+    let target: CollectionReference<StoreData<T>> = this.getCollection();
     const unsubscribe = await target.onSnapshot(onNext);
     if (this.snapshotMap[ownerKey]) this.snapshotMap[ownerKey]();
     this.snapshotMap[ownerKey] = unsubscribe;

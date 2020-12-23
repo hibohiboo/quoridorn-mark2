@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     :optionInfoList="optionInfoList"
     :disabled="disabled"
     :readonly="readonly"
@@ -17,36 +18,21 @@ import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
+import SelectMixin from "@/app/basic/common/components/select/base/SelectMixin";
 
-@Component({
-  components: { CtrlSelect }
-})
-export default class ChatColorTypeSelect extends Mixins<ComponentVue>(
+interface MultiMixin extends SelectMixin, ComponentVue {}
+
+@Component({ components: { CtrlSelect } })
+export default class ChatColorTypeSelect extends Mixins<MultiMixin>(
+  SelectMixin,
   ComponentVue
 ) {
   @Prop({ type: String, default: "owner" })
   public value!: string;
 
-  @Prop({ type: Boolean, default: false })
-  public disabled!: boolean;
-
-  @Prop({ type: Boolean, default: false })
-  public readonly!: boolean;
-
-  public input(value: string) {
-    this.$emit("input", value);
-  }
-
-  private get localValue(): string {
-    return this.value || "";
-  }
-
-  private set localValue(value: string) {
-    this.input(value);
-  }
-
   private optionInfoList: HtmlOptionInfo[] = [
+    { value: "", key: "", text: "", disabled: true },
     { value: "owner", key: "", text: "", disabled: false },
     { value: "original", key: "", text: "", disabled: false }
   ];
@@ -66,7 +52,9 @@ export default class ChatColorTypeSelect extends Mixins<ComponentVue>(
 
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
-      o.text = this.$t(`option.chat-color-type.${o.value}`)!.toString();
+      o.text = this.$t(
+        `selection.chat-color-type.${o.value || "label"}`
+      )!.toString();
       o.key = o.value;
     });
   }

@@ -1,7 +1,7 @@
 declare module "jszip";
 declare module "vuedraggable";
 declare module "vue-slider-component";
-declare module "mustache";
+declare module "Mustache";
 declare module "mathjs";
 declare module "moment";
 declare module "js-yaml";
@@ -13,41 +13,12 @@ declare module "create-keyframe-animation";
 declare module "url-join";
 declare module "body-scroll-lock";
 declare module "jsonp";
-declare var swal: (
-  ...pref: (
-    | string
-    | {
-        title?: string;
-        text?: string;
-        icon?: "warning" | "error" | "success" | "info";
-        button?: string;
-        buttons?: string[];
-        dangerMode?: boolean;
-      }
-  )[]
-) => Promise<boolean>;
+declare var Swal: {
+  fire: (obj: any) => Promise<{ isConfirmed: boolean }>;
+};
 declare var YT: any;
 
 declare module "address" {
-  type Point = {
-    x: number;
-    y: number;
-  };
-
-  type Size = {
-    width: number;
-    height: number;
-  };
-
-  type Rectangle = Point & Size;
-
-  type Matrix = {
-    column: number;
-    row: number;
-  };
-
-  type Address = Point & Matrix;
-
   type Anchor =
     | "left-top"
     | "left-center"
@@ -84,6 +55,7 @@ declare module "compare" {
         searchValue: string;
         property: string;
       }
+    | { refType: "can-create-chat-palette" }
     | string
     | number
     | boolean;
@@ -125,7 +97,7 @@ declare module "mode" {
     type: "view-card-deck";
     value: {
       flag: "on" | "off";
-      cardDeckId: string;
+      cardDeckKey: string;
     };
   };
 
@@ -153,16 +125,16 @@ declare module "task-info" {
   type ThrowParabolaInfo = {
     key?: string;
     char: string;
-    radius: number;
-    ratio: number;
+    radius?: number;
+    ratio?: number;
   };
 
   type BgmPlayInfo = {
-    id: string;
+    key: string;
   };
 
   type BgmStandByInfo = {
-    id: string;
+    key: string;
   };
 
   type StandByReturnInfo = {
@@ -186,6 +158,20 @@ declare module "task-info" {
     offsetY: number;
     pageX: number;
     pageY: number;
+  };
+
+  type UpdateResourceInfo = {
+    resourceMasterKey: string;
+    ownerType: "actor-list" | "scene-object-list";
+    ownerKey: string;
+    operationType: "set" | "add";
+    value: string;
+  };
+
+  type OtherTextUpdateInfo = {
+    docType: string;
+    docKey: string;
+    target: string | null;
   };
 }
 
@@ -242,13 +228,13 @@ declare module "task" {
 }
 
 declare module "context" {
-  import { Point } from "address";
   import { CompareInfo } from "compare";
+  import { Point } from "@/@types/store-data-optional";
 
   interface ContextTaskInfo extends Point {
     type: string;
     target: string | null;
-    pieceId?: string;
+    pieceKey?: string;
   }
 
   // 項目(表示条件ありなし)

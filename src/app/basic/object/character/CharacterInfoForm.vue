@@ -6,7 +6,9 @@
         class="object"
         :class="{ 'type-add': isAdd }"
         ref="object"
-        :draggable="isAdd && imageDocId ? 'true' : 'false'"
+        :draggable="
+          !!name && !isDuplicate && isAdd && mediaKey ? 'true' : 'false'
+        "
         @dragstart="dragStart"
         @dragend="dragEnd"
       ></div>
@@ -16,14 +18,14 @@
     <table class="info-table">
       <tr>
         <tr-string-input-component
-          labelName="name"
+          labelName="label.name"
           width="100%"
           v-model="nameVolatile"
         />
       </tr>
       <tr>
         <tr-number-input-component
-          labelName="size"
+          labelName="label.size"
           inputWidth="3em"
           v-model="sizeVolatile"
           :min="1"
@@ -34,12 +36,12 @@
           <label
             :for="`${key}-background-size`"
             class="label-background-size label-input"
-            v-t="'label.background-location'"
+            v-t="'selection.background-location.label'"
           ></label>
         </th>
         <td class="value-cell">
           <background-location-select
-            :id="`${key}-background-size`"
+            :elmId="`${key}-background-size`"
             v-model="backgroundSizeVolatile"
           />
         </td>
@@ -54,9 +56,9 @@
       <!-- 画像タブ -->
       <image-picker-component
         v-if="currentTabInfo.target === 'image'"
-        v-model="imageDocIdVolatile"
+        v-model="mediaKeyVolatile"
         :windowKey="key"
-        :imageTag.sync="imageTagVolatile"
+        :mediaTag.sync="mediaTagVolatile"
         :direction.sync="directionVolatile"
         ref="imagePicker"
       />
@@ -69,7 +71,7 @@
         <table>
           <tr>
             <tr-string-input-component
-              labelName="tag"
+              labelName="label.tag"
               width="100%"
               v-model="tagVolatile"
             />
@@ -84,23 +86,23 @@
             </th>
             <td class="value-cell">
               <scene-layer-select
-                v-model="layerIdVolatile"
-                :id="`${key}-layer`"
+                v-model="layerKeyVolatile"
+                :elmId="`${key}-layer`"
               />
             </td>
           </tr>
           <tr>
             <tr-string-input-component
-              labelName="ref-url"
+              labelName="label.ref-url"
               width="100%"
               v-model="urlVolatile"
             />
           </tr>
-          <tr v-if="characterSheetType">
+          <tr v-if="trpgSystemHelper && trpgSystemHelper.isSupportedOtherText">
             <th></th>
             <td>
-              <ctrl-button @click.stop="readCharacterSheet()">
-                <span v-t="'button.read-character-sheet'"></span>
+              <ctrl-button @click.stop="createOtherText()">
+                <span v-t="'button.create-other-text'"></span>
               </ctrl-button>
             </td>
           </tr>
@@ -124,7 +126,6 @@ import { Task, TaskResult } from "task";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import ComponentVue from "../../../core/window/ComponentVue";
-import { BackgroundSize, Direction } from "@/@types/room";
 import GameObjectManager from "../../GameObjectManager";
 import { TabInfo } from "@/@types/window";
 import VueEvent from "../../../core/decorator/VueEvent";
@@ -136,17 +137,15 @@ import ImagePickerComponent from "../../../core/component/ImagePickerComponent.v
 import SceneLayerSelect from "../../common/components/select/SceneLayerSelect.vue";
 import OtherTextEditComponent from "@/app/basic/other-text/OtherTextEditComponent.vue";
 import CtrlButton from "@/app/core/component/CtrlButton.vue";
+import { MemoStore } from "@/@types/store-data";
 import {
-  createShinobigamiChatPalette,
-  isShinobigamiUrl
-} from "@/app/core/utility/trpg_system/shinobigami";
-import {
-  createNechronicaChatPalette,
-  isNechronicaUrl
-} from "@/app/core/utility/trpg_system/nechronica";
-import { StoreUseData } from "@/@types/store";
-import { MemoStore } from "@/@types/gameObject";
-import { createEmptyStoreUseData } from "@/app/core/utility/Utility";
+  questionDialog,
+  createEmptyStoreUseData
+} from "@/app/core/utility/Utility";
+import { BackgroundSize, Direction } from "@/@types/store-data-optional";
+import { TrpgSystemHelper } from "@/app/core/utility/trpg_system/TrpgSystemHelper";
+import { getTrpgSystemHelper } from "@/app/core/utility/trpg_system/TrpgSystemFasade";
+
 const uuid = require("uuid");
 
 @Component({
@@ -176,12 +175,15 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   private mediaList = GameObjectManager.instance.mediaList;
   private isMounted: boolean = false;
   private imageSrc: string = "";
+  private actorList = GameObjectManager.instance.actorList;
 
-  private characterSheetType: "シノビガミ" | "ネクロニカ" | null = null;
+  private trpgSystemHelper: TrpgSystemHelper<any> | null = null;
+
+  @Prop({ type: String, default: null })
+  private docKey!: string;
 
   @Prop({ type: String, required: true })
   private name!: string;
-
   private nameVolatile: string = "";
   @Watch("name", { immediate: true })
   private onChangeName(value: string) {
@@ -194,7 +196,6 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
 
   @Prop({ type: String, required: true })
   private tag!: string;
-
   private tagVolatile: string = "";
   @Watch("tag", { immediate: true })
   private onChangeTag(value: string) {
@@ -207,7 +208,6 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
 
   @Prop({ type: String, required: true })
   private url!: string;
-
   private urlVolatile: string = "";
   @Watch("url", { immediate: true })
   private onChangeUrl(value: string) {
@@ -219,20 +219,19 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   }
 
   @Prop({ type: Array, required: true })
-  private otherTextList!: StoreUseData<MemoStore>[];
-  private otherTextListVolatile: StoreUseData<MemoStore>[] = [];
+  private otherTextList!: StoreData<MemoStore>[];
+  private otherTextListVolatile: StoreData<MemoStore>[] = [];
   @Watch("otherTextList", { immediate: true })
-  private onChangeOtherTextList(value: StoreUseData<MemoStore>[]) {
+  private onChangeOtherTextList(value: StoreData<MemoStore>[]) {
     this.otherTextListVolatile = value;
   }
   @Watch("otherTextListVolatile")
-  private onChangeOtherTextListVolatile(value: StoreUseData<MemoStore>[]) {
+  private onChangeOtherTextListVolatile(value: StoreData<MemoStore>[]) {
     this.$emit("update:otherTextList", value);
   }
 
   @Prop({ type: Number, required: true })
   private size!: number;
-
   private sizeVolatile: number = 0;
   @Watch("size", { immediate: true })
   private onChangeSize(value: number) {
@@ -244,34 +243,31 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   }
 
   @Prop({ type: String, default: null })
-  private imageDocId!: string | null;
-
-  private imageDocIdVolatile: string | null = null;
-  @Watch("imageDocId", { immediate: true })
-  private onChangeImageDocId(value: string | null) {
-    this.imageDocIdVolatile = value;
+  private mediaKey!: string | null;
+  private mediaKeyVolatile: string | null = null;
+  @Watch("mediaKey", { immediate: true })
+  private onChangeImageDocKey(value: string | null) {
+    this.mediaKeyVolatile = value;
   }
-  @Watch("imageDocIdVolatile")
-  private onChangeImageDocIdVolatile(value: string | null) {
-    this.$emit("update:imageDocId", value);
+  @Watch("mediaKeyVolatile")
+  private onChangeImageDocKeyVolatile(value: string | null) {
+    this.$emit("update:mediaKey", value);
   }
 
   @Prop({ type: String, default: null })
-  private imageTag!: string | null;
-
-  private imageTagVolatile: string | null = null;
-  @Watch("imageTag", { immediate: true })
+  private mediaTag!: string | null;
+  private mediaTagVolatile: string | null = null;
+  @Watch("mediaTag", { immediate: true })
   private onChangeImageTag(value: string | null) {
-    this.imageTagVolatile = value;
+    this.mediaTagVolatile = value;
   }
-  @Watch("imageTagVolatile")
+  @Watch("mediaTagVolatile")
   private onChangeImageTagVolatile(value: string | null) {
-    this.$emit("update:imageTag", value);
+    this.$emit("update:mediaTag", value);
   }
 
   @Prop({ type: String, required: true })
   private direction!: Direction;
-
   private directionVolatile: Direction = "none";
   @Watch("direction", { immediate: true })
   private onChangeDirection(value: Direction) {
@@ -284,7 +280,6 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
 
   @Prop({ type: String, required: true })
   private backgroundSize!: BackgroundSize;
-
   private backgroundSizeVolatile: BackgroundSize = "contain";
   @Watch("backgroundSize", { immediate: true })
   private onChangeBackgroundSize(value: BackgroundSize) {
@@ -296,16 +291,15 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   }
 
   @Prop({ type: String, required: true })
-  private layerId!: string;
-
-  private layerIdVolatile: string = "";
-  @Watch("layerId", { immediate: true })
-  private onChangeLayerId(value: string) {
-    this.layerIdVolatile = value;
+  private layerKey!: string;
+  private layerKeyVolatile: string = "";
+  @Watch("layerKey", { immediate: true })
+  private onChangeLayerKey(value: string) {
+    this.layerKeyVolatile = value;
   }
-  @Watch("layerIdVolatile")
-  private onChangeLayerIdVolatile(value: string) {
-    this.$emit("update:layerId", value);
+  @Watch("layerKeyVolatile")
+  private onChangeLayerKeyVolatile(value: string) {
+    this.$emit("update:layerKey", value);
   }
 
   private tabList: TabInfo[] = [
@@ -337,20 +331,24 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
   @LifeCycle
   public async mounted() {
     this.isMounted = true;
-    this.currentTabInfo = this.tabList.filter(
+    this.currentTabInfo = this.tabList.find(
       t => t.target === this.initTabTarget
-    )[0];
+    )!;
+  }
+
+  private get isDuplicate(): boolean {
+    return this.actorList.some(
+      ct => ct.data!.name === this.name && ct.key !== this.docKey
+    );
   }
 
   @Watch("isMounted")
-  @Watch("imageDocId")
+  @Watch("mediaKey")
   @Watch("direction")
   @Watch("backgroundSize")
   private onChangeImage() {
     if (!this.isMounted) return;
-    const imageObj = this.mediaList.filter(
-      obj => obj.id === this.imageDocId
-    )[0];
+    const imageObj = this.mediaList.find(obj => obj.key === this.mediaKey);
     if (!imageObj) return;
     this.imageSrc = imageObj.data!.url;
     this.objectElm.style.setProperty("--imageSrc", `url(${this.imageSrc})`);
@@ -418,31 +416,57 @@ export default class CharacterInfoForm extends Mixins<ComponentVue>(
 
   @Watch("urlVolatile", { immediate: true })
   private async onChangeUrlVolatile2(value: string) {
-    if (await isShinobigamiUrl(value)) {
-      this.characterSheetType = "シノビガミ";
-    } else if (await isNechronicaUrl(value)) {
-      this.characterSheetType = "ネクロニカ";
-    } else {
-      this.characterSheetType = null;
-    }
+    this.trpgSystemHelper = await getTrpgSystemHelper(value);
   }
 
   @VueEvent
-  private async readCharacterSheet() {
-    if (this.characterSheetType === "シノビガミ") {
-      const resultList = await createShinobigamiChatPalette(this.urlVolatile);
-      if (!resultList) return;
-      this.otherTextListVolatile.push(
-        ...resultList.map(r => createEmptyStoreUseData(uuid.v4(), r))
+  private async createOtherText() {
+    if (!this.trpgSystemHelper || !this.trpgSystemHelper.isSupportedOtherText)
+      return;
+
+    const confirm = await questionDialog({
+      title: this.$t("message.load-other-text-character-sheet").toString(),
+      text: this.$t("message.load-other-text-character-sheet-text").toString(),
+      confirmButtonText: this.$t("button.commit").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
+    if (!confirm) return;
+
+    const memoList = await this.trpgSystemHelper.createOtherText();
+    if (!memoList) return;
+
+    // 中身が空のタブを削除
+    this.otherTextListVolatile
+      .filter(v => !v.data!.tab && !v.data!.text)
+      .map((v, ind) => ind)
+      .reverse()
+      .forEach(ind => this.otherTextListVolatile.splice(ind, 1));
+
+    // 生成したデータからDB用データを生成
+    const otherTextDataList = memoList.map(r =>
+      createEmptyStoreUseData(uuid.v4(), r)
+    );
+
+    // タブ名が重複するものは上書き、そうでないものは追加
+    otherTextDataList.forEach(otd => {
+      const duplicateList = this.otherTextListVolatile.filter(
+        v => v.data!.tab === otd.data!.tab
       );
-    }
-    if (this.characterSheetType === "ネクロニカ") {
-      const resultList = await createNechronicaChatPalette(this.urlVolatile);
-      if (!resultList) return;
-      this.otherTextListVolatile.push(
-        ...resultList.map(r => createEmptyStoreUseData(uuid.v4(), r))
-      );
-    }
+      if (!duplicateList.length) {
+        // 重複が無かったらそのまま追加
+        this.otherTextListVolatile.push(otd);
+      } else {
+        // 重複があったら、タイプがURLだったら更新
+        if (otd.data!.type === "url") {
+          const duplicate = duplicateList.find(d => d.data!.type === "url");
+          if (duplicate) {
+            duplicate.data!.text = otd.data!.text;
+          } else {
+            this.otherTextListVolatile.push(otd);
+          }
+        }
+      }
+    });
   }
 }
 </script>

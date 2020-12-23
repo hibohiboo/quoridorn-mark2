@@ -20,10 +20,10 @@
           <template v-for="tab in useMemoList">
             <memo-tab-component
               v-if="localPermissionCheck(tab)"
-              :key="tab.id"
+              :key="tab.key"
               :tab="tab"
               :dragMode="dragMode"
-              :changeOrderId="changeOrderId"
+              :changeOrderKey="changeOrderKey"
               @hover="onHover"
               @edit="editTab"
               @chmod="chmodTab"
@@ -51,7 +51,6 @@
           :c-label="$t('label.sort')"
           n-icon=""
           :n-label="$t('label.sort')"
-          @hover="onHoverView"
         />
       </div>
     </simple-tab-component>
@@ -64,14 +63,12 @@ import { Mixins } from "vue-mixin-decorator";
 import draggable from "vuedraggable";
 import { Task, TaskResult } from "task";
 import { ModeInfo } from "mode";
-import { MemoStore } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import WindowVue from "../../core/window/WindowVue";
 import { permissionCheck } from "../../core/api/app-server/SocketFacade";
-import { Permission, StoreUseData } from "@/@types/store";
 import TaskManager from "../../core/task/TaskManager";
 import GameObjectManager from "../GameObjectManager";
 import { TabInfo, WindowOpenInfo } from "@/@types/window";
-import LanguageManager from "../../../LanguageManager";
 import { createEmptyStoreUseData } from "../../core/utility/Utility";
 import { clone } from "../../core/utility/PrimaryDataUtility";
 import TrCheckboxComponent from "../common/components/TrCheckboxComponent.vue";
@@ -97,12 +94,12 @@ const uuid = require("uuid");
   }
 })
 export default class MemoTabSettingWindow extends Mixins<
-  WindowVue<StoreUseData<MemoStore>[], StoreUseData<MemoStore>[]>
+  WindowVue<StoreData<MemoStore>[], StoreData<MemoStore>[]>
 >(WindowVue) {
-  public useMemoList: StoreUseData<MemoStore>[] = [];
+  public useMemoList: StoreData<MemoStore>[] = [];
 
   private dragMode = false;
-  private changeOrderId: string = "";
+  private changeOrderKey: string = "";
 
   private tabList: TabInfo[] = [{ key: "1", target: "tab-list", text: "" }];
   private currentTabInfo: TabInfo = this.tabList[0];
@@ -133,8 +130,8 @@ export default class MemoTabSettingWindow extends Mixins<
   }
 
   @VueEvent
-  private async editTab(tabInfo: StoreUseData<MemoStore>) {
-    const useMemo = this.useMemoList.find(lv => lv.id === tabInfo.id)!;
+  private async editTab(tabInfo: StoreData<MemoStore>) {
+    const useMemo = this.useMemoList.find(lv => lv.key === tabInfo.key)!;
     const text = await this.getInputTab(useMemo.data!.tab);
     if (text) {
       useMemo.data!.tab = text;
@@ -142,8 +139,8 @@ export default class MemoTabSettingWindow extends Mixins<
   }
 
   @VueEvent
-  private async chmodTab(tabInfo: StoreUseData<MemoStore>) {
-    const useMemo = this.useMemoList.find(lv => lv.id === tabInfo.id)!;
+  private async chmodTab(tabInfo: StoreData<MemoStore>) {
+    const useMemo = this.useMemoList.find(lv => lv.key === tabInfo.key)!;
     useMemo.permission = (
       await TaskManager.instance.ignition<
         WindowOpenInfo<Permission>,
@@ -160,9 +157,9 @@ export default class MemoTabSettingWindow extends Mixins<
   }
 
   @VueEvent
-  private async deleteTab(tabInfo: StoreUseData<MemoStore>) {
-    const idx = this.useMemoList.findIndex(lv => lv.id === tabInfo.id);
-    this.useMemoList.splice(idx, 1);
+  private async deleteTab(tabInfo: StoreData<MemoStore>) {
+    const index = this.useMemoList.findIndex(lv => lv.key === tabInfo.key);
+    this.useMemoList.splice(index, 1);
   }
 
   private async getInputTab(tab: string): Promise<string | undefined> {
@@ -192,6 +189,7 @@ export default class MemoTabSettingWindow extends Mixins<
     this.useMemoList.push(
       createEmptyStoreUseData(uuid.v4(), {
         tab: text,
+        type: "normal",
         text: ""
       })
     );
@@ -205,14 +203,12 @@ export default class MemoTabSettingWindow extends Mixins<
   @VueEvent
   private onHover(messageType: string, isHover: boolean) {
     this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
-          `chat-setting-window.message-list.${messageType}`
-        )
+      ? this.$t(`chat-setting-window.message-list.${messageType}`)!.toString()
       : "";
   }
 
   @VueEvent
-  private localPermissionCheck(data: StoreUseData<MemoStore>) {
+  private localPermissionCheck(data: StoreData<MemoStore>) {
     return permissionCheck(data, "view", 1);
   }
 
@@ -237,16 +233,7 @@ export default class MemoTabSettingWindow extends Mixins<
       owner: "Quoridorn",
       value: { type: "special-drag", value: "off" as "off" }
     });
-    this.changeOrderId = "";
-  }
-
-  @VueEvent
-  private onHoverView(isHover: boolean) {
-    if (isHover) this.$emit("onMouseHoverView", true);
-    else {
-      if (this.dragMode) this.$emit("onMouseHoverOrder", true);
-      else this.$emit("onMouseHoverView", false);
-    }
+    this.changeOrderKey = "";
   }
 
   @VueEvent

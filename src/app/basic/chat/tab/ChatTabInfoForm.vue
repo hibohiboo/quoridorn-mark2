@@ -10,7 +10,7 @@
         <table>
           <tr>
             <tr-string-input-component
-              labelName="name"
+              labelName="label.name"
               width="100%"
               :placeholder="$t('label.require-text')"
               v-model="tabNameVolatile"
@@ -25,7 +25,7 @@
         <table>
           <tr>
             <tr-checkbox-component
-              labelName="read-aloud"
+              labelName="label.read-aloud"
               cLabel=""
               nLabel=""
               v-model="useReadAloudVolatile"
@@ -33,7 +33,7 @@
           </tr>
           <tr>
             <tr-number-input-component
-              labelName="read-aloud-volume"
+              labelName="label.read-aloud-volume"
               inputWidth="5em"
               v-model="readAloudVolumeVolatile"
               :min="0"
@@ -57,7 +57,7 @@ import LifeCycle from "../../../core/decorator/LifeCycle";
 import ComponentVue from "../../../core/window/ComponentVue";
 import TrCheckboxComponent from "../../common/components/TrCheckboxComponent.vue";
 import TrStringInputComponent from "../../common/components/TrStringInputComponent.vue";
-import { TabInfo } from "../../../../@types/window";
+import { TabInfo } from "@/@types/window";
 import SimpleTabComponent from "../../../core/component/SimpleTabComponent.vue";
 
 @Component({
@@ -146,9 +146,9 @@ export default class ChatTabInfoForm extends Mixins<ComponentVue>(
   @LifeCycle
   public async mounted() {
     this.isMounted = true;
-    this.currentTabInfo = this.tabList.filter(
+    this.currentTabInfo = this.tabList.find(
       t => t.target === this.initTabTarget
-    )[0];
+    )!;
   }
 }
 </script>

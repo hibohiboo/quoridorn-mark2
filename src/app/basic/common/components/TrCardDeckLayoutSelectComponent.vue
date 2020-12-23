@@ -1,14 +1,10 @@
 <template>
   <tr class="tr-card-deck-layout-select-component">
     <th class="label-input">
-      <label :for="key" v-t="`label.${labelName}`"></label>
+      <label :for="key" v-t="labelName"></label>
     </th>
     <td>
-      <card-deck-layout-select
-        :key="key"
-        v-model="localValue"
-        :id="`${key}-layer`"
-      />
+      <card-deck-layout-select :key="key" v-model="localValue" :elmId="key" />
     </td>
   </tr>
 </template>

@@ -3,7 +3,7 @@
     class="tab-info"
     :class="{
       locked: tab.exclusionOwner,
-      changeOrder: changeOrderId === tab.id,
+      changeOrder: changeOrderKey === tab.key,
       dragMode
     }"
     :style="{
@@ -11,8 +11,8 @@
         tab.exclusionOwner
       )})'`
     }"
-    @onMouseDown="changeOrderId = tab.id"
-    @onMouseUp="changeOrderId = ''"
+    @onMouseDown="changeOrderKey = tab.key"
+    @onMouseUp="changeOrderKey = ''"
   >
     <span class="icon-menu drag-mark"></span>
     <span>{{ tab.data.name }}</span>
@@ -41,9 +41,8 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from "vue-property-decorator";
+import { Component, Prop } from "vue-property-decorator";
 import SButton from "@/app/basic/common/components/SButton.vue";
-import { StoreUseData } from "@/@types/store";
 import SocketFacade, {
   permissionCheck
 } from "../../../core/api/app-server/SocketFacade";
@@ -51,32 +50,34 @@ import TaskManager from "../../../core/task/TaskManager";
 import GameObjectManager from "../../GameObjectManager";
 import { WindowOpenInfo } from "@/@types/window";
 import LanguageManager from "../../../../LanguageManager";
-import { ChatTabInfo } from "@/@types/room";
-import { DataReference } from "@/@types/data";
+import { ChatTabStore } from "@/@types/store-data";
 import VueEvent from "../../../core/decorator/VueEvent";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
+import { questionDialog } from "@/app/core/utility/Utility";
 
-@Component({
-  components: { SButton }
-})
-export default class ChatTabComponent extends Vue {
+@Component({ components: { SButton } })
+export default class ChatTabComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: Object, required: true })
-  private tab!: StoreUseData<ChatTabInfo>;
+  private tab!: StoreData<ChatTabStore>;
 
   @Prop({ type: Boolean, required: true })
   private dragMode = false;
 
   @Prop({ type: String, required: true })
-  private changeOrderId: string = "";
+  private changeOrderKey: string = "";
 
   private chatTabListCC = SocketFacade.instance.chatTabListCC();
 
   @VueEvent
-  private isEditable(tabInfo: StoreUseData<ChatTabInfo>) {
+  private isEditable(tabInfo: StoreData<ChatTabStore>) {
     return permissionCheck(tabInfo, "edit");
   }
 
   @VueEvent
-  private async editTab(tabInfo: StoreUseData<ChatTabInfo>) {
+  private async editTab(tabInfo: StoreData<ChatTabStore>) {
     if (!this.isEditable(tabInfo)) return;
 
     await TaskManager.instance.ignition<WindowOpenInfo<string>, never>({
@@ -84,18 +85,18 @@ export default class ChatTabComponent extends Vue {
       owner: "Quoridorn",
       value: {
         type: "chat-tab-edit-window",
-        args: tabInfo.id!
+        args: tabInfo.key
       }
     });
   }
 
   @VueEvent
-  private isChmodAble(tabInfo: StoreUseData<ChatTabInfo>) {
+  private isChmodAble(tabInfo: StoreData<ChatTabStore>) {
     return permissionCheck(tabInfo, "chmod");
   }
 
   @VueEvent
-  private async chmodTab(tabInfo: StoreUseData<ChatTabInfo>) {
+  private async chmodTab(tabInfo: StoreData<ChatTabStore>) {
     if (!this.isChmodAble(tabInfo)) return;
 
     await TaskManager.instance.ignition<WindowOpenInfo<DataReference>, never>({
@@ -104,30 +105,34 @@ export default class ChatTabComponent extends Vue {
       value: {
         type: "chmod-window",
         args: {
-          type: "chat-tab",
-          docId: tabInfo.id!
+          type: tabInfo.collection,
+          key: tabInfo.key
         }
       }
     });
   }
 
   @VueEvent
-  private isDeletable(tabInfo: StoreUseData<ChatTabInfo>) {
+  private isDeletable(tabInfo: StoreData<ChatTabStore>) {
     return !tabInfo.data!.isSystem && permissionCheck(tabInfo, "edit");
   }
 
   @VueEvent
-  private async deleteTab(tabInfo: StoreUseData<ChatTabInfo>) {
+  private async deleteTab(tabInfo: StoreData<ChatTabStore>) {
     if (!this.isDeletable(tabInfo)) return;
-    const msg = ChatTabComponent.getDialogMessage("delete-tab").replace(
-      "$1",
-      tabInfo.data!.name
-    );
-    const result = window.confirm(msg);
+    const text = this.$t("message.delete-tab")!
+      .toString()
+      .replace("$1", tabInfo.data!.name);
+    const result = questionDialog({
+      title: this.$t("button.delete").toString(),
+      text,
+      confirmButtonText: this.$t("button.delete").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
     if (!result) return;
 
     try {
-      await this.chatTabListCC.deletePackage([tabInfo.id!]);
+      await this.chatTabListCC.deletePackage([tabInfo.key]);
     } catch (err) {
       // TODO error message.
       return;

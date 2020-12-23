@@ -32,15 +32,12 @@ import VueEvent from "../../../core/decorator/VueEvent";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
 import CtrlButton from "../../../core/component/CtrlButton.vue";
-import { PermissionNode } from "../../../../@types/store";
 import ChatTabInfoForm from "./ChatTabInfoForm.vue";
 
-@Component({
-  components: { ChatTabInfoForm, CtrlButton }
-})
-export default class ChatTabAddWindow extends Mixins<WindowVue<string, never>>(
-  WindowVue
-) {
+@Component({ components: { ChatTabInfoForm, CtrlButton } })
+export default class ChatTabAddWindow extends Mixins<
+  WindowVue<string, boolean>
+>(WindowVue) {
   private chatTabList = GameObjectManager.instance.chatTabList;
   private actorGroupList = GameObjectManager.instance.actorGroupList;
   private isProcessed: boolean = false;
@@ -57,16 +54,14 @@ export default class ChatTabAddWindow extends Mixins<WindowVue<string, never>>(
   }
 
   private get isDuplicate(): boolean {
-    return (
-      this.chatTabList.filter(ct => ct.data!.name === this.tabName).length > 0
-    );
+    return this.chatTabList.some(ct => ct.data!.name === this.tabName);
   }
 
   @Watch("isDuplicate")
   private onChangeIsDuplicate() {
     this.windowInfo.message = this.isDuplicate
-      ? ChatTabAddWindow.getDialogMessage("duplicate")
-      : ChatTabAddWindow.getDialogMessage("default");
+      ? this.$t("message.name-duplicate")!.toString()
+      : "";
   }
 
   private static getDialogMessage(target: string) {
@@ -76,36 +71,31 @@ export default class ChatTabAddWindow extends Mixins<WindowVue<string, never>>(
 
   @VueEvent
   private async commit() {
-    if (!this.isDuplicate) {
-      const gameMastersActorGroup = this.actorGroupList.filter(
-        ag => ag.data!.isSystem && ag.data!.name === "GameMasters"
-      )[0];
-      const gameMastersPermission: PermissionNode = {
-        type: "group",
-        id: gameMastersActorGroup.id!
-      };
-      await this.cc!.addDirect(
-        [
-          {
-            name: this.tabName,
-            isSystem: false,
-            useReadAloud: this.useReadAloud,
-            readAloudVolume: this.readAloudVolume
-          }
-        ],
-        [
-          {
-            permission: {
-              view: { type: "none", list: [] },
-              edit: { type: "allow", list: [gameMastersPermission] },
-              chmod: { type: "allow", list: [gameMastersPermission] }
-            }
-          }
-        ]
-      );
-    }
+    if (this.isDuplicate) return;
+    const gameMastersActorGroup = this.actorGroupList.find(
+      ag => ag.data!.isSystem && ag.data!.name === "GameMasters"
+    )!;
+    const gameMastersPermission: PermissionNode = {
+      type: "group",
+      key: gameMastersActorGroup.key
+    };
+    await this.cc!.addDirect([
+      {
+        permission: {
+          view: { type: "none", list: [] },
+          edit: { type: "allow", list: [gameMastersPermission] },
+          chmod: { type: "allow", list: [gameMastersPermission] }
+        },
+        data: {
+          name: this.tabName,
+          isSystem: false,
+          useReadAloud: this.useReadAloud,
+          readAloudVolume: this.readAloudVolume
+        }
+      }
+    ]);
     this.isProcessed = true;
-    await this.close();
+    await this.finally(true);
   }
 
   @TaskProcessor("window-close-closing")
@@ -123,7 +113,7 @@ export default class ChatTabAddWindow extends Mixins<WindowVue<string, never>>(
   private async rollback() {
     if (!this.isProcessed) {
       this.isProcessed = true;
-      await this.close();
+      await this.finally();
     }
   }
 }

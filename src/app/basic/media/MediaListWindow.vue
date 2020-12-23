@@ -6,9 +6,9 @@
         v-model="isViewThumbnail"
         colorStyle="skyblue"
         c-icon="image"
-        :c-label="$t('label.thumbnail')"
+        :c-label="$t('media-list-window.label.thumbnail')"
         n-icon="list2"
-        :n-label="$t('label.list')"
+        :n-label="$t('media-list-window.label.list')"
         @hover="onHoverThumbnailView"
       />
       <input
@@ -32,7 +32,7 @@
       <div class="tab-container">
         <media-item-component
           v-for="media in useMediaList"
-          :key="media.id"
+          :key="media.key"
           :media="media"
           :isViewThumbnail="isViewThumbnail"
           @preview="preview(media)"
@@ -58,16 +58,15 @@ import SocketFacade, {
   permissionCheck
 } from "../../core/api/app-server/SocketFacade";
 import VueEvent from "../../core/decorator/VueEvent";
-import { StoreUseData } from "../../../@types/store";
-import { MediaInfo } from "../../../@types/room";
+import { MediaStore } from "@/@types/store-data";
 import TaskManager from "../../core/task/TaskManager";
 import SCheck from "../common/components/SCheck.vue";
 import GameObjectManager from "../GameObjectManager";
 import LanguageManager from "../../../LanguageManager";
-import { TabInfo, WindowOpenInfo } from "../../../@types/window";
-import { DataReference } from "../../../@types/data";
+import { TabInfo, WindowOpenInfo } from "@/@types/window";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
-import { DeleteFileRequest } from "../../../@types/socket";
+import { DeleteFileRequest } from "@/@types/socket";
+import { questionDialog } from "@/app/core/utility/Utility";
 
 @Component({
   components: {
@@ -81,7 +80,7 @@ export default class MediaListWindow extends Mixins<WindowVue<void, never>>(
   WindowVue
 ) {
   private mediaList = GameObjectManager.instance.mediaList;
-  private useMediaList: StoreUseData<MediaInfo>[] = [];
+  private useMediaList: StoreData<MediaStore>[] = [];
   private mediaCC = SocketFacade.instance.mediaCC();
 
   private tabList: TabInfo[] = [];
@@ -141,24 +140,27 @@ export default class MediaListWindow extends Mixins<WindowVue<void, never>>(
   }
 
   private createTabInfoList() {
+    this.windowInfo.message = this.$t(
+      "media-list-window.message-list.how-to-upload"
+    ).toString();
     this.tabList = this.mediaList
       .filter(m => permissionCheck(m, "view"))
       .map(m => m.data!.tag)
-      .filter((tag, idx, list) => list.indexOf(tag) === idx)
-      .map((tag, idx) => ({
-        key: idx.toString(),
+      .filter((tag, index, list) => list.indexOf(tag) === index)
+      .map((tag, index) => ({
+        key: index.toString(),
         target: tag,
-        text: tag || LanguageManager.instance.getText("label.non-tag")
+        text: tag || this.$t("label.non-tag")!.toString()
       }));
     if (!this.currentTabInfo) {
       this.currentTabInfo = this.tabList[0];
       return;
     }
 
-    const idx = this.tabList.findIndex(
+    const index = this.tabList.findIndex(
       t => JSON.stringify(t) === JSON.stringify(this.currentTabInfo)
     );
-    if (idx === -1) this.currentTabInfo = this.tabList[0];
+    if (index === -1) this.currentTabInfo = this.tabList[0];
   }
 
   private static getDialogMessage(target: string) {
@@ -167,31 +169,36 @@ export default class MediaListWindow extends Mixins<WindowVue<void, never>>(
   }
 
   @VueEvent
-  private async chmodMedia(media: StoreUseData<MediaInfo>) {
+  private async chmodMedia(media: StoreData<MediaStore>) {
     await TaskManager.instance.ignition<WindowOpenInfo<DataReference>, never>({
       type: "window-open",
       owner: "Quoridorn",
       value: {
         type: "chmod-window",
         args: {
-          type: "media",
-          docId: media.id!
+          type: media.collection,
+          key: media.key
         }
       }
     });
   }
 
   @VueEvent
-  private async deleteMedia(media: StoreUseData<MediaInfo>) {
-    const msg = MediaListWindow.getDialogMessage("delete-media").replace(
+  private async deleteMedia(media: StoreData<MediaStore>) {
+    const text = MediaListWindow.getDialogMessage("delete-media").replace(
       "$1",
       media.data!.name
     );
-    const result = window.confirm(msg);
-    if (!result) return;
+    const confirm = await questionDialog({
+      title: this.$t("button.delete").toString(),
+      text,
+      confirmButtonText: this.$t("button.delete").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
+    if (!confirm) return;
 
     try {
-      await this.mediaCC.deletePackage([media.id!]);
+      await this.mediaCC.deletePackage([media.key]);
     } catch (err) {
       // TODO error message.
       return;
@@ -205,15 +212,15 @@ export default class MediaListWindow extends Mixins<WindowVue<void, never>>(
 
   private setHoverWindowMessage(isHover: boolean, messageType: string) {
     this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
+      ? this.$t(
           `${this.windowInfo.type}.message-list.${messageType}`
-        )
+        )!.toString()
       : "";
   }
 
   @VueEvent
-  private async addCutIn(media: StoreUseData<MediaInfo>) {
-    await TaskManager.instance.ignition<WindowOpenInfo<MediaInfo>, never>({
+  private async addCutIn(media: StoreData<MediaStore>) {
+    await TaskManager.instance.ignition<WindowOpenInfo<MediaStore>, never>({
       type: "window-open",
       owner: "Quoridorn",
       value: {

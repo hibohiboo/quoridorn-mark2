@@ -27,7 +27,7 @@ import { Task, TaskResult } from "task";
 import { StandByReturnInfo } from "task-info";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import LifeCycle from "../../../core/decorator/LifeCycle";
-import { WindowMoveInfo } from "../../../../@types/window";
+import { WindowMoveInfo } from "@/@types/window";
 import SeekBarComponent from "./SeekBarComponent.vue";
 import SocketFacade from "../../../core/api/app-server/SocketFacade";
 import WindowManager from "../../../core/window/WindowManager";
@@ -37,18 +37,17 @@ import WindowVue from "../../../core/window/WindowVue";
 import CtrlButton from "../../../core/component/CtrlButton.vue";
 import CssManager from "../../../core/css/CssManager";
 import GameObjectManager from "../../GameObjectManager";
-import LanguageManager from "../../../../LanguageManager";
 import BgmManager from "./BgmManager";
 import YoutubeManager, {
   getYoutubeThunbnail,
   YoutubeEventHandler
 } from "./YoutubeManager";
 import {
-  CutInDeclareInfo,
   PlayBgmInfo,
   YoutubeMuteChangeInfo,
   YoutubeVolumeChangeInfo
-} from "../../../../@types/room";
+} from "@/@types/room";
+import { CutInStore } from "@/@types/store-data";
 
 @Component({
   components: { SeekBarComponent, CtrlButton }
@@ -59,8 +58,8 @@ export default class PlayBgmFileWindow
   @Prop({ type: Boolean, default: false })
   private isIpadTesting!: boolean;
 
-  private bgmInfo: CutInDeclareInfo | null = null;
-  private targetId: string | null = null;
+  private bgmInfo: CutInStore | null = null;
+  private targetKey: string | null = null;
   private volume: number = 0;
   private isWindowMoving = false;
 
@@ -110,12 +109,12 @@ export default class PlayBgmFileWindow
     );
     this.isMounted = true;
 
-    let { targetId, data } = this.windowInfo.args!;
-    this.targetId = targetId;
+    let { targetKey, data } = this.windowInfo.args!;
+    this.targetKey = targetKey;
 
     if (!data) {
       const cutInDataCC = SocketFacade.instance.cutInDataCC();
-      data = (await cutInDataCC.getData(targetId!))!.data!;
+      data = (await cutInDataCC.findSingle("key", targetKey!))!.data!.data!;
     }
     this.bgmInfo = data;
 
@@ -156,11 +155,11 @@ export default class PlayBgmFileWindow
     }
 
     await BgmManager.playBgm(
-      targetId || null,
+      targetKey || null,
       this.bgmInfo,
       this.windowKey,
       this.windowInfo.status,
-      this.bgmFileElementId,
+      this.bgmFileElementKey,
       this
     );
     this.maxVolume = this.bgmInfo.volume;
@@ -169,7 +168,7 @@ export default class PlayBgmFileWindow
   }
 
   private get isStandByBgm(): boolean {
-    return (this.targetId && this.bgmInfo!.isStandBy) as boolean;
+    return (this.targetKey && this.bgmInfo!.isStandBy) as boolean;
   }
 
   public setVolume(volume: number) {
@@ -213,16 +212,16 @@ export default class PlayBgmFileWindow
     this.windowInfo.heightPx = this.windowInfo.declare.size.heightPx;
     WindowManager.instance.arrangePoint(this.windowKey, true);
     GameObjectManager.instance.playingBgmList.push({
-      targetId: this.targetId,
+      targetKey: this.targetKey,
       tag: this.bgmInfo!.tag,
       windowKey: this.windowKey
     });
     setTimeout(() => {
-      YoutubeManager.instance.play(this.bgmFileElementId);
+      YoutubeManager.instance.play(this.bgmFileElementKey);
     });
   }
 
-  private get bgmFileElementId() {
+  private get bgmFileElementKey() {
     return `${this.windowKey}-${this.status}-bgm-file`;
   }
 
@@ -239,15 +238,15 @@ export default class PlayBgmFileWindow
   @LifeCycle
   private destroyed() {
     if (this.status !== "window") return;
-    YoutubeManager.instance.destroyed(this.bgmFileElementId);
+    YoutubeManager.instance.destroyed(this.bgmFileElementKey);
   }
 
   public onReady(): void {
     if (this.status !== "window") return;
     if (this.isIpadTesting) console.log("onReady");
-    const windowTitle = LanguageManager.instance.getText(
+    const windowTitle = this.$t(
       `${this.windowInfo.type}.window-title`
-    );
+    )!.toString();
     setTimeout(() => {
       this.windowInfo.title = `${this.bgmInfo!.tag}`;
       this.windowInfo.message = this.bgmInfo!.title;
@@ -259,7 +258,7 @@ export default class PlayBgmFileWindow
       if (this.isStandByBgm) {
         if (this.isIpadTesting) console.log("isStandByBgm to pause");
         BgmManager.instance.notifyOpenedStandByWindow(
-          this.targetId!,
+          this.targetKey!,
           this.windowKey
         );
         setTimeout(() => {
@@ -383,7 +382,7 @@ export default class PlayBgmFileWindow
     if (this.bgmInfo!.isRepeat) {
       this.seek = this.bgmStart;
       YoutubeManager.instance.seekTo(
-        this.bgmFileElementId,
+        this.bgmFileElementKey,
         this.bgmStart,
         true
       );

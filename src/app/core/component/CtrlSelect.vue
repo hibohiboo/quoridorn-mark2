@@ -9,9 +9,9 @@
       v-if="!multiple"
       class="input"
       :class="{ pending: isPending }"
-      :value="localValue === null ? 'null' : selectionValue"
-      @input="localValue = getSelectionValue(1)"
-      :id="id || undefined"
+      :value="selectionValue"
+      @input="localValue = getSelectionValue()"
+      :id="elmId || undefined"
       ref="component"
       :disabled="disabled || readonly"
       :style="{
@@ -42,8 +42,8 @@
       v-else
       class="input"
       :class="{ pending: isPending }"
-      @input="localValue = getSelectionValue(1)"
-      :id="id || undefined"
+      @input="localValue = getSelectionValue()"
+      :id="elmId || undefined"
       ref="component"
       :disabled="disabled || readonly"
       :style="{
@@ -77,11 +77,11 @@
 <script lang="ts">
 import { Prop, Watch } from "vue-property-decorator";
 import { Component } from "vue-mixin-decorator";
-import { Rectangle } from "address";
 import { createRectangle } from "../utility/CoordinateUtility";
-import { HtmlOptionInfo } from "../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 import SelectMixin from "../../basic/common/components/select/base/SelectMixin";
 import VueEvent from "../decorator/VueEvent";
+import { Rectangle } from "@/@types/store-data-optional";
 
 @Component
 export default class CtrlSelect extends SelectMixin {
@@ -119,7 +119,9 @@ export default class CtrlSelect extends SelectMixin {
       elm.options
     ) as HTMLOptionElement[];
     optionElmList.forEach(o => {
-      o.selected = (this.localValue as string[]).some(v => v === o.value);
+      o.selected = (this.localValue as (string | null)[]).some(
+        v => v === o.value
+      );
     });
   }
 

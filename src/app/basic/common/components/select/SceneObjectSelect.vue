@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     :multiple="multiple"
@@ -15,20 +16,18 @@ import { Prop, Watch } from "vue-property-decorator";
 import LifeCycle from "../../../../core/decorator/LifeCycle";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 import GameObjectManager from "../../../GameObjectManager";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class SceneObjectSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
 ) {
   @Prop({ type: String, default: null })
-  private actorId!: string;
+  private actorKey!: string;
 
   @Prop({ type: Boolean, default: false })
   private nullable!: boolean;
@@ -40,24 +39,24 @@ export default class SceneObjectSelect extends Mixins<MultiMixin>(
     this.createOptionInfoList();
   }
 
-  @Watch("actorId")
-  private onChangeActorId() {
+  @Watch("actorKey")
+  private onChangeActorKey() {
     this.createOptionInfoList();
   }
 
   private createOptionInfoList() {
     this.optionInfoList = GameObjectManager.instance.sceneObjectList
-      .filter(so => so.data!.actorId === this.actorId)
+      .filter(so => so.data!.actorKey === this.actorKey)
       .map(c => ({
-        key: c.id!,
-        value: c.id!,
+        key: c.key,
+        value: c.key,
         text: c.data!.name,
         disabled: false
       }));
     if (this.nullable) {
       this.optionInfoList.unshift({
         key: null,
-        value: "null",
+        value: null,
         text: this.$t("label.non-select")!.toString(),
         disabled: false
       });

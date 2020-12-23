@@ -30,7 +30,6 @@ import TaskProcessor from "../task/TaskProcessor";
 import LifeCycle from "../decorator/LifeCycle";
 import WindowVue from "./WindowVue";
 import CtrlButton from "../component/CtrlButton.vue";
-import LanguageManager from "../../../LanguageManager";
 import BaseInput from "../component/BaseInput.vue";
 import VueEvent from "../decorator/VueEvent";
 
@@ -54,12 +53,8 @@ export default class ConfirmWindow extends Mixins<
   ): Promise<TaskResult<never> | void> {
     const type = this.windowInfo.type;
     const target = this.info!.target;
-    this.windowInfo.title = LanguageManager.instance.getText(
-      `${type}.${target}.title`
-    );
-    this.message = LanguageManager.instance.getText(
-      `${type}.${target}.message`
-    );
+    this.windowInfo.title = this.$t(`${type}.${target}.title`)!.toString();
+    this.message = this.$t(`${type}.${target}.message`)!.toString();
     task.resolve();
   }
 
@@ -69,12 +64,8 @@ export default class ConfirmWindow extends Mixins<
     this.info = this.windowInfo.args!;
     const type = this.windowInfo.type;
     const target = this.info!.target;
-    this.windowInfo.title = LanguageManager.instance.getText(
-      `${type}.${target}.title`
-    );
-    this.message = LanguageManager.instance.getText(
-      `${type}.${target}.message`
-    );
+    this.windowInfo.title = this.$t(`${type}.${target}.title`)!.toString();
+    this.message = this.$t(`${type}.${target}.message`)!.toString();
   }
 
   @VueEvent

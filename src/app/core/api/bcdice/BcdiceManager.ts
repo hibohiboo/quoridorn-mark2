@@ -1,15 +1,11 @@
 import { listToEmpty } from "../../utility/PrimaryDataUtility";
 import TaskManager from "../../task/TaskManager";
-import {
-  BcdiceDiceRollResult,
-  BcdiceSystemInfo,
-  BcdiceVersionInfo,
-  DiceSystem
-} from "@/@types/bcdice";
 import { CustomDiceBotInfo } from "@/@types/room";
 import SocketFacade from "../app-server/SocketFacade";
 import LanguageManager from "../../../../LanguageManager";
 import { loadYaml } from "../../utility/FileUtility";
+import { BcdiceDiceRollResult } from "@/@types/store-data-optional";
+import { errorDialog } from "@/app/core/utility/Utility";
 
 export default class BcdiceManager {
   // シングルトン
@@ -86,7 +82,10 @@ export default class BcdiceManager {
       const jsonStr = await fetch(url);
       json = await jsonStr.json();
     } catch (err) {
-      alert("BCDice-APIとの通信に失敗しました。");
+      await errorDialog({
+        title: LanguageManager.instance.getText("message.error"),
+        text: "BCDice-APIとの通信に失敗しました。"
+      });
       console.error("[!!CAUTION!!] これは問題ですっ！🐧💦");
       console.error(err);
       // TODO 対症療法
@@ -162,7 +161,9 @@ export default class BcdiceManager {
   ): Promise<string | null> {
     if (!system) return null;
     if (system === "DiceBot")
-      return LanguageManager.instance.getText("label.default-dicebot");
+      return LanguageManager.instance.getText(
+        "bcdice-manager.label.default-dicebot"
+      );
     const info = await BcdiceManager.getBcdiceSystemInfo(baseUrl, system);
     return info.name;
   }

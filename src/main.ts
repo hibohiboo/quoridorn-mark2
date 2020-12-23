@@ -2,8 +2,12 @@ import Vue from "vue";
 import router from "./router";
 import MainVue from "./MainVue.vue";
 import VueI18n from "vue-i18n";
+import ChitAddWindow from "./app/basic/object/chit/ChitAddWindow.vue";
 import ChitEditWindow from "./app/basic/object/chit/ChitEditWindow.vue";
-import MapMastEditWindow from "./app/basic/object/map-mask/MapMaskEditWindow.vue";
+import MapMaskAddWindow from "./app/basic/object/map-mask/MapMaskAddWindow.vue";
+import MapMaskEditWindow from "./app/basic/object/map-mask/MapMaskEditWindow.vue";
+import MapMarkerAddWindow from "./app/basic/object/map-marker/MapMarkerAddWindow.vue";
+import MapMarkerEditWindow from "./app/basic/object/map-marker/MapMarkerEditWindow.vue";
 import ResourceMasterAddWindow from "./app/basic/initiative/ResourceMasterAddWindow.vue";
 import VersionInfoWindow from "./app/basic/login/VersionInfoWindow.vue";
 import EditSceneWindow from "./app/basic/map/EditSceneWindow.vue";
@@ -22,9 +26,7 @@ import ActorAddWindow from "./app/basic/object/actor/ActorAddWindow.vue";
 import ChatWindow from "./app/basic/chat/ChatWindow.vue";
 import InitiativeWindow from "./app/basic/initiative/InitiativeWindow.vue";
 import TermsOfUseWindow from "./app/basic/login/TermsOfUseWindow.vue";
-import MapMastAddWindow from "./app/basic/object/map-mask/MapMaskAddWindow.vue";
 import LoginRoomWindow from "./app/basic/login/LoginRoomWindow.vue";
-import ChitAddWindow from "./app/basic/object/chit/ChitAddWindow.vue";
 import BgmAddWindow from "./app/basic/cut-in/bgm/BgmAddWindow.vue";
 import CardDeckListWindow from "./app/basic/card/CardDeckListWindow.vue";
 import BgmEditWindow from "./app/basic/cut-in/bgm/BgmEditWindow.vue";
@@ -54,6 +56,11 @@ import DiceSymbolAddWindow from "@/app/basic/object/dice-symbol/DiceSymbolAddWin
 import SecretDiceRollWindow from "@/app/basic/chat/secret-dice/SecretDiceRollWindow.vue";
 import SimpleTextInputWindow from "@/app/core/window/SimpleTextInputWindow.vue";
 import MemoTabSettingWindow from "@/app/basic/other-text/MemoTabSettingWindow.vue";
+import ChatPaletteTabSettingWindow from "@/app/basic/chat-palette/ChatPaletteTabSettingWindow.vue";
+import PublicMemoAddWindow from "@/app/basic/public-memo/PublicMemoAddWindow.vue";
+import PublicMemoEditWindow from "@/app/basic/public-memo/PublicMemoEditWindow.vue";
+import LikeAddWindow from "@/app/basic/chat/like/LikeAddWindow.vue";
+import LikeEditWindow from "@/app/basic/chat/like/LikeEditWindow.vue";
 
 Vue.config.productionTip = false;
 Vue.use(VueI18n);
@@ -80,8 +87,10 @@ async function main(): Promise<void> {
   Vue.component("login-room-window", LoginRoomWindow);
   Vue.component("version-info-window", VersionInfoWindow);
   Vue.component("room-info-window", RoomInfoWindow);
-  Vue.component("map-mask-add-window", MapMastAddWindow);
-  Vue.component("map-mask-edit-window", MapMastEditWindow);
+  Vue.component("map-mask-add-window", MapMaskAddWindow);
+  Vue.component("map-mask-edit-window", MapMaskEditWindow);
+  Vue.component("map-marker-add-window", MapMarkerAddWindow);
+  Vue.component("map-marker-edit-window", MapMarkerEditWindow);
   Vue.component("chit-add-window", ChitAddWindow);
   Vue.component("chit-edit-window", ChitEditWindow);
   Vue.component("scene-list-window", SceneListWindow);
@@ -120,6 +129,11 @@ async function main(): Promise<void> {
   Vue.component("chmod-input-window", ChmodInputWindow);
   Vue.component("simple-text-input-window", SimpleTextInputWindow);
   Vue.component("memo-tab-setting-window", MemoTabSettingWindow);
+  Vue.component("chat-palette-tab-setting-window", ChatPaletteTabSettingWindow);
+  Vue.component("public-memo-add-window", PublicMemoAddWindow);
+  Vue.component("public-memo-edit-window", PublicMemoEditWindow);
+  Vue.component("like-add-window", LikeAddWindow);
+  Vue.component("like-edit-window", LikeEditWindow);
 
   const i18n: VueI18n = await LanguageManager.instance.init();
 

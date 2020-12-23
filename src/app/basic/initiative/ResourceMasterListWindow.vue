@@ -21,20 +21,20 @@
         <tr
           class="resource-master"
           v-for="resource in resourceMasterList"
-          :key="resource.id"
+          :key="resource.key"
         >
           <td>{{ resource.data.label }}</td>
-          <td v-t="`label.resource-type-${resource.data.type}`"></td>
+          <td v-t="`selection.resource-type.${resource.data.type}`"></td>
           <td class="center">{{ resource.data.isAutoAddActor ? "✔︎" : "" }}</td>
           <td class="center">
             {{ resource.data.isAutoAddMapObject ? "✔︎" : "" }}
           </td>
           <td>
-            <ctrl-button @click="editResource(resource.id)">
+            <ctrl-button @click="editResource(resource.key)">
               <span v-t="'button.modify'"></span>
             </ctrl-button>
             <ctrl-button
-              @click="deleteResource(resource.id)"
+              @click="deleteResource(resource.key)"
               :disabled="!!resource.data.systemColumnType"
             >
               <span v-t="'button.delete'"></span>
@@ -67,15 +67,13 @@ import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import GameObjectManager from "../GameObjectManager";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
-import { WindowOpenInfo } from "../../../@types/window";
-import { DataReference } from "../../../@types/data";
+import { WindowOpenInfo } from "@/@types/window";
 import VueEvent from "../../core/decorator/VueEvent";
 import { importJson, saveJson } from "../../core/utility/FileUtility";
-import { StoreUseData } from "../../../@types/store";
-import { ResourceMasterStore } from "../../../@types/gameObject";
-import LanguageManager from "../../../LanguageManager";
+import { ResourceMasterStore } from "@/@types/store-data";
 import * as moment from "moment";
 import App from "../../../views/App.vue";
+import { errorDialog, questionDialog } from "@/app/core/utility/Utility";
 
 @Component({
   components: {
@@ -105,7 +103,7 @@ export default class ResourceMasterListWindow extends Mixins<
   private async downloadData() {
     console.log(JSON.stringify(this.resourceMasterList, null, "  "));
     const dateTimeStr = moment().format("YYYYMMDDHHmmss");
-    saveJson<StoreUseData<ResourceMasterStore>[]>(
+    saveJson<StoreData<ResourceMasterStore>[]>(
       `Quoridorn_ResourceMaster_${dateTimeStr}`,
       "resource-master",
       this.resourceMasterList
@@ -115,11 +113,14 @@ export default class ResourceMasterListWindow extends Mixins<
   @VueEvent
   private async uploadData() {
     console.log(JSON.stringify(this.resourceMasterList, null, "  "));
-    const dataContainer = await importJson<StoreUseData<ResourceMasterStore>[]>(
+    const dataContainer = await importJson<StoreData<ResourceMasterStore>[]>(
       "resource-master"
     );
     if (!dataContainer) {
-      alert(LanguageManager.instance.getText("label.importFailure"));
+      await errorDialog({
+        title: this.$t("message.error").toString(),
+        text: this.$t("label.importFailure")!.toString()
+      });
       return;
     }
     const importResourceMasterList = dataContainer.data;
@@ -130,7 +131,7 @@ export default class ResourceMasterListWindow extends Mixins<
   }
 
   @VueEvent
-  private async editResource(id: string) {
+  private async editResource(key: string) {
     await TaskManager.instance.ignition<WindowOpenInfo<DataReference>, never>({
       type: "window-open",
       owner: "Quoridorn",
@@ -138,24 +139,30 @@ export default class ResourceMasterListWindow extends Mixins<
         type: "resource-master-edit-window",
         args: {
           type: "resource-master",
-          docId: id
+          key: key
         }
       }
     });
   }
 
   @VueEvent
-  private async deleteResource(id: string) {
-    const flg = window.confirm(
-      this.$t(`${this.windowInfo.type}.dialog.delete-resource`)!.toString()
-    );
-    if (!flg) return;
+  private async deleteResource(key: string) {
+    const result = questionDialog({
+      title: this.$t("button.delete").toString(),
+      text: this.$t(
+        `${this.windowInfo.type}.dialog.delete-resource`
+      )!.toString(),
+      confirmButtonText: this.$t("button.delete").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
+    if (!result) return;
     try {
-      await this.cc.deletePackage([id]);
+      await this.cc.deletePackage([key]);
     } catch (err) {
-      alert(
-        this.$t(`${this.windowInfo.type}.dialog.delete-failure`)!.toString()
-      );
+      await errorDialog({
+        title: this.$t("message.error").toString(),
+        text: this.$t("message.delete-failure")!.toString()
+      });
       return;
     }
   }

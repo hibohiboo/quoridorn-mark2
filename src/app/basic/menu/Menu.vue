@@ -2,55 +2,48 @@
   <div id="menu" @contextmenu.prevent>
     <!-- 操作ボタングループ -->
     <div class="span-group">
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('ファイル')"
-        :class="{ isHover: isShow('ファイル') }"
-      >
-        ファイル
-      </span>
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('表示')"
-        :class="{ isHover: isShow('表示', 'ウィンドウ') }"
-      >
-        表示
-      </span>
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('コマ')"
-        :class="{ isHover: isShow('コマ') }"
-      >
-        コマ
-      </span>
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('マップ')"
-        :class="{ isHover: isShow('マップ') }"
-      >
-        マップ
-      </span>
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('画像')"
-        :class="{ isHover: isShow('画像') }"
-      >
-        画像
-      </span>
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('ヘルプ')"
-        :class="{ isHover: isShow('ヘルプ') }"
-      >
-        ヘルプ
-      </span>
-      <span
-        @click="menuClick()"
-        @mouseenter="menuHover('デモ')"
-        :class="{ isHover: isShow('デモ') }"
-      >
-        デモ
-      </span>
+      <menu-down-item
+        type="管理"
+        textTarget="menu.management"
+        :isHover="isShow('管理')"
+        @mousedown="menuClick"
+        @mouseenter="menuHover"
+      />
+      <menu-down-item
+        type="画面"
+        textTarget="menu.window"
+        :isHover="isShow('画面')"
+        @mousedown="menuClick"
+        @mouseenter="menuHover"
+      />
+      <menu-down-item
+        type="マップ"
+        textTarget="label.map"
+        :isHover="isShow('マップ')"
+        @mousedown="menuClick"
+        @mouseenter="menuHover"
+      />
+      <menu-down-item
+        type="演出"
+        textTarget="menu.directing"
+        :isHover="isShow('演出')"
+        @mousedown="menuClick"
+        @mouseenter="menuHover"
+      />
+      <menu-down-item
+        type="作成"
+        textTarget="menu.create"
+        :isHover="isShow('作成')"
+        @mousedown="menuClick"
+        @mouseenter="menuHover"
+      />
+      <menu-down-item
+        type="ヘルプ"
+        textTarget="menu.help"
+        :isHover="isShow('ヘルプ')"
+        @mousedown="menuClick"
+        @mouseenter="menuHover"
+      />
     </div>
     <!-- 部屋情報 -->
     <div class="menu-button" @click="clickRoomInfo">
@@ -60,215 +53,185 @@
       名
     </div>
     <!-- 共有メモ -->
-    <div class="menu-button" @click="clickPublicMemo">
+    <div class="menu-button" @click="onClickCreatePublicMemo">
       <span class="icon-file-text"></span>
-      <span>共有メモ</span>
+      <span v-t="'type.public-memo'"></span>
     </div>
     <!-- ログアウト -->
     <div class="menu-button" @click="clickLogOut">
       <span class="icon-switch"></span>
-      <span>ログアウト</span>
-    </div>
-
-    <!--------------------------------------------------
-     ! ファイル
-     !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu2" v-show="isShow('ファイル')">
-      <div class="item" @click="clickExport">セーブ</div>
-      <div class="item" @click="clickImport">ロード</div>
-      <hr @mouseenter="menuHover('ファイル')" />
-      <div class="item" @click="clickChatLog">チャットログ取得</div>
+      <span v-t="'button.logout'"></span>
     </div>
     <!--------------------------------------------------
-     ! 表示
+     ! 管理
      !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu3" v-show="isShow('表示', 'ウィンドウ')">
-      <div class="item" @mouseenter="menuHover('ウィンドウ')">
-        ウィンドウ
-        <span class="triangle"></span>
-      </div>
-      <hr @mouseenter="menuHover('表示')" />
-      <menu-boolean-item
-        property="private.setting.standImage"
-        @mouseenter="menuHover('表示')"
-      >
-        立ち絵表示
-      </menu-boolean-item>
-      <menu-boolean-item
-        property="private.setting.cutIn"
-        @mouseenter="menuHover('表示')"
-      >
-        カットイン表示
-      </menu-boolean-item>
-      <hr @mouseenter="menuHover('表示')" />
-      <menu-boolean-item
-        property="public.setting.gridId"
-        @mouseenter="menuHover('表示')"
-      >
-        座標表示
-      </menu-boolean-item>
-      <menu-boolean-item
-        property="public.setting.gridLine"
-        @mouseenter="menuHover('表示')"
-      >
-        マス目表示
-      </menu-boolean-item>
-      <hr @mouseenter="menuHover('表示')" />
-      <menu-boolean-item
-        property="public.setting.isFitGrid"
-        @mouseenter="menuHover('表示')"
-      >
-        マス目にキャラクターを合わせる
-      </menu-boolean-item>
-      <hr @mouseenter="menuHover('表示')" />
+    <div class="hover-menu" v-show="isShow('管理')" :style="hoverMenuStyle">
+      <menu-window-item type="player-box-window" @click="menuClick" />
+      <menu-window-item type="media-list-window" @click="menuClick" />
+      <hr />
+      <div
+        class="item disabled"
+        @click="onClickExport"
+        v-t="'menu.export-room-data'"
+      ></div>
+      <div
+        class="item disabled"
+        @click="onClickImport"
+        v-t="'menu.import-room-data'"
+      ></div>
+      <hr class="disabled" />
       <div
         class="item"
-        @click="clickSettingFontSize"
-        @mouseenter="menuHover('表示')"
-      >
-        フォントサイズ調整
-      </div>
-      <hr @mouseenter="menuHover('表示')" />
+        @click="onClickExportChatLog"
+        v-t="'menu.export-chat-log'"
+      ></div>
+    </div>
+    <!--------------------------------------------------
+     ! 画面
+     !-------------------------------------------------->
+    <div class="hover-menu" v-show="isShow('画面')" :style="hoverMenuStyle">
+      <menu-window-item type="chat-window" @click="menuClick" />
+      <menu-window-item type="chat-palette-window" @click="menuClick" />
+      <hr />
+      <menu-window-item type="initiative-window" @click="menuClick" />
+      <hr />
       <div
         class="item"
         @click="clickResetWindowLocate"
-        @mouseenter="menuHover('表示')"
-      >
-        ウィンドウ配置初期化
-      </div>
-    </div>
-    <!--------------------------------------------------
-     ! コマ
-     !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu4" v-show="isShow('コマ')">
-      <div class="item" @click="clickAddCharacter">キャラクター追加</div>
-      <div class="item" @click="clickAddRange">範囲追加</div>
-      <hr />
-      <div class="item" @click="clickAddChit">チット作成</div>
-      <hr />
-      <div class="item" @click="clickGraveyard">墓場</div>
-      <div class="item" @click="clickWaitingRoom">キャラクター待合室</div>
-      <hr />
-      <menu-boolean-item property="public.setting.pieceRotateMarker">
-        回転マーカーを表示する
-      </menu-boolean-item>
+        v-t="'menu.window-position-reset'"
+      ></div>
     </div>
     <!--------------------------------------------------
      ! マップ
      !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu5" v-show="isShow('マップ')">
-      <div class="item" @click="clickChangeMap">マップ変更</div>
-      <div class="item" @click="clickAddFloorTile">フロアタイル追加</div>
-      <div class="item" @click="clickAddMapMask">マップマスク追加</div>
-      <div class="item" @click="clickCreateEasyMap">簡易マップ作成</div>
+    <div class="hover-menu" v-show="isShow('マップ')" :style="hoverMenuStyle">
+      <menu-window-item type="scene-list-window" @click="menuClick" />
       <hr />
-      <div class="item" @click="clickSaveMap">マップ状態保存</div>
-      <div class="item" @click="clickSwitchMap">マップ切り替え</div>
+      <menu-window-item type="map-mask-add-window" @click="menuClick" />
+      <menu-window-item type="map-marker-add-window" @click="menuClick" />
+      <menu-window-item type="chit-add-window" @click="menuClick" />
+      <menu-window-item type="character-add-window" @click="menuClick" />
+      <menu-window-item type="dice-symbol-add-window" @click="menuClick" />
+      <hr />
+      <menu-window-item type="card-deck-list-window" @click="menuClick" />
     </div>
     <!--------------------------------------------------
-     ! 画像
+     ! 作成
      !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu6" v-show="isShow('画像')">
-      <div class="item" @click="clickFileUploader">ファイルアップローダー</div>
+    <div class="hover-menu" v-show="isShow('作成')" :style="hoverMenuStyle">
+      <menu-window-item type="public-memo-add-window" @click="menuClick" />
       <hr />
-      <div class="item" @click="clickTagEdit">タグ編集</div>
-      <div class="item" @click="clickDeleteImage">画像削除</div>
+      <div
+        class="item"
+        @click="onClickCreateActor"
+        v-t="'actor-add-window.window-title'"
+      ></div>
+      <hr />
+      <div
+        class="item"
+        @click="onClickCreateChatTab"
+        v-t="'chat-tab-add-window.window-title'"
+      ></div>
+      <div
+        class="item"
+        @click="onClickCreateResourceMaster"
+        v-t="'resource-master-add-window.window-title'"
+      ></div>
+      <hr />
+      <menu-window-item type="map-mask-add-window" @click="menuClick" />
+      <menu-window-item type="map-marker-add-window" @click="menuClick" />
+      <menu-window-item type="chit-add-window" @click="menuClick" />
+      <menu-window-item type="character-add-window" @click="menuClick" />
+      <menu-window-item type="dice-symbol-add-window" @click="menuClick" />
+      <hr />
+      <div
+        class="item"
+        @click="onClickCreateBgm"
+        v-t="'bgm-add-window.window-title'"
+      ></div>
     </div>
+    <!--------------------------------------------------
+     ! 演出
+     !-------------------------------------------------->
+    <div class="hover-menu" v-show="isShow('演出')" :style="hoverMenuStyle">
+      <menu-window-item type="cut-in-list-window" @click="menuClick" />
+    </div>
+    <!--------------------------------------------------
+     ! 立ち絵表示
+     !-------------------------------------------------->
+    <!--------------------------------------------------
+     ! カットイン表示
+     !-------------------------------------------------->
+    <!--------------------------------------------------
+     ! 座標表示
+     !-------------------------------------------------->
+    <!--------------------------------------------------
+     ! マス目表示
+     !-------------------------------------------------->
+    <!--------------------------------------------------
+     ! マス目にコマを合わせる
+     !-------------------------------------------------->
     <!--------------------------------------------------
      ! ヘルプ
      !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu7" v-show="isShow('ヘルプ')">
-      <div class="item" @click="clickVersion">バージョン</div>
-      <div class="item" @click="clickManual">マニュアル</div>
+    <div class="hover-menu" v-show="isShow('ヘルプ')" :style="hoverMenuStyle">
+      <div class="item" @click="clickVersion" v-t="'label.version'"></div>
       <hr />
-      <div class="item" @click="clickOfficialSite">オフィシャルサイトへ</div>
-    </div>
-    <!--------------------------------------------------
-     ! ウィンドウ
-     !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu8" v-show="isShow('ウィンドウ')">
-      <menu-boolean-item
-        @click="openChatWindow"
-        property="private.display.chatWindow"
-      >
-        チャット表示
-      </menu-boolean-item>
-      <menu-boolean-item @click="menuClick" property="private.setting.dice">
-        ダイス表示
-      </menu-boolean-item>
-      <menu-boolean-item
-        @click="openPlayerBoxWindow"
-        property="private.display.playerBoxWindow"
-      >
-        プレイヤーボックス表示
-      </menu-boolean-item>
-      <menu-boolean-item
-        @click="openInitiativeWindow"
-        property="private.display.initiativeWindow"
-      >
-        イニシアティブ表示
-      </menu-boolean-item>
-      <menu-boolean-item
-        @click="menuClick"
-        property="private.display.resourceWindow"
-      >
-        リソース表示
-      </menu-boolean-item>
+      <div
+        class="item"
+        @click="clickOfficialSite"
+        v-t="'menu.goto-official-site'"
+      ></div>
       <hr />
-      <menu-boolean-item
-        @click="openChatPaletteWindow"
-        property="private.display.chatPaletteSettingWindow"
-      >
-        チャットパレット表示
-      </menu-boolean-item>
-      <menu-boolean-item
-        @click="menuClick"
-        property="private.display.counterRemoconWindow"
-      >
-        カウンターリモコン表示
-      </menu-boolean-item>
-    </div>
-    <!--------------------------------------------------
-     ! デモ
-     !-------------------------------------------------->
-    <div class="hoverMenu hoverMenu9" v-show="isShow('デモ')">
-      <div class="item" @click="clickDevHistory">開発履歴</div>
-      <hr />
-      <div class="item" @click="clickBufForm">不具合の報告</div>
+      <div class="item" @click="clickBufForm" v-t="'menu.bug-reports'"></div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import MenuBooleanItem from "./MenuBooleanItem.vue";
-
-import { Action } from "vuex-class";
-import { Component, Vue } from "vue-property-decorator";
-import { StoreUseData } from "../../../@types/store";
-import TaskManager from "../../core/task/TaskManager";
-import { UserData } from "../../../@types/room";
+import { Component } from "vue-property-decorator";
+import { ActorGroupStore, UserStore } from "@/@types/store-data";
 import GameObjectManager from "../GameObjectManager";
-import { WindowOpenInfo } from "../../../@types/window";
 import VueEvent from "../../core/decorator/VueEvent";
 import App from "../../../views/App.vue";
-import { someByStr } from "../../core/utility/Utility";
+import {
+  findByKey,
+  findRequireByKey,
+  someByStr
+} from "../../core/utility/Utility";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
+import MenuWindowItem from "@/app/basic/menu/MenuWindowItem.vue";
+import { createPoint } from "@/app/core/utility/CoordinateUtility";
+import WindowManager from "@/app/core/window/WindowManager";
+import MenuDownItem from "@/app/basic/menu/MenuDownItem.vue";
+import EventProcessor from "@/app/core/event/EventProcessor";
+import moment from "moment/moment";
+import * as Mustache from "mustache";
+import { saveHTML } from "@/app/core/utility/FileUtility";
+import urljoin from "url-join";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
+import { Point } from "@/@types/store-data-optional";
 
 @Component({
   components: {
+    MenuDownItem,
+    MenuWindowItem,
     MenuBooleanItem
   },
   filters: {
-    loginNum: (userList: StoreUseData<UserData>[]) =>
+    loginNum: (userList: StoreData<UserStore>[]) =>
       userList.filter(user => user!.data!.login > 0).length
   }
 })
-export default class Menu extends Vue {
+export default class Menu extends Mixins<ComponentVue>(ComponentVue) {
   private roomData = GameObjectManager.instance.roomData;
 
-  private isConnectHover: boolean = false;
   private isSelecting: boolean = false;
   private currentMenu: string = "";
-  private userList: StoreUseData<UserData>[] =
+  private currentMenuPoint: Point = createPoint(0, 0);
+  private userList: StoreData<UserStore>[] =
     GameObjectManager.instance.userList;
 
   public key: string = "menu";
@@ -276,44 +239,34 @@ export default class Menu extends Vue {
   // @LifeCycle
   // public async mounted() {}
 
-  menuClick(): void {
-    this.isSelecting = !this.isSelecting;
-  }
-
-  @VueEvent
-  private async openChatWindow() {
-    this.menuClick();
-    await App.openSimpleWindow("chat-window");
-  }
-
-  @VueEvent
-  private async openPlayerBoxWindow() {
-    this.menuClick();
-    await App.openSimpleWindow("player-box-window");
-  }
-
-  @VueEvent
-  private async openInitiativeWindow() {
-    this.menuClick();
-    await App.openSimpleWindow("initiative-window");
-  }
-
-  @VueEvent
-  private async openChatPaletteWindow() {
-    this.menuClick();
-    await App.openSimpleWindow("chat-palette-window");
-  }
-
   isShow(...props: any[]): any {
     return this.isSelecting && someByStr(props, this.currentMenu);
   }
 
-  menuHover(prop: string): void {
-    this.currentMenu = prop;
+  @EventProcessor("click")
+  private mouseDown(event: MouseEvent | TouchEvent): void {
+    this.isSelecting = false;
   }
 
-  hoverConnect(flg: boolean): void {
-    this.isConnectHover = flg;
+  menuClick(event: MouseEvent): void {
+    this.isSelecting = this.menuHover(event) || !this.isSelecting;
+  }
+
+  @VueEvent
+  private menuHover(event: MouseEvent): boolean {
+    const elm = event.target as HTMLElement;
+    const result = this.currentMenu !== elm.dataset.type!;
+    this.currentMenu = elm.dataset.type!;
+    const r = elm.getBoundingClientRect();
+    this.currentMenuPoint = createPoint(r.x, r.y + r.height);
+    return result;
+  }
+
+  @VueEvent
+  private get hoverMenuStyle() {
+    return {
+      left: `${this.currentMenuPoint.x}px`
+    };
   }
 
   /** 部屋情報ボタン押下 */
@@ -324,7 +277,9 @@ export default class Menu extends Vue {
 
   /** 共有メモボタン押下 */
   @VueEvent
-  private clickPublicMemo() {}
+  private async onClickCreatePublicMemo() {
+    await App.openSimpleWindow("public-memo-add-window");
+  }
 
   /** ログアウトボタン押下 */
   @VueEvent
@@ -336,167 +291,160 @@ export default class Menu extends Vue {
    * ファイル
    * ----------------- */
   /** セーブ */
-  clickExport(): void {
-    this.menuClick();
+  @VueEvent
+  private onClickExport(event: MouseEvent): void {
+    this.menuClick(event);
   }
 
   /** ロード */
-  clickImport(): void {
-    this.menuClick();
+  @VueEvent
+  private onClickImport(event: MouseEvent): void {
+    this.menuClick(event);
   }
 
   /** チャットログ保存 */
-  clickChatLog(): void {
-    this.menuClick();
+  @VueEvent
+  private async onClickExportChatLog(event: MouseEvent): Promise<void> {
+    this.menuClick(event);
+    const dateStr = moment().format("YYYYMMDD_HHmmss");
+    const title = `Quoridorn_chatLog_${dateStr}`;
+
+    const chatTabList = GameObjectManager.instance.chatTabList;
+    let chatList = GameObjectManager.instance.chatList;
+    const userList = GameObjectManager.instance.userList;
+    const actorList = GameObjectManager.instance.actorList;
+    const actorGroupList = GameObjectManager.instance.actorGroupList;
+    const groupChatTabList = GameObjectManager.instance.groupChatTabList;
+    const userTypeLanguageMap = {
+      PL: this.$t("selection.user-type.PL")!.toString(),
+      GM: this.$t("selection.user-type.GM")!.toString(),
+      VISITOR: this.$t("selection.user-type.VISITOR")!.toString()
+    };
+
+    const convert = (data: any) => {
+      return JSON.stringify(data);
+    };
+
+    if (!GameObjectManager.instance.isGm) {
+      const someActor = (key: string | null): boolean => {
+        const actor = findByKey(actorList, key);
+        if (!actor) return true;
+        return actor.owner === SocketFacade.instance.userKey;
+      };
+      chatList = chatList.filter(c => {
+        if (!c.data!.isSecret) return true;
+        if (someActor(c.data!.actorKey)) return true;
+        const targetKey = c.data!.targetKey;
+        switch (c.data!.targetType) {
+          case "group":
+            const groupChatTab = findRequireByKey(groupChatTabList, targetKey);
+            const actorGroupKey = groupChatTab.data!.actorGroupKey;
+            const actorGroup: StoreData<ActorGroupStore> = findRequireByKey(
+              actorGroupList,
+              actorGroupKey
+            );
+            return actorGroup.data!.list.some(
+              a => a.userKey === SocketFacade.instance.userKey
+            );
+          case "actor":
+            return someActor(targetKey);
+          default:
+            return true;
+        }
+      });
+    }
+
+    const data = {
+      owner: SocketFacade.instance.userKey,
+      chatTabList: convert(chatTabList),
+      chatList: convert(chatList),
+      userList: convert(userList),
+      actorList: convert(actorList),
+      actorGroupList: convert(actorGroupList),
+      groupChatTabList: convert(groupChatTabList),
+      userTypeLanguageMap: convert(userTypeLanguageMap),
+      editedMessage: this.$t("label.edited")!.toString(),
+      title,
+      mode: "dev"
+    };
+
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const baseUrl = process.env.BASE_URL;
+    const path = "static/chatLogTemplate.html";
+    const templateFilePath = urljoin(protocol, host, baseUrl, path);
+    return Promise.resolve()
+      .then(() => fetch(templateFilePath).then(res => res.text()))
+      .then((templateStr: string) => Mustache.render(templateStr, data))
+      .then((contents: string) => saveHTML(`${title}`, contents))
+      .catch((err: any) => console.error(err));
   }
 
   /* --------------------
    * 表示
    * ----------------- */
-  /** フォントサイズ調整 */
-  private async clickSettingFontSize(): Promise<void> {
-    this.menuClick();
-    alert("プレイヤーボックス画面から行う仕様です。");
-    await App.openSimpleWindow("player-box-window");
-  }
 
   /** ウィンドウ配置初期化 */
-  clickResetWindowLocate(): void {
-    this.menuClick();
+  @VueEvent
+  private clickResetWindowLocate(event: MouseEvent): void {
+    this.menuClick(event);
+    WindowManager.instance.arrangePointAll();
   }
 
-  /* --------------------
-   * コマ
-   * ----------------- */
-  /** キャラクター追加 */
-  private async clickAddCharacter(): Promise<void> {
-    this.menuClick();
-    await App.openSimpleWindow("character-add-window");
+  @VueEvent
+  private async onClickCreateBgm(event: MouseEvent): Promise<void> {
+    this.menuClick(event);
+    if (!(await App.openSimpleWindow("bgm-add-window"))) return;
+    await WindowManager.instance.activeWindowForce("cut-in-list-window");
   }
 
-  /** 範囲追加 */
-  clickAddRange(): void {
-    this.menuClick();
-    alert("未実装です！ごめんなさい！");
+  @VueEvent
+  private async onClickCreateChatTab(event: MouseEvent): Promise<void> {
+    this.menuClick(event);
+    if (!(await App.openSimpleWindow("chat-tab-add-window"))) return;
+    await WindowManager.instance.activeWindowForce("chat-window");
+    await WindowManager.instance.activeWindowForce("chat-setting-window");
   }
 
-  /** チット作成 */
-  private async clickAddChit(): Promise<void> {
-    this.menuClick();
-    await App.openSimpleWindow("chit-add-window");
+  @VueEvent
+  private async onClickCreateActor(event: MouseEvent): Promise<void> {
+    this.menuClick(event);
+    if (!(await App.openSimpleWindow("actor-add-window"))) return;
+    await WindowManager.instance.activeWindowForce("player-box-window");
   }
 
-  /** 墓場 */
-  private async clickGraveyard(): Promise<void> {
-    this.menuClick();
-    alert(
-      "「墓場」はプレイヤーボックス画面に統合されます！\n未実装だったらごめんなさい！"
+  @VueEvent
+  private async onClickCreateResourceMaster(event: MouseEvent): Promise<void> {
+    this.menuClick(event);
+    if (!(await App.openSimpleWindow("resource-master-add-window"))) return;
+    await WindowManager.instance.activeWindowForce("initiative-window");
+    await WindowManager.instance.activeWindowForce(
+      "resource-master-list-window"
     );
-    await App.openSimpleWindow("player-box-window");
-  }
-
-  /** キャラクター待合室 */
-  private async clickWaitingRoom(): Promise<void> {
-    this.menuClick();
-    alert(
-      "「キャラクター待合室」はプレイヤーボックス画面に統合されます！\n未実装だったらごめんなさい！"
-    );
-    await App.openSimpleWindow("player-box-window");
-  }
-
-  /* --------------------
-   * マップ
-   * ----------------- */
-  /** マップ変更 */
-  private async clickChangeMap(): Promise<void> {
-    this.menuClick();
-    await App.openSimpleWindow("scene-list-window");
-  }
-
-  /** フロアタイル追加 */
-  private async clickAddFloorTile(): Promise<void> {
-    this.menuClick();
-    alert(
-      "フロアタイルは未実装です。\nマップマスクを工夫して代用してください。"
-    );
-    await App.openSimpleWindow("map-mask-add-window");
-  }
-
-  /** マップマスク追加 */
-  private async clickAddMapMask(): Promise<void> {
-    this.menuClick();
-    await App.openSimpleWindow("map-mask-add-window");
-  }
-
-  /** 簡易マップ作成 */
-  private async clickCreateEasyMap(): Promise<void> {
-    this.menuClick();
-  }
-
-  /** マップ状態保存 */
-  private async clickSaveMap(): Promise<void> {
-    this.menuClick();
-    alert("シーンリスト画面から行う仕様です。\n未実装だったらごめんなさい！");
-    await App.openSimpleWindow("scene-list-window");
-  }
-
-  /** マップ切り替え */
-  private async clickSwitchMap(): Promise<void> {
-    this.menuClick();
-    alert("シーンリスト画面から行う仕様です。\n未実装だったらごめんなさい！");
-    await App.openSimpleWindow("scene-list-window");
-  }
-
-  /* --------------------
-   * 画像
-   * ----------------- */
-  /** ファイルアップローダー */
-  clickFileUploader(): void {
-    this.menuClick();
-  }
-
-  /** タグ編集 */
-  clickTagEdit(): void {
-    this.menuClick();
-  }
-
-  /** 画像削除 */
-  clickDeleteImage(): void {
-    this.menuClick();
   }
 
   /* --------------------
    * ヘルプ
    * ----------------- */
   /** バージョン */
-  private async clickVersion(): Promise<void> {
-    this.menuClick();
+  @VueEvent
+  private async clickVersion(event: MouseEvent): Promise<void> {
+    this.menuClick(event);
     await App.openSimpleWindow("version-info-window");
   }
 
-  /** マニュアル */
-  clickManual(): void {
-    this.menuClick();
-  }
-
   /** オフィシャルサイトへ */
-  clickOfficialSite(): void {
+  @VueEvent
+  private clickOfficialSite(event: MouseEvent): void {
     window.open("https://quoridorn.com/", "_blank");
-    this.menuClick();
-  }
-
-  /* --------------------
-   * デモ
-   * ----------------- */
-  /** 開発履歴 */
-  clickDevHistory(): void {
-    this.menuClick();
+    this.menuClick(event);
   }
 
   /** 不具合の報告 */
-  clickBufForm(): void {
+  @VueEvent
+  private clickBufForm(event: MouseEvent): void {
     window.open("https://9224.teacup.com/quoridorn_bug/bbs", "_blank");
-    this.menuClick();
+    this.menuClick(event);
   }
 }
 </script>
@@ -516,23 +464,16 @@ export default class Menu extends Vue {
   padding: 0 1rem;
   box-sizing: border-box;
   filter: var(--filter);
-
-  > *:not(:first-child) {
-    margin-left: 1em;
-  }
 }
 
 .span-group {
-  display: flex;
-  flex-direction: row;
+  @include flex-box(row, flex-start, center);
   background-color: rgba(250, 250, 250, 0.2);
   border: solid gray 1px;
   padding: 0 1em;
 
   span {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
+    @include inline-flex-box(row, center, center);
     padding: 0 1em;
     white-space: nowrap;
     height: 1.8rem;
@@ -546,9 +487,8 @@ export default class Menu extends Vue {
 }
 
 .menu-button {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
+  @include inline-flex-box(row, center, center);
+  margin-left: 1em;
   position: relative;
   background: rgba(250, 250, 250, 0.4);
   border: solid gray 1px;
@@ -564,7 +504,7 @@ export default class Menu extends Vue {
     background: rgba(250, 250, 250, 0.5);
   }
 }
-.hoverMenu {
+.hover-menu {
   position: fixed;
   top: calc(var(--menu-bar-height) / 2 + 0.9rem - 1px);
   background: white;
@@ -580,33 +520,18 @@ export default class Menu extends Vue {
     padding: 0;
   }
 
-  > .item:hover {
-    background: lightblue;
+  > .disabled {
+    background: darkgray;
+    cursor: no-drop;
   }
-}
-.hoverMenu2 {
-  left: 1em;
-}
-.hoverMenu3 {
-  left: 7em;
-}
-.hoverMenu4 {
-  left: 11em;
-}
-.hoverMenu5 {
-  left: 15em;
-}
-.hoverMenu6 {
-  left: 20em;
-}
-.hoverMenu7 {
-  left: 24em;
-}
-.hoverMenu8 {
-  left: calc(24em - 1px);
-}
-.hoverMenu9 {
-  left: 29em;
+
+  > :not(.disabled) {
+    cursor: pointer;
+
+    &:hover {
+      background: lightblue;
+    }
+  }
 }
 
 .item {
@@ -617,29 +542,5 @@ export default class Menu extends Vue {
     display: inline;
     vertical-align: middle;
   }
-
-  img.check {
-    display: inline;
-    width: 10px;
-    height: 10px;
-    min-width: 10px;
-    min-height: 10px;
-    margin-right: 5px;
-    border: none;
-  }
-}
-.triangle {
-  position: absolute;
-  right: 7px;
-  top: 0;
-  bottom: 0;
-  margin: auto;
-  display: inline-block;
-  vertical-align: middle;
-  width: 0;
-  height: 0;
-  border-left: 5px solid black;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
 }
 </style>

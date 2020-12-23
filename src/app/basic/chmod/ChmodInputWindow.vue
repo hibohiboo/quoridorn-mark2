@@ -37,23 +37,16 @@
 </template>
 
 <script lang="ts">
-import { Component } from "vue-property-decorator";
-import { Mixins } from "vue-mixin-decorator";
+import { Component, Mixins } from "vue-mixin-decorator";
 import { Task, TaskResult } from "task";
 import TaskProcessor from "../../core/task/TaskProcessor";
 import LifeCycle from "../../core/decorator/LifeCycle";
 import ChmodRuleEditComponent from "./ChmodRuleEditComponent.vue";
-import SocketFacade, {
-  permissionCheck
-} from "../../core/api/app-server/SocketFacade";
-import NekostoreCollectionController from "../../core/api/app-server/NekostoreCollectionController";
 import VueEvent from "../../core/decorator/VueEvent";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import PermissionTypeSelect from "../common/components/select/PermissionTypeSelect.vue";
-import { Permission } from "@/@types/store";
 import { TabInfo } from "@/@types/window";
-import { DataReference } from "@/@types/data";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
 import { clone } from "@/app/core/utility/PrimaryDataUtility";
 
@@ -92,7 +85,7 @@ export default class ChmodInputWindow extends Mixins<
 
   private createTabInfoList() {
     this.tabList.forEach(t => {
-      t.text = this.$t(`label.permission-${t.target}`)!.toString();
+      t.text = this.$t(`selection.permission.${t.target}`)!.toString();
     });
   }
 

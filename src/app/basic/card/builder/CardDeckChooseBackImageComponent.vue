@@ -3,7 +3,7 @@
     message="choose-back-image"
     @back="$emit('back')"
     @next="$emit('next')"
-    :nextDisabled="!backImageIdVolatile"
+    :nextDisabled="!backImageKeyVolatile"
   >
     <label>
       <span v-t="'label.background-color'"></span>
@@ -11,9 +11,9 @@
     </label>
     <image-picker-component
       class="image-picker-component"
-      v-model="backImageIdVolatile"
+      v-model="backImageKeyVolatile"
       :windowKey="key"
-      :imageTag.sync="imageTagVolatile"
+      :mediaTag.sync="mediaTagVolatile"
       :isSimple="true"
       imageSize="20em"
     />
@@ -51,30 +51,30 @@ export default class CardDeckChooseBackImageComponent extends Mixins<
     this.$emit("update:color", value);
   }
 
-  // backImageId
+  // backImageKey
   @Prop({ type: String, required: true })
-  private backImageId!: string;
-  private backImageIdVolatile: string = "";
-  @Watch("backImageId", { immediate: true })
-  private onChangeBackImageId(value: string) {
-    this.backImageIdVolatile = value;
+  private backImageKey!: string;
+  private backImageKeyVolatile: string = "";
+  @Watch("backImageKey", { immediate: true })
+  private onChangeBackImageKey(value: string) {
+    this.backImageKeyVolatile = value;
   }
-  @Watch("backImageIdVolatile")
-  private onChangeBackImageIdVolatile(value: string) {
-    this.$emit("update:backImageId", value);
+  @Watch("backImageKeyVolatile")
+  private onChangeBackImageKeyVolatile(value: string) {
+    this.$emit("update:backImageKey", value);
   }
 
-  // imageTag
+  // mediaTag
   @Prop({ required: true })
-  private imageTag!: string | null;
-  private imageTagVolatile: string | null = null;
-  @Watch("imageTag", { immediate: true })
+  private mediaTag!: string | null;
+  private mediaTagVolatile: string | null = null;
+  @Watch("mediaTag", { immediate: true })
   private onChangeImageTag(value: string | null) {
-    this.imageTagVolatile = value;
+    this.mediaTagVolatile = value;
   }
-  @Watch("imageTagVolatile")
+  @Watch("mediaTagVolatile")
   private onChangeImageTagVolatile(value: string | null) {
-    this.$emit("update:imageTag", value);
+    this.$emit("update:mediaTag", value);
   }
 }
 </script>

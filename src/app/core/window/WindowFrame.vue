@@ -161,8 +161,7 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue, Watch } from "vue-property-decorator";
-import { Point, Size } from "address";
+import { Component, Prop, Watch, Vue } from "vue-property-decorator";
 import ResizeKnob from "./ResizeKnob.vue";
 import TaskManager, { MouseMoveParam } from "../task/TaskManager";
 import TaskProcessor from "../task/TaskProcessor";
@@ -174,15 +173,12 @@ import {
 } from "../utility/CoordinateUtility";
 import TitleIcon from "./TitleIcon.vue";
 import WindowManager from "./WindowManager";
-import {
-  WindowInfo,
-  WindowMoveInfo,
-  WindowResizeInfo
-} from "../../../@types/window";
+import { WindowInfo, WindowMoveInfo, WindowResizeInfo } from "@/@types/window";
 import LifeCycle from "../decorator/LifeCycle";
 import { convertNumberZero } from "../utility/PrimaryDataUtility";
 import { getCssPxNum } from "../css/Css";
 import VueEvent from "../decorator/VueEvent";
+import { Point, Size } from "@/@types/store-data-optional";
 
 @Component({
   components: { TitleIcon, ResizeKnob }
@@ -218,6 +214,7 @@ export default class WindowFrame extends Vue {
     return this.windowInfo.key;
   }
 
+  @VueEvent
   private get fontSizeChangeBan(): boolean {
     return (
       this.isMoving ||
@@ -569,13 +566,6 @@ export default class WindowFrame extends Vue {
     const y = this.windowInfo.y + this.windowInfo.diffRect.y;
     // this.windowElm.style.setProperty("--windowY", `${y}px`);
     this.windowElm.style.transform = `translate(${x}px, ${y}px)`;
-  }
-
-  @Watch("isMounted")
-  @Watch("windowInfo.diffRect.y")
-  @Watch("windowInfo.y")
-  private onChangeWindowY() {
-    if (!this.isMounted) return;
   }
 
   @Watch("isMounted")

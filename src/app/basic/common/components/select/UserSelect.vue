@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     :multiple="multiple"
@@ -17,14 +18,12 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 import GameObjectManager from "../../../GameObjectManager";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class UserSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -50,11 +49,13 @@ export default class UserSelect extends Mixins<MultiMixin>(
   private createOptionInfoList() {
     let userList = GameObjectManager.instance.userList;
     this.optionInfoList = userList.map(u => {
-      const userTypeStr = this.$t(`label.${u.data!.type}`)!.toString();
+      const userTypeStr = this.$t(
+        `selection.user-type.${u.data!.type}`
+      )!.toString();
       const text = `${u.data!.name}(${userTypeStr})`;
       return {
-        key: u.id!,
-        value: u.id!,
+        key: u.key,
+        value: u.key,
         text,
         disabled: false
       };

@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     :multiple="multiple"
@@ -16,9 +17,9 @@ import { Prop } from "vue-property-decorator";
 import ComponentVue from "../../../../core/window/ComponentVue";
 import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
-import { permissionCheck } from "../../../../core/api/app-server/SocketFacade";
+import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 import GameObjectManager from "../../../GameObjectManager";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
@@ -31,7 +32,7 @@ export default class ActorSelect extends Mixins<MultiMixin>(
   ComponentVue
 ) {
   @Prop({ type: String, default: "" })
-  private userId!: string;
+  private userKey!: string;
 
   @Prop({ type: Boolean, default: false })
   private nullable!: boolean;
@@ -54,19 +55,19 @@ export default class ActorSelect extends Mixins<MultiMixin>(
   private createOptionInfoList() {
     this.optionInfoList = GameObjectManager.instance.actorList
       .filter(a => {
-        if (this.userId && a.owner !== this.userId) return false;
+        if (this.userKey && a.owner !== this.userKey) return false;
         return permissionCheck(a, "view");
       })
       .map(c => ({
-        key: c.id!,
-        value: c.id!,
+        key: c.key,
+        value: c.key,
         text: c.data!.name,
         disabled: false
       }));
     if (this.nullable) {
       this.optionInfoList.unshift({
         key: null,
-        value: "null",
+        value: null,
         text: this.$t("label.non-select")!.toString(),
         disabled: false
       });

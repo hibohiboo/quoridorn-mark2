@@ -72,14 +72,17 @@
 import { Prop, Watch } from "vue-property-decorator";
 import { Task, TaskResult } from "task";
 import { Component, Mixins } from "vue-mixin-decorator";
-import { Point, Rectangle, Size } from "address";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../core/component/CtrlSelect.vue";
-import { OtherTextViewInfo } from "@/@types/gameObject";
+import {
+  OtherTextViewInfo,
+  Point,
+  Rectangle,
+  Size
+} from "@/@types/store-data-optional";
 import ComponentVue from "../../../core/window/ComponentVue";
 import { WindowInfo, WindowMoveInfo, WindowOpenInfo } from "@/@types/window";
-import { BcdiceSystemInfo, DiceSystem } from "@/@types/bcdice";
 import { getCssPxNum } from "@/app/core/css/Css";
 import SocketFacade from "../../../core/api/app-server/SocketFacade";
 import SButton from "./SButton.vue";
@@ -165,10 +168,11 @@ export default class BcdiceSystemInput extends Mixins<ComponentVue>(
           owner: "Quoridorn",
           value: {
             type: "",
-            docId: this.windowInfo.key,
+            key: this.windowInfo.key,
             dataList: [
               createEmptyStoreUseData(uuid.v4(), {
                 tab: "",
+                type: "normal",
                 text: this.helpMessage
               })
             ],
@@ -467,7 +471,7 @@ export default class BcdiceSystemInput extends Mixins<ComponentVue>(
   private async languageChangeFinished(
     task: Task<never, never>
   ): Promise<TaskResult<never> | void> {
-    this.noTarget = LanguageManager.instance.getText("label.no-target");
+    this.noTarget = this.$t("label.no-target")!.toString();
     const index = this.systemList.findIndex(s => s.system === "DiceBot");
     this.systemList[index].name = this.noTarget;
     task.resolve();

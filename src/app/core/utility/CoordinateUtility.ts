@@ -1,7 +1,14 @@
-import { Address, Anchor, Matrix, Point, Rectangle, Size } from "address";
+import { Anchor } from "address";
 import { getCssPxNum } from "../css/Css";
-import { WindowSize } from "../../../@types/window";
+import { WindowSize } from "@/@types/window";
 import WindowManager from "../window/WindowManager";
+import {
+  Address,
+  Matrix,
+  Point,
+  Rectangle,
+  Size
+} from "@/@types/store-data-optional";
 
 export function createPoint(x: number, y: number): Point {
   return { x, y };
@@ -206,30 +213,26 @@ export function calcWindowPosition(
     width: sceneSize.width,
     height: sceneSize.height - menuHeight
   });
-  const windowCenter = calcCenter({
-    ...createPoint(0, menuHeight),
-    ...windowSize
-  });
 
   if (position === "center") {
-    point.x = sceneCenter.x - windowCenter.x;
-    point.y = sceneCenter.y - windowCenter.y;
+    point.x = (sceneSize.width * 3) / 10;
+    point.y = (sceneSize.height * 3) / 10;
   } else {
     const windowTitleHeight = getCssPxNum("--window-title-height");
     const windowPadding = getCssPxNum("--window-padding");
     const scrollBarWidth = getCssPxNum("--scroll-bar-width");
     const [h, v] = position.toString().split("-");
     if (h === "left") point.x = 0;
-    if (h === "center") point.x = sceneCenter.x - windowCenter.x;
+    if (h === "center") point.x = (sceneSize.width * 3) / 10;
     if (h === "right")
       point.x =
         sceneSize.width -
         windowSize.width -
-        windowPadding * 2 -
+        // windowPadding * 2 -
         scrollBarWidth -
         2;
     if (v === "top") point.y = menuHeight;
-    if (v === "center") point.y = sceneCenter.y - windowCenter.y;
+    if (v === "center") point.y = (sceneSize.height * 3) / 10;
     if (v === "bottom")
       point.y =
         sceneSize.height -

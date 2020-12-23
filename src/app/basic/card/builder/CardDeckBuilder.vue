@@ -71,8 +71,8 @@
         :frontBackgroundColor.sync="frontBackgroundColor"
         :fontColor.sync="fontColor"
         :backBackgroundColor.sync="newDeckBackColor"
-        :backImageId.sync="newDeckBackImageId"
-        :imageTag.sync="newDeckTag"
+        :backImageKey.sync="newDeckBackImageKey"
+        :mediaTag.sync="newDeckTag"
         :nameHeight.sync="nameHeight"
         :nameFontSize.sync="nameFontSize"
         :nameBackgroundColor.sync="nameBackgroundColor"
@@ -108,8 +108,8 @@
         @back="subStatusNum = 2"
         @next="subStatusNum = 4"
         :color.sync="newDeckBackColor"
-        :backImageId.sync="newDeckBackImageId"
-        :imageTag.sync="newDeckTag"
+        :backImageKey.sync="newDeckBackImageKey"
+        :mediaTag.sync="newDeckTag"
       />
       <card-deck-create-card-component
         class="sub-contents create-card"
@@ -117,14 +117,14 @@
         @back="subStatusNum = 3"
         @next="statusNum = 3"
         :width="width"
-        :imageTag="newDeckTag"
+        :mediaTag="newDeckTag"
         :height="height"
         :padTop="padTop"
         :padHorizontal="padHorizontal"
         :padBottom="padBottom"
         :radius="radius"
         :frontBackgroundColorDefault="frontBackgroundColor"
-        :backImage="newDeckBackImageId"
+        :backImage="newDeckBackImageKey"
         :backBackgroundColor="newDeckBackColor"
         :fontColor="fontColor"
         :nameHeight="nameHeight"
@@ -133,7 +133,7 @@
         :textHeight="textHeight"
         :textFontSizeDefault="textFontSize"
         :textPaddingDefault="textPadding"
-        :textBackgroundColor="textBackgroundColor"
+        :textBackgroundColorDefault="textBackgroundColor"
         :cardList="newCardList"
         @hover-card="hoverCard"
       />
@@ -166,27 +166,26 @@ import { Component, Mixins } from "vue-mixin-decorator";
 import { Prop } from "vue-property-decorator";
 import { ModeInfo } from "mode";
 import urljoin from "url-join";
-import { Rectangle } from "address";
 import ComponentVue from "../../../core/window/ComponentVue";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import {
-  CardDeckBig,
-  CardMeta,
-  CardObject,
-  CardYamlInfo,
-  InputCardInfo,
-  OtherTextViewInfo
-} from "@/@types/gameObject";
+  CardDeckBigStore,
+  CardMetaStore,
+  CardObjectStore
+} from "@/@types/store-data";
 import {
   createAddress,
   createPoint
 } from "@/app/core/utility/CoordinateUtility";
-import { createEmptyStoreUseData, getSrc } from "@/app/core/utility/Utility";
+import {
+  createEmptyStoreUseData,
+  findRequireByKey,
+  getSrc
+} from "@/app/core/utility/Utility";
 import SocketFacade from "../../../core/api/app-server/SocketFacade";
 import { CardCountInfo } from "./CardChooserComponent.vue";
 import { loadYaml } from "@/app/core/utility/FileUtility";
 import VueEvent from "../../../core/decorator/VueEvent";
-import { StoreUseData } from "@/@types/store";
 import TaskManager from "../../../core/task/TaskManager";
 import GameObjectManager from "../../GameObjectManager";
 import CardDeckChooserComponent from "./CardDeckChooserComponent.vue";
@@ -196,11 +195,17 @@ import CardDeckCreateCardComponent from "./CardDeckCreateCardComponent.vue";
 import CardChooserComponent from "./CardChooserComponent.vue";
 import CardDeckFrameSettingComponent from "./CardDeckFrameSettingComponent.vue";
 import TextFrame from "./TextFrame.vue";
+import {
+  CardYamlInfo,
+  InputCardInfo,
+  OtherTextViewInfo,
+  Rectangle
+} from "@/@types/store-data-optional";
 const uuid = require("uuid");
 
 type DeckInfo = {
-  cardDeckBig: StoreUseData<CardDeckBig>;
-  cardMetaList: StoreUseData<CardMeta>[];
+  cardDeckBig: StoreData<CardDeckBigStore>;
+  cardMetaList: StoreData<CardMetaStore>[];
 };
 
 @Component({
@@ -220,7 +225,7 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
   @Prop({ type: String, default: "" })
   private cardDeckId!: string;
 
-  public static DEFAULT_CARD_FRAME_PARANOIA_REBOOTED: CardMeta = {
+  public static DEFAULT_CARD_FRAME_PARANOIA_REBOOTED: CardMetaStore = {
     width: 200,
     height: 300,
     radius: 0,
@@ -232,11 +237,11 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
     fontColor: "#000000",
     nameHeight: 0,
     nameFontSize: 20,
-    nameBackgroundColor: "rgba(0, 0, 0, 0)",
+    nameBackgroundColor: "rgba(255, 255, 255, 0)",
     textHeight: 0,
     textFontSize: 11,
     textPadding: 5,
-    textBackgroundColor: "rgba(0, 0, 0, 0)",
+    textBackgroundColor: "rgba(255, 255, 255, 0)",
     frontImage: "",
     backImage: "",
     name: "",
@@ -251,11 +256,11 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
 
   private presetDeckList: DeckInfo[] = [];
   private dbDeckList: DeckInfo[] = [];
-  private selectedDeckIdList: string[] = [];
+  private selectedDeckKeyList: string[] = [];
 
   private newDeckName: string = "";
   private newDeckBackColor: string = "#ffffff";
-  private newDeckBackImageId: string = "";
+  private newDeckBackImageKey: string = "";
   private newDeckTag: string | null = null;
 
   private width: number = 200;
@@ -268,13 +273,13 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
   private fontColor: string = "#000000";
   private nameHeight: number = 30;
   private nameFontSize: number = 20;
-  private nameBackgroundColor: string = "rgba(0, 0, 0, 0)";
+  private nameBackgroundColor: string = "rgba(255, 255, 255, 0.3)";
   private textHeight: number = 60;
   private textFontSize: number = 11;
   private textPadding: number = 0;
-  private textBackgroundColor: string = "rgba(0, 0, 0, 0)";
+  private textBackgroundColor: string = "rgba(255, 255, 255, 0.3)";
 
-  private newCardList: StoreUseData<CardMeta>[] = [];
+  private newCardList: StoreData<CardMetaStore>[] = [];
 
   private selectedCardList: CardCountInfo[] = [];
   private statusNum: number = 1;
@@ -291,92 +296,91 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
   @VueEvent
   private async resistDeck() {
     // 大山札の登録
-    const cardDeckBigId: string = (
-      await this.cardDeckBigCC.addDirect([{ name: this.newDeckName }])
+    const cardDeckBigKey = (
+      await this.cardDeckBigCC.addDirect([{ data: { name: this.newDeckName } }])
     )[0];
 
-    const cardMetaList: CardMeta[] = this.selectedCardList
+    const cardMetaList: CardMetaStore[] = this.selectedCardList
       .filter(ccInfo => ccInfo.count)
-      .map(ccInfo => this.cardList.filter(c => c.id === ccInfo.id)[0].data!);
-    const cardMetaIdList = await this.cardMetaCC.addDirect(
-      cardMetaList,
-      cardMetaList.map(() => ({
-        owner: cardDeckBigId
+      .map(ccInfo => findRequireByKey(this.cardList, ccInfo.key).data!);
+    const cardMetaKeyList = await this.cardMetaCC.addDirect(
+      cardMetaList.map(data => ({
+        owner: cardDeckBigKey,
+        data
       }))
     );
 
     console.log(JSON.stringify(cardMetaList, null, "  "));
-    console.log(JSON.stringify(cardMetaIdList, null, "  "));
+    console.log(JSON.stringify(cardMetaKeyList, null, "  "));
 
-    const cardObjectList: CardObject[] = this.selectedCardList
+    const cardObjectList: CardObjectStore[] = this.selectedCardList
       .filter(ccInfo => ccInfo.count)
-      .map((ccInfo, idx) => {
-        // const idx: number = this.cardList.findIndex(c => (c.id = ccInfo.id));
+      .map((ccInfo, index) => {
+        // const index: number = this.cardList.findIndex(c => (c.key = ccInfo.id));
         return {
-          cardMetaId: cardMetaIdList[idx],
-          cardDeckBigId,
+          cardMetaKey: cardMetaKeyList[index],
+          cardDeckBigKey,
           isTurnOff: true,
           point: createPoint(0, 0),
           angle: 0
         };
       });
 
-    const cardDeckSmallId: string = (
-      await this.cardDeckSmallCC.touch(undefined, [{ owner: null }])
-    )[0];
-
-    const cardObjectIdList = await this.cardObjectCC.addDirect(
-      cardObjectList,
-      cardObjectList.map((_k, v) => ({
-        order: v,
-        owner: cardDeckSmallId,
-        ownerType: "card-deck-small"
-      }))
-    );
-
-    const cardSceneLayer = this.sceneLayerList.filter(
+    const cardSceneLayer = this.sceneLayerList.find(
       sl => sl.data!.type === "card"
+    )!;
+
+    const cardDeckSmallKey = (
+      await this.cardDeckSmallCC.addDirect([
+        {
+          ownerType: null,
+          owner: null,
+          data: {
+            address: createAddress(0, 0, 0, 0),
+            layout: "pile-up",
+            cardHeightRatio: 1,
+            cardWidthRatio: 1,
+            columns: 2,
+            rows: 3,
+            layoutColumns: 1,
+            layoutRows: 1,
+            name: "",
+            isUseHoverView: true,
+            tileReorderingMode: "insert",
+            width: 200,
+            layerKey: cardSceneLayer.key,
+            total: cardObjectList.length
+          }
+        }
+      ])
     )[0];
 
-    await this.cardDeckSmallCC.add(
-      [cardDeckSmallId],
-      [
-        {
-          address: createAddress(0, 0, 0, 0),
-          layout: "pile-up",
-          cardHeightRatio: 1,
-          cardWidthRatio: 1,
-          columns: 2,
-          rows: 3,
-          layoutColumns: 1,
-          layoutRows: 1,
-          name: "",
-          isUseHoverView: true,
-          tileReorderingMode: "insert",
-          width: 200,
-          layerId: cardSceneLayer.id!,
-          total: cardObjectIdList.length
-        }
-      ],
-      [{}]
+    await this.cardObjectCC.addDirect(
+      cardObjectList.map((data, v) => ({
+        order: v,
+        owner: cardDeckSmallKey,
+        ownerType: "card-deck-small-list",
+        data
+      }))
     );
     await this.close();
   }
 
   @VueEvent
   private hoverCard(
-    card: StoreUseData<CardMeta>,
+    card: StoreData<CardMetaStore>,
     isHover: boolean,
     rect: Rectangle
   ) {
     if (isHover) {
       const text = `${card.data!.name}\n${card.data!.text}`;
       this.otherTextViewInfo = {
-        type: "card-meta",
-        docId: card.id!,
+        type: "card-meta-list",
+        key: card.key,
         dataList: [
           createEmptyStoreUseData(uuid.v4(), {
             tab: "",
+            type: "normal",
             text
           })
         ],
@@ -389,17 +393,15 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
   }
 
   @VueEvent
-  private get cardList(): StoreUseData<CardMeta>[] {
-    const resultList: StoreUseData<CardMeta>[] = [];
+  private get cardList(): StoreData<CardMetaStore>[] {
+    const resultList: StoreData<CardMetaStore>[] = [];
 
     resultList.push(...this.newCardList);
 
     this.presetDeckList
       .concat(this.dbDeckList)
-      .filter(
-        deck =>
-          this.selectedDeckIdList.findIndex(id => id === deck.cardDeckBig.id) >
-          -1
+      .filter(deck =>
+        this.selectedDeckKeyList.some(key => key === deck.cardDeckBig.key)
       )
       .forEach(deck => {
         resultList.push(...deck.cardMetaList);
@@ -411,9 +413,9 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
   private async created() {
     // DBデッキリストを参照
     this.cardDeckBigList.forEach(cardDeckBig => {
-      const cardMetaList: StoreUseData<CardMeta>[] = this.cardMetaList.filter(
-        cm => cm.owner === cardDeckBig.id
-      );
+      const cardMetaList: StoreUseData<
+        CardMetaStore
+      >[] = this.cardMetaList.filter(cm => cm.owner === cardDeckBig.key);
       this.dbDeckList.push({ cardDeckBig, cardMetaList });
     });
 
@@ -421,15 +423,15 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
     // 読み込み必須でないためthrowは伝搬しないで警告だけ表示
     try {
       (await loadYaml<CardYamlInfo[]>("static/conf/deck.yaml")).forEach(
-        (presetDeck: CardYamlInfo, deckIdx: number) => {
+        (presetDeck: CardYamlInfo, deckIndex: number) => {
           const name = presetDeck.title;
-          const id = `preset-deck-${name}-${deckIdx}`;
-          const cardDeckBig = createEmptyStoreUseData(id, { name });
-          const cardMetaList: StoreUseData<CardMeta>[] = presetDeck.cards.map(
-            (c: InputCardInfo, cardIdx: number) => {
-              const cardId = `preset-card-${deckIdx}-${cardIdx}`;
+          const key = `preset-deck-${name}-${deckIndex}`;
+          const cardDeckBig = createEmptyStoreUseData(key, { name });
+          const cardMetaList: StoreData<CardMetaStore>[] = presetDeck.cards.map(
+            (c: InputCardInfo, cardIndex: number) => {
+              const cardKey = `preset-card-${deckIndex}-${cardIndex}`;
               const basePath = presetDeck.basePath || "";
-              const cardMeta: CardMeta = {
+              const cardMeta: CardMetaStore = {
                 width: presetDeck.width,
                 height: presetDeck.height,
                 padHorizontal: presetDeck.padHorizontal || 0,
@@ -452,16 +454,16 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
                 nameHeight: presetDeck.nameHeight || 0,
                 nameFontSize: presetDeck.nameFontSize || 20,
                 nameBackgroundColor:
-                  presetDeck.nameBackgroundColor || "rgba(0, 0, 0, 0)",
+                  presetDeck.nameBackgroundColor || "rgba(255, 255, 255, 0.3)",
                 text: c.text || "",
                 textHeight: presetDeck.textHeight || 0,
                 textFontSize: presetDeck.textFontSize || 11,
                 textPadding: presetDeck.textPadding || 0,
                 textBackgroundColor:
-                  presetDeck.textBackgroundColor || "rgba(0, 0, 0, 0)"
+                  presetDeck.textBackgroundColor || "rgba(255, 255, 255, 0.3)"
               };
               if (!cardMeta.radius) cardMeta.radius = 0;
-              return createEmptyStoreUseData(cardId, cardMeta);
+              return createEmptyStoreUseData(cardKey, cardMeta);
             }
           );
           this.presetDeckList.push({ cardDeckBig, cardMetaList });
@@ -486,7 +488,7 @@ export default class CardDeckBuilder extends Mixins<ComponentVue>(
         type: "view-card-deck",
         value: {
           flag: "off" as "off",
-          cardDeckId: ""
+          cardDeckKey: ""
         }
       }
     });

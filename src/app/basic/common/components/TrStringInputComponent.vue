@@ -1,7 +1,7 @@
 <template>
   <tr class="tr-string-input-component">
     <th class="label-input">
-      <label :for="key" v-t="`label.${labelName}`"></label>
+      <label :for="key" v-t="labelName"></label>
     </th>
     <td>
       <input
@@ -27,6 +27,7 @@
 import { Prop } from "vue-property-decorator";
 import { Component, Mixins } from "vue-mixin-decorator";
 import ComponentVue from "../../../core/window/ComponentVue";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
 
 @Component
 export default class TrStringInputComponent extends Mixins<ComponentVue>(
@@ -50,6 +51,7 @@ export default class TrStringInputComponent extends Mixins<ComponentVue>(
   @Prop({ type: String, default: undefined })
   private list!: string | undefined;
 
+  @LifeCycle
   private mounted() {
     if (this.inputWidth) {
       const inputElm = this.$refs.inputElm as HTMLInputElement;

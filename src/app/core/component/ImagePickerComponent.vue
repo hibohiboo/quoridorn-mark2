@@ -17,9 +17,9 @@
       <div
         class="image"
         v-for="image in useImageList"
-        :key="image.id"
-        :class="{ active: value === image.id }"
-        @click="localValue = image.id"
+        :key="image.key"
+        :class="{ active: value === image.key }"
+        @click="localValue = image.key"
       >
         <span v-if="viewName">{{ image.data.name }}</span>
         <img :src="image.data.url" alt="" draggable="false" />
@@ -39,7 +39,7 @@
         <td>
           <div class="flex-space-between">
             <image-tag-select
-              :id="`${windowKey}-image-pick-tag`"
+              :elmId="`${windowKey}-image-pick-tag`"
               class="tagSelect"
               v-model="selectImageTag"
               ref="input"
@@ -52,14 +52,14 @@
         <th>
           <label
             :for="`${windowKey}-image-pick-direction`"
-            v-t="'label.direction'"
+            v-t="'selection.direction.label'"
             class="label-input"
           ></label>
         </th>
         <td>
           <div class="flex-space-between">
             <direction-type-select
-              :id="`${windowKey}-image-pick-direction`"
+              :elmId="`${windowKey}-image-pick-direction`"
               v-model="direction"
             />
           </div>
@@ -73,14 +73,14 @@
 import { Component, Prop, Watch } from "vue-property-decorator";
 import LifeCycle from "../decorator/LifeCycle";
 import { Mixins } from "vue-mixin-decorator";
-import { StoreUseData } from "@/@types/store";
 import ComponentVue from "../window/ComponentVue";
-import { Direction, MediaInfo } from "@/@types/room";
+import { MediaStore } from "@/@types/store-data";
 import CtrlButton from "./CtrlButton.vue";
 import GameObjectManager from "../../basic/GameObjectManager";
 import ImageTagSelect from "../../basic/common/components/select/ImageTagSelect.vue";
 import DirectionTypeSelect from "../../basic/common/components/select/DirectionTypeSelect.vue";
 import VueEvent from "../decorator/VueEvent";
+import { Direction } from "@/@types/store-data-optional";
 
 @Component({
   components: {
@@ -99,7 +99,7 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
   private value!: string | null;
 
   @Prop({ type: String, default: null })
-  private imageTag!: string | null;
+  private mediaTag!: string | null;
 
   @Prop({ type: String, default: "none" })
   private direction!: Direction;
@@ -116,8 +116,8 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
   private isMounted: boolean = false;
   private selectImageTag: string | null = null;
 
-  private rawImageList: StoreUseData<MediaInfo>[] = [];
-  private useImageList: StoreUseData<MediaInfo>[] = [];
+  private rawImageList: StoreData<MediaStore>[] = [];
+  private useImageList: StoreData<MediaStore>[] = [];
   private searchText: string = "";
 
   @Watch("isMounted")
@@ -130,6 +130,7 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
     this.useImageList = this.rawImageList.filter(d => {
       if (!d || !d.data) return false;
       if (regExp && !d.data.name.match(regExp)) return false;
+      if (this.selectImageTag === null) return d.data.tag === "";
       return d.data.tag === this.selectImageTag;
     });
   }
@@ -137,7 +138,7 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
   @VueEvent
   private get selectedTagIndexText() {
     const index = this.useImageList.findIndex(
-      image => image.id === this.localValue
+      image => image.key === this.localValue
     );
     return `${index + 1}/${this.useImageList.length}`;
   }
@@ -162,14 +163,14 @@ export default class ImagePickerComponent extends Mixins<ComponentVue>(
     this.$emit("input", colorStr);
   }
 
-  @Watch("imageTag", { immediate: true })
+  @Watch("mediaTag", { immediate: true })
   private onChangeImageTag(value: string) {
     this.selectImageTag = value;
   }
 
   @Watch("selectImageTag")
   private onChangeSelectImageTag() {
-    this.$emit("update:imageTag", this.selectImageTag);
+    this.$emit("update:mediaTag", this.selectImageTag);
   }
 
   @Watch("direction")

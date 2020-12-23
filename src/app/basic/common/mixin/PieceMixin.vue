@@ -2,26 +2,21 @@
 import AddressCalcMixin from "./AddressCalcMixin.vue";
 import { Prop, Watch } from "vue-property-decorator";
 import { Mixin, Mixins } from "vue-mixin-decorator";
-import { Point } from "address";
 import { Task, TaskResult } from "task";
 import { ContextTaskInfo } from "context";
 import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
 import Unsubscribe from "nekostore/lib/Unsubscribe";
 import SocketFacade, {
-  getStoreObj,
   permissionCheck
 } from "../../../core/api/app-server/SocketFacade";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import {
-  KeepBcdiceDiceRollResult,
+  KeepBcdiceDiceRollResultStore,
   MemoStore,
-  ObjectMoveInfo,
-  OtherTextViewInfo,
-  SceneObject,
-  SceneObjectType
-} from "@/@types/gameObject";
-import { StoreObj, StoreUseData } from "@/@types/store";
+  SceneObjectStore,
+  SceneAndObjectStore
+} from "@/@types/store-data";
 import {
   copyAddress,
   createAddress,
@@ -29,17 +24,23 @@ import {
   createRectangle,
   getEventPoint
 } from "@/app/core/utility/CoordinateUtility";
-import { findRequireById } from "@/app/core/utility/Utility";
+import { findRequireByKey, questionDialog } from "@/app/core/utility/Utility";
 import TaskManager, { MouseMoveParam } from "../../../core/task/TaskManager";
 import VueEvent from "../../../core/decorator/VueEvent";
-import { SceneAndObject } from "@/@types/room";
 import CssManager from "../../../core/css/CssManager";
 import GameObjectManager from "../../GameObjectManager";
 import { WindowOpenInfo } from "@/@types/window";
 import { clone } from "@/app/core/utility/PrimaryDataUtility";
-import { DataReference } from "@/@types/data";
 import { sendChatLog } from "@/app/core/utility/ChatUtility";
 import BcdiceManager from "@/app/core/api/bcdice/BcdiceManager";
+import { exportData } from "@/app/core/utility/ExportUtility";
+import {
+  ObjectMoveInfo,
+  OtherTextViewInfo,
+  Point,
+  SceneObjectType
+} from "@/@types/store-data-optional";
+import { getTrpgSystemHelper } from "@/app/core/utility/trpg_system/TrpgSystemFasade";
 const uuid = require("uuid");
 
 @Mixin
@@ -47,12 +48,12 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   AddressCalcMixin
 >(AddressCalcMixin) {
   @Prop({ type: String, required: true })
-  protected docId!: string;
+  protected docKey!: string;
 
   @Prop({ type: String, required: true })
   protected type!: string;
 
-  private pieceId = uuid.v4();
+  private pieceKey = uuid.v4();
 
   protected isHover: boolean = false;
   protected isMoving: boolean = false;
@@ -64,20 +65,20 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   private memoList = GameObjectManager.instance.memoList;
 
   protected isMounted: boolean = false;
-  protected sceneObjectInfo: StoreUseData<SceneObject> | null = null;
-  protected sceneAndObjectInfo: StoreUseData<SceneAndObject> | null = null;
-  private otherLockTimeoutId: number | null = null;
+  protected sceneObjectInfo: StoreData<SceneObjectStore> | null = null;
+  protected sceneAndObjectInfo: StoreData<SceneAndObjectStore> | null = null;
+  private otherLockTimeoutKey: number | null = null;
   private isTransitioning: boolean = false;
   private roomData = GameObjectManager.instance.roomData;
   private sceneAndObjectUnsubscribe: Unsubscribe | null = null;
 
-  private get sceneId() {
-    return this.roomData.sceneId;
+  private get sceneKey() {
+    return this.roomData.sceneKey;
   }
 
-  @Watch("sceneId")
-  private async onChangeSceneId() {
-    await this.resetSceneId(this.sceneId);
+  @Watch("sceneKey")
+  private async onChangeSceneKey() {
+    await this.resetSceneKey(this.sceneKey);
   }
 
   @VueEvent
@@ -125,22 +126,22 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   };
 
   public get key() {
-    return `${this.type}-${this.docId}`;
+    return `${this.type}-${this.docKey}`;
   }
 
-  private async resetSceneId(sceneId: string) {
-    this.sceneAndObjectInfo = (await this.sceneAndObjectCC!.find([
+  private async resetSceneKey(sceneKey: string) {
+    this.sceneAndObjectInfo = (await this.sceneAndObjectCC!.findList([
       {
-        property: "data.sceneId",
+        property: "data.sceneKey",
         operand: "==",
-        value: sceneId
+        value: sceneKey
       },
       {
-        property: "data.objectId",
+        property: "data.objectKey",
         operand: "==",
-        value: this.docId
+        value: this.docKey
       }
-    ]))![0];
+    ]))![0].data!;
 
     this.onChangePoint();
 
@@ -148,13 +149,13 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       await this.sceneAndObjectUnsubscribe();
     }
     this.sceneAndObjectUnsubscribe = await this.sceneAndObjectCC!.setSnapshot(
-      this.docId,
-      this.sceneAndObjectInfo.id!,
-      (snapshot: DocumentSnapshot<StoreObj<SceneAndObject>>) => {
+      this.docKey,
+      this.sceneAndObjectInfo.key,
+      (snapshot: DocumentSnapshot<StoreData<SceneAndObjectStore>>) => {
         if (!snapshot.data) return;
         const status = snapshot.data.status;
         if (status === "modified" || status === "modify-touched") {
-          this.sceneAndObjectInfo = getStoreObj<SceneAndObject>(snapshot);
+          this.sceneAndObjectInfo = snapshot.data!;
         }
         if (status === "modified") {
           if (this.sceneAndObjectInfo!.data!.isOriginalAddress) {
@@ -168,16 +169,19 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
 
   @LifeCycle
   protected async mounted() {
-    this.sceneObjectInfo = (await this.sceneObjectCC!.getData(this.docId))!;
+    this.sceneObjectInfo = (await this.sceneObjectCC!.findSingle(
+      "key",
+      this.docKey
+    ))!.data!;
 
     await this.sceneObjectCC!.setSnapshot(
-      this.pieceId,
-      this.docId,
+      this.pieceKey,
+      this.docKey,
       snapshot => {
         if (!snapshot.data) return;
         const status = snapshot.data.status;
         if (status === "modified" || status === "modify-touched") {
-          this.sceneObjectInfo = getStoreObj<SceneObject>(snapshot);
+          this.sceneObjectInfo = snapshot.data!;
           if (status === "modified") {
             this.isMoving = false;
             if (!this.sceneAndObjectInfo!.data!.isOriginalAddress) {
@@ -189,7 +193,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       }
     );
 
-    await this.resetSceneId(this.sceneId);
+    await this.resetSceneKey(this.sceneKey);
 
     this.isMounted = true;
     this.onChangePoint();
@@ -197,19 +201,18 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
 
   private get isOtherLastModify(): boolean {
     if (!this.sceneObjectInfo) return false;
-    const targetStoreObj = this.sceneAndObjectInfo!.data!.isOriginalAddress
+    const targetStoreData = this.sceneAndObjectInfo!.data!.isOriginalAddress
       ? this.sceneAndObjectInfo!
       : this.sceneObjectInfo!;
-    const lastExclusionOwner = targetStoreObj.lastExclusionOwner;
-    const lastExclusionOwnerId = GameObjectManager.instance.getExclusionOwnerId(
+    const lastExclusionOwner = targetStoreData.lastExclusionOwner;
+    const lastExclusionOwnerKey = GameObjectManager.instance.getExclusionOwnerKey(
       lastExclusionOwner
     );
     return (
-      !!lastExclusionOwnerId &&
-      lastExclusionOwnerId !== GameObjectManager.instance.mySelfUserId
+      !!lastExclusionOwnerKey &&
+      lastExclusionOwnerKey !== SocketFacade.instance.userKey
     );
   }
-
   protected get basicClasses() {
     if (!this.isMounted || !this.sceneObjectInfo) return [];
     const result = [
@@ -220,18 +223,25 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       permissionCheck(this.sceneObjectInfo, "edit")
         ? "editable"
         : "non-editable",
-      this.sceneObjectInfo.owner === GameObjectManager.instance.mySelfUserId
+      this.sceneObjectInfo.owner === SocketFacade.instance.userKey
         ? "owners"
         : "non-owners"
     ];
     if (this.isFocused) result.push("focus");
     if (this.isOtherLastModify) result.push("other-player-last-modify");
     if (this.isTransitioning) result.push("transitioning");
-    if (this.sceneObjectInfo.data!.isHideSubType) result.push("hide-sub-type");
+    if (this.sceneObjectInfo.data!.type === "map-marker") {
+      if (!this.sceneObjectInfo.data!.isHideSubType) {
+        result.push("hide-back");
+        result.push("hide-front");
+      }
+    } else {
+      if (this.sceneObjectInfo.data!.isHideSubType)
+        result.push("hide-sub-type");
+    }
 
     return result;
   }
-
   protected get elm(): HTMLElement {
     return this.$refs.component as HTMLElement;
   }
@@ -262,12 +272,12 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     const useY = this.isMoving ? y + this.volatileInfo.moveDiff.y : y;
 
     if (this.isOtherLastModify) {
-      if (this.otherLockTimeoutId !== null)
-        clearTimeout(this.otherLockTimeoutId);
+      if (this.otherLockTimeoutKey !== null)
+        clearTimeout(this.otherLockTimeoutKey);
 
       this.isTransitioning = true;
       // other-player-last-modifyに設定されている「transition」の0.3sに合わせている
-      this.otherLockTimeoutId = window.setTimeout(() => {
+      this.otherLockTimeoutKey = window.setTimeout(() => {
         this.isTransitioning = false;
       }, 300);
     }
@@ -281,7 +291,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   @Watch("memoList", { deep: true })
   private onChangeOtherText() {
     this.otherTextList = this.memoList.filter(
-      m => m.ownerType === "scene-object" && m.owner === this.docId
+      m => m.ownerType === "scene-object-list" && m.owner === this.docKey
     );
   }
 
@@ -322,10 +332,25 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
 
   @Watch("isMounted")
   @Watch("sceneObjectInfo.data.isHideHighlight")
+  @Watch("sceneObjectInfo.data.isHideSubType")
   private onChangeIsHideHighlight() {
-    const outlineWidth = this.sceneObjectInfo!.data!.isHideHighlight ? 0 : 6;
-    this.elm.style.outlineOffset = `-${outlineWidth}px`;
-    this.elm.style.outline = `rgb(187, 187, 255) solid ${outlineWidth}px`;
+    if (this.sceneObjectInfo!.data!.type === "map-marker") {
+      const texture = this.sceneObjectInfo!.data!.textures[
+        this.sceneObjectInfo!.data!.textureIndex
+      ];
+      if (this.sceneObjectInfo!.data!.isHideSubType) {
+        this.elm.style.outlineOffset = `0px`;
+        this.elm.style.outline = "";
+      } else {
+        this.elm.style.outlineOffset = "-6px";
+        if (texture.type === "color")
+          this.elm.style.outline = `${texture.backgroundColor} solid 6px`;
+      }
+    } else {
+      const outlineWidth = this.sceneObjectInfo!.data!.isHideHighlight ? 0 : 6;
+      this.elm.style.outlineOffset = `-${outlineWidth}px`;
+      this.elm.style.outline = `rgb(187, 187, 255) solid ${outlineWidth}px`;
+    }
   }
 
   private boxShadowColor: string = "";
@@ -350,7 +375,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   @Watch("isMounted")
   @Watch("sceneObjectInfo.data.backgroundList", { deep: true })
   @Watch("sceneObjectInfo.data.textureIndex")
-  @Watch("sceneObjectInfo.data.subTypeId")
+  @Watch("sceneObjectInfo.data.subTypeKey")
   private onChangeBackground() {
     if (!this.isMounted) return;
     const textures = this.sceneObjectInfo!.data!.textures;
@@ -363,7 +388,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       this.elm.style.setProperty(`--font-color`, backInfo.fontColor);
       this.elm.style.setProperty(`--text`, `"${backInfo.text}"`);
     } else {
-      const media = findRequireById(this.mediaList, backInfo.imageId);
+      const media = findRequireByKey(this.mediaList, backInfo.mediaKey);
       this.elm.style.setProperty(`--image`, `url('${media.data!.url}')`);
       let direction = "";
       if (backInfo.direction === "horizontal") direction = "scale(-1, 1)";
@@ -395,12 +420,12 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       this.elm.style.setProperty(`--text`, `''`);
     }
     if (this.sceneObjectInfo!.data!.type === "dice-symbol") {
-      const diceTypeId = this.sceneObjectInfo!.data!.subTypeId;
+      const diceTypeKey = this.sceneObjectInfo!.data!.subTypeKey;
       const pips = this.sceneObjectInfo!.data!.subTypeValue;
       const pipsInfo = GameObjectManager.instance.diceAndPipsList.find(
-        dap => dap.data!.diceTypeId === diceTypeId && dap.data!.pips === pips
+        dap => dap.data!.diceTypeKey === diceTypeKey && dap.data!.pips === pips
       );
-      const media = findRequireById(this.mediaList, pipsInfo!.data!.mediaId);
+      const media = findRequireByKey(this.mediaList, pipsInfo!.data!.mediaKey);
       this.elm.style.setProperty(`--image`, `url('${media.data!.url}')`);
       this.elm.style.setProperty(`--image-background-size`, "contain");
       return;
@@ -412,7 +437,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
-    if (!param || param.key !== this.docId) return;
+    if (!param || param.key !== this.docKey) return;
     if (!this.isMoving) return;
     const point = task.value!;
     const planeLocateScene = this.getPoint(point);
@@ -424,9 +449,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
 
   @TaskProcessor("change-focus-scene-object-finished")
   private async changeFocusSceneObjectFinished(
-    task: Task<{ id: string; isFocus: boolean }, never>
+    task: Task<{ key: string; isFocus: boolean }, never>
   ): Promise<TaskResult<never> | void> {
-    if (task.value!.id !== this.docId) return;
+    if (task.value!.key !== this.docKey) return;
     this.isFocused = task.value!.isFocus;
   }
 
@@ -434,9 +459,32 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     const args = task.value.args;
     return (
       args.type !== this.type ||
-      args.docId !== this.docId ||
-      args.pieceId !== this.pieceId
+      args.key !== this.docKey ||
+      args.pieceKey !== this.pieceKey
     );
+  }
+
+  private async changeFlag<T extends keyof SceneObjectStore>(
+    prop: T,
+    value: NonNullable<SceneObjectStore[T]>
+  ) {
+    console.log(
+      `【${prop.toString()}:${value}】 type: ${this.type}, docKey: ${
+        this.docKey
+      }`
+    );
+    try {
+      const data: SceneObjectStore = (await this.sceneObjectCC!.findSingle(
+        "key",
+        this.docKey
+      ))!.data!.data!;
+      data[prop]! = value;
+      await this.sceneObjectCC!.updatePackage([
+        { key: this.docKey, data: data }
+      ]);
+    } catch (err) {
+      console.warn(err);
+    }
   }
 
   @TaskProcessor("change-highlight-view-finished")
@@ -444,16 +492,8 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<any, never>
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
-    console.log(
-      `【highlight:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
-    );
-    try {
-      const data = (await this.sceneObjectCC!.getData(this.docId))!;
-      data.data!.isHideHighlight = task.value.value;
-      await this.sceneObjectCC!.updatePackage([this.docId], [data.data!]);
-    } catch (err) {
-      console.warn(err);
-    }
+    const val: boolean = task.value.value;
+    await this.changeFlag("isHideHighlight", val);
   }
 
   @TaskProcessor("change-border-view-finished")
@@ -461,16 +501,17 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<any, never>
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
-    console.log(
-      `【border:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
-    );
-    try {
-      const data = (await this.sceneObjectCC!.getData(this.docId))!;
-      data.data!.isHideBorder = task.value.value;
-      await this.sceneObjectCC!.updatePackage([this.docId], [data.data!]);
-    } catch (err) {
-      console.warn(err);
-    }
+    const val: boolean = task.value.value;
+    await this.changeFlag("isHideBorder", val);
+  }
+
+  @TaskProcessor("change-marker-back-view-finished")
+  private async changeMarkerBackViewFinished(
+    task: Task<any, never>
+  ): Promise<TaskResult<never> | void> {
+    if (this.isNotThisTask(task)) return;
+    const val: boolean = task.value.value;
+    await this.changeFlag("isHideSubType", val);
   }
 
   @TaskProcessor("lock-object-finished")
@@ -478,16 +519,8 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<any, never>
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
-    console.log(
-      `【lock:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
-    );
-    try {
-      const data = (await this.sceneObjectCC!.getData(this.docId))!;
-      data.data!.isLock = task.value.value;
-      await this.sceneObjectCC!.updatePackage([this.docId], [data.data!]);
-    } catch (err) {
-      console.warn(err);
-    }
+    const val: boolean = task.value.value;
+    await this.changeFlag("isLock", val);
   }
 
   @TaskProcessor("copy-object-finished")
@@ -496,12 +529,63 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
     console.log(
-      `【copy:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
+      `【copy:${task.value.value}】 type: ${this.type}, docKey: ${this.docKey}`
     );
 
-    const data: SceneObject = (await this.sceneObjectCC!.getData(this.docId))!
-      .data!;
-    await SocketFacade.instance.sceneObjectCC().addDirect([data]);
+    const data: SceneObjectStore = (await this.sceneObjectCC!.findSingle(
+      "key",
+      this.docKey
+    ))!.data!.data!;
+    const sceneObjectKey: string = (
+      await SocketFacade.instance.sceneObjectCC().addDirect([{ data }])
+    )[0];
+
+    if (this.otherTextList.length) {
+      await SocketFacade.instance.memoCC().addDirect(
+        this.otherTextList.map(data => ({
+          ownerType: "scene-object-list",
+          owner: sceneObjectKey,
+          data: data.data!
+        }))
+      );
+    }
+  }
+
+  @TaskProcessor("export-object-finished")
+  private async exportObjectFinished(
+    task: Task<any, never>
+  ): Promise<TaskResult<never> | void> {
+    if (this.isNotThisTask(task)) return;
+
+    const sceneObject = GameObjectManager.instance.sceneObjectList.find(
+      so => so.key === this.docKey
+    )!;
+
+    const memoList = (await SocketFacade.instance.memoCC().findList([
+      {
+        property: "owner",
+        operand: "==",
+        value: this.docKey
+      }
+    ]))!.map(doc => doc.data!);
+
+    const exportList: StoreData<any>[] = [];
+
+    if (this.type === "character") {
+      const actor = GameObjectManager.instance.actorList.find(
+        a => a.key === sceneObject.data!.actorKey
+      )!;
+      exportList.push(actor);
+      const statusList = GameObjectManager.instance.actorStatusList.filter(
+        as => as.owner === actor.key
+      );
+      exportList.push(...statusList);
+    }
+
+    exportList.push(sceneObject);
+    if (memoList.length) exportList.push(...memoList);
+    console.log(exportList);
+    await exportData(exportList, "part");
   }
 
   @TaskProcessor("delete-object-finished")
@@ -510,10 +594,10 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
     console.log(
-      `【delete:${task.value.value}】 type: ${this.type}, docId: ${this.docId}`
+      `【delete:${task.value.value}】 type: ${this.type}, docKey: ${this.docKey}`
     );
 
-    await GameObjectManager.deleteSceneObject(this.docId);
+    await GameObjectManager.deleteSceneObject(this.docKey);
   }
 
   @TaskProcessor("open-ref-url-finished")
@@ -521,8 +605,85 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<any, never>
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
-    const data = (await this.sceneObjectCC!.getData(this.docId))!.data!;
-    window.open(data.url, "_blank");
+    const data = (await this.sceneObjectCC!.findSingle("key", this.docKey))!
+      .data!;
+    window.open(data.data!.url, "_blank");
+  }
+
+  @TaskProcessor("create-chat-palette-finished")
+  private async createChatPaletteFinished(
+    task: Task<any, never>
+  ): Promise<TaskResult<never> | void> {
+    if (this.isNotThisTask(task)) return;
+    const data = (await this.sceneObjectCC!.findSingle("key", this.docKey))!
+      .data!;
+    const url = data.data!.url;
+    const trpgSystemHelper = await getTrpgSystemHelper(url);
+    if (!trpgSystemHelper || !trpgSystemHelper.isSupportedChatPalette) return;
+
+    const confirm = await questionDialog({
+      title: this.$t("message.load-chat-palette-character-sheet").toString(),
+      text: this.$t(
+        "message.load-chat-palette-character-sheet-text"
+      ).toString(),
+      confirmButtonText: this.$t("button.commit").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
+    if (!confirm) return;
+    const sceneObject = GameObjectManager.instance.sceneObjectList.find(
+      so => so.key === this.docKey
+    )!;
+    const actor = GameObjectManager.instance.actorList.find(
+      a => a.key === sceneObject.data!.actorKey
+    )!;
+    const chatPaletteListCC = SocketFacade.instance.chatPaletteListCC();
+    const userKey = SocketFacade.instance.userKey;
+    const helperName = trpgSystemHelper.constructor.name;
+    const duplicateSnapShotList = await chatPaletteListCC.findList([
+      { property: "ownerType", operand: "==", value: "user-list" },
+      { property: "owner", operand: "==", value: userKey },
+      { property: "data.source", operand: "==", value: helperName }
+    ]);
+
+    const chatPaletteInfoList = await trpgSystemHelper.createChatPalette();
+
+    if (duplicateSnapShotList) {
+      duplicateSnapShotList.map(sp => {
+        const cpInfoInd = chatPaletteInfoList.findIndex(
+          cpi => cpi.name === sp.data!.data!.name
+        );
+        if (cpInfoInd > -1) {
+          sp.data!.data!.paletteText =
+            chatPaletteInfoList[cpInfoInd].paletteText;
+          sp.ref.update(sp.data!);
+          chatPaletteInfoList.splice(cpInfoInd, 1);
+        }
+      });
+    }
+
+    if (chatPaletteInfoList.length) {
+      await chatPaletteListCC.addDirect(
+        chatPaletteInfoList.map(cpi => ({
+          ownerType: "user-list",
+          owner: userKey,
+          permission: GameObjectManager.PERMISSION_OWNER_VIEW,
+          data: {
+            name: cpi.name,
+            source: helperName,
+            chatFontColorType: "owner",
+            chatFontColor: "#000000",
+            actorKey: actor.key,
+            sceneObjectKey: this.docKey,
+            targetKey: null, // TODO 入力項目を作成
+            outputTabKey: null, // TODO 入力項目を作成
+            statusKey: null,
+            system: null, // TODO 入力項目を作成
+            isSecret: false,
+            paletteText: cpi.paletteText
+          }
+        }))
+      );
+    }
   }
 
   @TaskProcessor("edit-actor-finished")
@@ -530,8 +691,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<any, never>
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
-    const data = (await this.sceneObjectCC!.getData(this.docId))!.data!;
-    const actorId = data.actorId!;
+    const data = (await this.sceneObjectCC!.findSingle("key", this.docKey))!
+      .data!;
+    const actorKey = data.data!.actorKey!;
     await TaskManager.instance.ignition<WindowOpenInfo<DataReference>, never>({
       type: "window-open",
       owner: "Quoridorn",
@@ -539,7 +701,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
         type: "actor-edit-window",
         args: {
           type: "actor",
-          docId: actorId
+          key: actorKey
         }
       }
     });
@@ -550,9 +712,10 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<any, never>
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
-    const data = (await this.sceneObjectCC!.getData(this.docId))!;
+    const data = (await this.sceneObjectCC!.findSingle("key", this.docKey))!
+      .data!;
     const pipsList = GameObjectManager.instance.diceAndPipsList
-      .filter(dap => dap.data!.diceTypeId === data.data!.subTypeId)
+      .filter(dap => dap.data!.diceTypeKey === data.data!.subTypeKey)
       .map(dap => dap.data!.pips);
     const pipsLength = pipsList.filter(p => p && p !== "0").length;
     let pips: string = "";
@@ -573,28 +736,32 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
           // 新規追加
           await keepBcdiceDiceRollResultListCC.addDirect([
             {
-              type: "hide-dice-symbol-roll",
-              text: command,
-              targetId: data.id!,
-              bcdiceDiceRollResult: resultJson
+              data: {
+                type: "hide-dice-symbol-roll",
+                text: command,
+                targetKey: data.key,
+                bcdiceDiceRollResult: resultJson
+              }
             }
           ]);
         } else {
           // 更新
           keepBcdiceDiceRollResult.data!.bcdiceDiceRollResult = resultJson;
-          await keepBcdiceDiceRollResultListCC.updatePackage(
-            [keepBcdiceDiceRollResult.id!],
-            [keepBcdiceDiceRollResult.data!]
-          );
+          await keepBcdiceDiceRollResultListCC.updatePackage([
+            {
+              key: keepBcdiceDiceRollResult.key,
+              data: keepBcdiceDiceRollResult.data!
+            }
+          ]);
         }
         pips = resultJson.dices![0]!.value.toString();
         await sendChatLog(
           {
             chatType: "system-message",
             text: this.$t("message.dice-roll-dice-symbol-hide").toString(),
-            tabId: null,
-            targetId: null,
-            statusId: null,
+            tabKey: null,
+            targetKey: null,
+            statusKey: null,
             system: null,
             isSecret: false
           },
@@ -606,9 +773,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
           {
             chatType: "system-message",
             text: `System error!!. dice roll failure. command: ${command}`,
-            tabId: null,
-            targetId: null,
-            statusId: null,
+            tabKey: null,
+            targetKey: null,
+            statusKey: null,
             system: null,
             isSecret: false
           },
@@ -618,16 +785,16 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       }
     } else {
       // ダイスを隠していないなら
-      const command = `1D${pipsLength} ${this.$t("type.dice-symbol")} ${this.$t(
-        "label.dice-roll"
-      )}`;
+      const command = `1D${pipsLength} ${this.$t(
+        "type.dice-symbol"
+      )!.toString()} ${this.$t("context.dice-roll")!.toString()}`;
       const diceRollResult = await sendChatLog(
         {
           chatType: "system-message",
           text: command,
-          tabId: null,
-          targetId: null,
-          statusId: null,
+          tabKey: null,
+          targetKey: null,
+          statusKey: null,
           system: null,
           isSecret: false
         },
@@ -639,9 +806,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
           {
             chatType: "system-message",
             text: `System error!!. dice roll failure. command: ${command}`,
-            tabId: null,
-            targetId: null,
-            statusId: null,
+            tabKey: null,
+            targetKey: null,
+            statusKey: null,
             system: null,
             isSecret: false
           },
@@ -653,7 +820,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     }
     try {
       data.data!.subTypeValue = pips;
-      await this.sceneObjectCC!.updatePackage([this.docId], [data.data!]);
+      await this.sceneObjectCC!.updatePackage([
+        { key: this.docKey, data: data.data! }
+      ]);
     } catch (err) {
       console.warn(err);
     }
@@ -665,15 +834,18 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
 
-    const data = (await this.sceneObjectCC!.getData(this.docId))!;
+    const data = (await this.sceneObjectCC!.findSingle("key", this.docKey))!
+      .data!;
     const faceNum = GameObjectManager.instance.diceTypeList.find(
-      dt => dt.id === data.data!.subTypeId
+      dt => dt.key === data.data!.subTypeKey
     )!.data!.faceNum;
     const oldPips: string = data.data!.subTypeValue;
     const isHideSubType = data.data!.isHideSubType;
     const pips = task.value.value;
     data.data!.subTypeValue = pips;
-    await this.sceneObjectCC!.updatePackage([this.docId], [data.data!]);
+    await this.sceneObjectCC!.updatePackage([
+      { key: this.docKey, data: data.data! }
+    ]);
 
     const msgTarget = isHideSubType
       ? "change-pips-dice-symbol-hide"
@@ -686,9 +858,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
           .replace("{0}", `D${faceNum}`)
           .replace("{1}", oldPips)
           .replace("{2}", pips),
-        tabId: null,
-        targetId: null,
-        statusId: null,
+        tabKey: null,
+        targetKey: null,
+        statusKey: null,
         system: null,
         isSecret: false
       },
@@ -698,20 +870,20 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     const keepBcdiceDiceRollResult = await this.getKeepBcdiceDiceRollResult();
     if (keepBcdiceDiceRollResult) {
       await keepBcdiceDiceRollResultListCC.deletePackage([
-        keepBcdiceDiceRollResult.id!
+        keepBcdiceDiceRollResult.key
       ]);
     }
   }
 
-  private async getKeepBcdiceDiceRollResult(): Promise<StoreUseData<
-    KeepBcdiceDiceRollResult
+  private async getKeepBcdiceDiceRollResult(): Promise<StoreData<
+    KeepBcdiceDiceRollResultStore
   > | null> {
     const keepBcdiceDiceRollResultListCC = SocketFacade.instance.keepBcdiceDiceRollResultListCC();
-    const list = await keepBcdiceDiceRollResultListCC.find([
+    const list = await keepBcdiceDiceRollResultListCC.findList([
       { property: "data.type", operand: "==", value: "hide-dice-symbol-roll" },
-      { property: "data.targetId", operand: "==", value: this.docId }
+      { property: "data.targetKey", operand: "==", value: this.docKey }
     ]);
-    return list ? list[0] : null;
+    return list ? list[0].data! : null;
   }
 
   @TaskProcessor("change-dice-view-finished")
@@ -720,14 +892,17 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
   ): Promise<TaskResult<never> | void> {
     if (this.isNotThisTask(task)) return;
 
-    const data = (await this.sceneObjectCC!.getData(this.docId))!;
+    const data = (await this.sceneObjectCC!.findSingle("key", this.docKey))!
+      .data!;
     const faceNum = GameObjectManager.instance.diceTypeList.find(
-      dt => dt.id === data.data!.subTypeId
+      dt => dt.key === data.data!.subTypeKey
     )!.data!.faceNum;
     const isHideSubType = task.value.value;
     const pips = data.data!.subTypeValue;
     data.data!.isHideSubType = isHideSubType;
-    await this.sceneObjectCC!.updatePackage([this.docId], [data.data!]);
+    await this.sceneObjectCC!.updatePackage([
+      { key: this.docKey, data: data.data! }
+    ]);
 
     let msgTarget = isHideSubType ? "hide-dice-symbol" : "view-dice-symbol";
 
@@ -741,7 +916,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
 
       const keepBcdiceDiceRollResultListCC = SocketFacade.instance.keepBcdiceDiceRollResultListCC();
       await keepBcdiceDiceRollResultListCC.deletePackage([
-        keepBcdiceDiceRollResult.id!
+        keepBcdiceDiceRollResult.key
       ]);
       msgTarget = "view-dice-symbol-dice-roll";
     }
@@ -754,9 +929,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
           .replace("{0}", `D${faceNum}`)
           .replace("{1}", pips)
           .replace("{2}", diceRollResult),
-        tabId: null,
-        targetId: null,
-        statusId: null,
+        tabKey: null,
+        targetKey: null,
+        statusKey: null,
         system: null,
         isSecret: false
       },
@@ -776,7 +951,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     if (this.sceneAndObjectInfo!.data!.isOriginalAddress) {
       try {
         await this.sceneAndObjectCC!.touchModify([
-          this.sceneAndObjectInfo!.id!
+          this.sceneAndObjectInfo!.key
         ]);
       } catch (err) {
         console.warn(err);
@@ -784,7 +959,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       }
     } else {
       try {
-        await this.sceneObjectCC!.touchModify([this.docId]);
+        await this.sceneObjectCC!.touchModify([this.docKey]);
       } catch (err) {
         console.warn(err);
         return;
@@ -820,7 +995,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
 
   private mouseDown(button: string) {
     TaskManager.instance.setTaskParam<MouseMoveParam>("mouse-moving-finished", {
-      key: this.docId,
+      key: this.docKey,
       type: `button-${button}`
     });
     TaskManager.instance.setTaskParam<MouseMoveParam>(
@@ -828,9 +1003,9 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
         ? "mouse-move-end-right-finished"
         : `mouse-move-end-left-finished`,
       {
-        key: this.docId,
+        key: this.docKey,
         type: `${button}-click`,
-        pieceId: this.pieceId
+        pieceKey: this.pieceKey
       }
     );
   }
@@ -840,7 +1015,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
-    if (!param || param.key !== this.docId || param.pieceId !== this.pieceId)
+    if (!param || param.key !== this.docKey || param.pieceKey !== this.pieceKey)
       return;
 
     console.log("mouse-move-end-left-finished", param.key, param.type);
@@ -876,18 +1051,25 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     }
 
     if (this.sceneAndObjectInfo!.data!.isOriginalAddress) {
-      const data: SceneAndObject = clone(this.sceneAndObjectInfo!.data)!;
+      const data: SceneAndObjectStore = clone(this.sceneAndObjectInfo!.data)!;
       if (!data.originalAddress)
         data.originalAddress = createAddress(0, 0, 0, 0);
       copyAddress(address, data.originalAddress);
-      await this.sceneAndObjectCC!.update(
-        [this.sceneAndObjectInfo!.id!],
-        [data]
-      );
+      await this.sceneAndObjectCC!.update([
+        {
+          key: this.sceneAndObjectInfo!.key,
+          data
+        }
+      ]);
     } else {
-      const data: SceneObject = clone(this.sceneObjectInfo!.data)!;
+      const data: SceneObjectStore = clone(this.sceneObjectInfo!.data)!;
       copyAddress(address, data);
-      await this.sceneObjectCC!.update([this.docId], [data]);
+      await this.sceneObjectCC!.update([
+        {
+          key: this.docKey,
+          data
+        }
+      ]);
     }
     this.inflateWidth = 0;
     TaskManager.instance.setTaskParam("mouse-moving-finished", null);
@@ -901,7 +1083,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
-    if (!param || param.key !== this.docId || param.pieceId !== this.pieceId)
+    if (!param || param.key !== this.docKey || param.pieceKey !== this.pieceKey)
       return;
     console.log("mouse-move-end-right-finished", param.key, param.type);
     const point: Point = task.value!;
@@ -918,8 +1100,8 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
         owner: "Quoridorn",
         value: {
           type: this.type,
-          target: this.docId,
-          pieceId: this.pieceId,
+          target: this.docKey,
+          pieceKey: this.pieceKey,
           x: point.x,
           y: point.y
         }
@@ -981,8 +1163,8 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
       type: "other-text-view",
       owner: "Quoridorn",
       value: {
-        type: this.type,
-        docId: this.docId,
+        type: "scene-object-list",
+        key: this.docKey,
         dataList: this.otherTextList,
         rect: createRectangle(data.x, data.y, rect.width, rect.height),
         isFix: false
@@ -997,7 +1179,7 @@ export default class PieceMixin<T extends SceneObjectType> extends Mixins<
     await TaskManager.instance.ignition<string, never>({
       type: "other-text-hide",
       owner: "Quoridorn",
-      value: this.docId
+      value: this.docKey
     });
   }
 }

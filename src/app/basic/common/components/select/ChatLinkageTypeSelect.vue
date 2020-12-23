@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     ref="component"
@@ -15,27 +16,20 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class ChatLinkageTypeSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
 ) {
   private optionInfoList: HtmlOptionInfo[] = [
-    { value: "", key: "chat-linkage-type", text: "", disabled: true },
-    { value: "none", key: "not-exist", text: "", disabled: false },
-    { value: "last", key: "chat-linkage-type-last", text: "", disabled: false },
-    {
-      value: "regexp",
-      key: "chat-linkage-type-regexp",
-      text: "",
-      disabled: false
-    }
+    { value: "", key: "", text: "", disabled: true },
+    { value: "none", key: "", text: "", disabled: false },
+    { value: "last", key: "", text: "", disabled: false },
+    { value: "regexp", key: "", text: "", disabled: false }
   ];
 
   @LifeCycle
@@ -53,7 +47,13 @@ export default class ChatLinkageTypeSelect extends Mixins<MultiMixin>(
 
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
-      o.text = this.$t(`label.${o.key}`)!.toString();
+      o.key = o.value;
+      o.text =
+        o.value === "none"
+          ? this.$t("label.none")!.toString()
+          : this.$t(
+              `selection.chat-linkage-type.${o.value || "label"}`
+            )!.toString();
     });
   }
 }

@@ -6,7 +6,7 @@
         class="object"
         :class="{ 'type-add': isAdd }"
         ref="object"
-        :draggable="isAdd && imageDocId"
+        :draggable="isAdd && !!mediaKey"
         @dragstart="dragStart"
         @dragend="dragEnd"
       ></div>
@@ -16,7 +16,7 @@
     <table class="info-table">
       <tr>
         <tr-number-input-component
-          labelName="width"
+          labelName="label.width"
           inputWidth="3em"
           v-model="widthVolatile"
           :min="1"
@@ -24,7 +24,7 @@
       </tr>
       <tr>
         <tr-number-input-component
-          labelName="height"
+          labelName="label.height"
           inputWidth="3em"
           v-model="heightVolatile"
           :min="1"
@@ -35,12 +35,12 @@
           <label
             :for="`${key}-background-size`"
             class="label-background-size label-input"
-            v-t="'label.background-location'"
+            v-t="'selection.background-location.label'"
           ></label>
         </th>
         <td class="value-cell">
           <background-location-select
-            :id="`${key}-background-size`"
+            :elmId="`${key}-background-size`"
             v-model="backgroundSizeVolatile"
           />
         </td>
@@ -55,9 +55,9 @@
       <!-- 画像タブ -->
       <image-picker-component
         v-if="currentTabInfo.target === 'image'"
-        v-model="imageDocIdVolatile"
+        v-model="mediaKeyVolatile"
         :windowKey="key"
-        :imageTag.sync="imageTagVolatile"
+        :mediaTag.sync="mediaTagVolatile"
         :direction.sync="directionVolatile"
         ref="imagePicker"
       />
@@ -70,14 +70,14 @@
         <table>
           <tr>
             <tr-string-input-component
-              labelName="tag"
+              labelName="label.tag"
               width="100%"
               v-model="tagVolatile"
             />
           </tr>
           <tr>
             <tr-string-input-component
-              labelName="name"
+              labelName="label.name"
               width="100%"
               v-model="nameVolatile"
             />
@@ -92,8 +92,8 @@
             </th>
             <td class="value-cell">
               <scene-layer-select
-                v-model="layerIdVolatile"
-                :id="`${key}-layer`"
+                v-model="layerKeyVolatile"
+                :elmId="`${key}-layer`"
               />
             </td>
           </tr>
@@ -117,7 +117,7 @@ import { Task, TaskResult } from "task";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import ComponentVue from "../../../core/window/ComponentVue";
-import { BackgroundSize, Direction } from "@/@types/room";
+import { BackgroundSize, Direction } from "@/@types/store-data-optional";
 import GameObjectManager from "../../GameObjectManager";
 import { TabInfo } from "@/@types/window";
 import VueEvent from "../../../core/decorator/VueEvent";
@@ -127,8 +127,7 @@ import SimpleTabComponent from "../../../core/component/SimpleTabComponent.vue";
 import ImagePickerComponent from "../../../core/component/ImagePickerComponent.vue";
 import TrStringInputComponent from "../../common/components/TrStringInputComponent.vue";
 import SceneLayerSelect from "../../common/components/select/SceneLayerSelect.vue";
-import { StoreUseData } from "@/@types/store";
-import { MemoStore } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import OtherTextEditComponent from "@/app/basic/other-text/OtherTextEditComponent.vue";
 
 @Component({
@@ -183,14 +182,14 @@ export default class ChitInfoForm extends Mixins<ComponentVue>(ComponentVue) {
   }
 
   @Prop({ type: Array, required: true })
-  private otherTextList!: StoreUseData<MemoStore>[];
-  private otherTextListVolatile: StoreUseData<MemoStore>[] = [];
+  private otherTextList!: StoreData<MemoStore>[];
+  private otherTextListVolatile: StoreData<MemoStore>[] = [];
   @Watch("otherTextList", { immediate: true })
-  private onChangeOtherTextList(value: StoreUseData<MemoStore>[]) {
+  private onChangeOtherTextList(value: StoreData<MemoStore>[]) {
     this.otherTextListVolatile = value;
   }
   @Watch("otherTextListVolatile")
-  private onChangeOtherTextListVolatile(value: StoreUseData<MemoStore>[]) {
+  private onChangeOtherTextListVolatile(value: StoreData<MemoStore>[]) {
     this.$emit("update:otherTextList", value);
   }
 
@@ -221,29 +220,28 @@ export default class ChitInfoForm extends Mixins<ComponentVue>(ComponentVue) {
   }
 
   @Prop({ type: String, default: null })
-  private imageDocId!: string | null;
-
-  private imageDocIdVolatile: string | null = null;
-  @Watch("imageDocId", { immediate: true })
-  private onChangeImageDocId(value: string | null) {
-    this.imageDocIdVolatile = value;
+  private mediaKey!: string | null;
+  private mediaKeyVolatile: string | null = null;
+  @Watch("mediaKey", { immediate: true })
+  private onChangeImageDocKey(value: string | null) {
+    this.mediaKeyVolatile = value;
   }
-  @Watch("imageDocIdVolatile")
-  private onChangeImageDocIdVolatile(value: string | null) {
-    this.$emit("update:imageDocId", value);
+  @Watch("mediaKeyVolatile")
+  private onChangeImageDocKeyVolatile(value: string | null) {
+    this.$emit("update:mediaKey", value);
   }
 
   @Prop({ type: String, default: null })
-  private imageTag!: string | null;
+  private mediaTag!: string | null;
 
-  private imageTagVolatile: string | null = null;
-  @Watch("imageTag", { immediate: true })
+  private mediaTagVolatile: string | null = null;
+  @Watch("mediaTag", { immediate: true })
   private onChangeImageTag(value: string | null) {
-    this.imageTagVolatile = value;
+    this.mediaTagVolatile = value;
   }
-  @Watch("imageTagVolatile")
+  @Watch("mediaTagVolatile")
   private onChangeImageTagVolatile(value: string | null) {
-    this.$emit("update:imageTag", value);
+    this.$emit("update:mediaTag", value);
   }
 
   @Prop({ type: String, required: true })
@@ -273,16 +271,16 @@ export default class ChitInfoForm extends Mixins<ComponentVue>(ComponentVue) {
   }
 
   @Prop({ type: String, required: true })
-  private layerId!: string;
+  private layerKey!: string;
 
-  private layerIdVolatile: string = "";
-  @Watch("layerId", { immediate: true })
-  private onChangeLayerId(value: string) {
-    this.layerIdVolatile = value;
+  private layerKeyVolatile: string = "";
+  @Watch("layerKey", { immediate: true })
+  private onChangeLayerKey(value: string) {
+    this.layerKeyVolatile = value;
   }
-  @Watch("layerIdVolatile")
-  private onChangeLayerIdVolatile(value: string) {
-    this.$emit("update:layerId", value);
+  @Watch("layerKeyVolatile")
+  private onChangeLayerKeyVolatile(value: string) {
+    this.$emit("update:layerKey", value);
   }
 
   private tabList: TabInfo[] = [
@@ -314,20 +312,18 @@ export default class ChitInfoForm extends Mixins<ComponentVue>(ComponentVue) {
   @LifeCycle
   public async mounted() {
     this.isMounted = true;
-    this.currentTabInfo = this.tabList.filter(
+    this.currentTabInfo = this.tabList.find(
       t => t.target === this.initTabTarget
-    )[0];
+    )!;
   }
 
   @Watch("isMounted")
-  @Watch("imageDocId")
+  @Watch("mediaKey")
   @Watch("direction")
   @Watch("backgroundSize")
   private onChangeImage() {
     if (!this.isMounted) return;
-    const imageObj = this.mediaList.filter(
-      obj => obj.id === this.imageDocId
-    )[0];
+    const imageObj = this.mediaList.find(obj => obj.key === this.mediaKey);
     if (!imageObj) return;
     this.imageSrc = imageObj.data!.url;
     this.objectElm.style.setProperty("--imageSrc", `url('${this.imageSrc}')`);

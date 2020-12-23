@@ -35,6 +35,7 @@ import TaskProcessor from "../../../core/task/TaskProcessor";
 import { Task, TaskResult } from "task";
 import CtrlButton from "../../../core/component/CtrlButton.vue";
 import ChatTabInfoForm from "@/app/basic/chat/tab/ChatTabInfoForm.vue";
+import { findRequireByKey } from "@/app/core/utility/Utility";
 
 @Component({
   components: { ChatTabInfoForm, CtrlButton }
@@ -42,7 +43,7 @@ import ChatTabInfoForm from "@/app/basic/chat/tab/ChatTabInfoForm.vue";
 export default class ChatTabEditWindow extends Mixins<WindowVue<string, never>>(
   WindowVue
 ) {
-  private docId: string | null = null;
+  private docKey: string | null = null;
   private chatTabList = GameObjectManager.instance.chatTabList;
   private isProcessed: boolean = false;
   private cc = SocketFacade.instance.chatTabListCC();
@@ -56,8 +57,8 @@ export default class ChatTabEditWindow extends Mixins<WindowVue<string, never>>(
     await this.init();
     this.inputEnter("input:not([type='button'])", this.commit);
 
-    this.docId = this.windowInfo.args!;
-    const data = this.chatTabList.filter(ct => ct.id === this.docId)[0];
+    this.docKey = this.windowInfo.args!;
+    const data = findRequireByKey(this.chatTabList, this.docKey);
 
     if (this.windowInfo.status === "window") {
       // 排他チェック
@@ -81,7 +82,7 @@ export default class ChatTabEditWindow extends Mixins<WindowVue<string, never>>(
 
     if (this.windowInfo.status === "window") {
       try {
-        await this.cc.touchModify([this.docId]);
+        await this.cc.touchModify([this.docKey]);
       } catch (err) {
         console.warn(err);
         this.isProcessed = true;
@@ -92,24 +93,20 @@ export default class ChatTabEditWindow extends Mixins<WindowVue<string, never>>(
 
   private get isDuplicate(): boolean {
     if (this.tabName === null) return false;
-    return (
-      this.chatTabList.filter(
-        ct => ct.data!.name === this.tabName && ct.id !== this.docId
-      ).length > 0
+    return this.chatTabList.some(
+      ct => ct.data!.name === this.tabName && ct.key !== this.docKey
     );
   }
 
   @Watch("isDuplicate")
   private onChangeIsDuplicate() {
-    if (this.docId === null) return;
-    const tab = this.chatTabList.filter(ct => ct.id === this.docId)[0];
-    console.log(tab, this.chatTabList.concat());
+    if (this.docKey === null) return;
+    const tab = findRequireByKey(this.chatTabList, this.docKey);
     this.windowInfo.message = this.isDuplicate
-      ? ChatTabEditWindow.getDialogMessage("duplicate")
-      : ChatTabEditWindow.getDialogMessage("default").replace(
-          "$1",
-          tab.data!.name
-        );
+      ? this.$t("message.name-duplicate")!.toString()
+      : this.$t("message.original")!
+          .toString()
+          .replace("$1", tab.data!.name);
   }
 
   private static getDialogMessage(target: string) {
@@ -120,11 +117,16 @@ export default class ChatTabEditWindow extends Mixins<WindowVue<string, never>>(
   @VueEvent
   private async commit() {
     if (!this.isDuplicate) {
-      const data = this.chatTabList.filter(ct => ct.id === this.docId)[0];
+      const data = findRequireByKey(this.chatTabList, this.docKey);
       data.data!.name = this.tabName!;
       data.data!.useReadAloud = this.useReadAloud!;
       data.data!.readAloudVolume = this.readAloudVolume!;
-      await this.cc!.update([this.docId!], [data.data!]);
+      await this.cc!.update([
+        {
+          key: this.docKey!,
+          data: data.data!
+        }
+      ]);
     }
     this.isProcessed = true;
     await this.close();
@@ -144,7 +146,7 @@ export default class ChatTabEditWindow extends Mixins<WindowVue<string, never>>(
   @VueEvent
   private async rollback() {
     try {
-      await this.cc!.releaseTouch([this.docId!]);
+      await this.cc!.releaseTouch([this.docKey!]);
     } catch (err) {
       // nothing
     }

@@ -3,7 +3,7 @@
     <div class="user-area">
       <label>
         <span class="label-input" v-t="'label.owner'"></span>
-        <user-select :isUseAll="true" v-model="userId" />
+        <user-select :isUseAll="true" v-model="userKey" />
       </label>
     </div>
     <label class="view-type-select">
@@ -35,7 +35,7 @@
             <div
               class="actor-info"
               v-for="actor in tabbedOwnerActorList"
-              :key="actor.id"
+              :key="actor.key"
               :class="[actor.data.type]"
             >
               <div class="first-line">
@@ -75,7 +75,7 @@
                 <!-- チャット文字色 -->
                 <tr>
                   <tr-chat-color-input-component
-                    labelName="chat-font-color"
+                    labelName="label.chat-font-color"
                     :readonly="true"
                     :type.sync="actor.data.chatFontColorType"
                     :color.sync="actor.data.chatFontColor"
@@ -84,7 +84,7 @@
                 <!-- 立ち絵位置 -->
                 <tr>
                   <tr-range-component
-                    labelName="stand-image-position"
+                    labelName="label.stand-image-position"
                     :min="1"
                     :max="12"
                     :readonly="true"
@@ -94,10 +94,10 @@
                 <!-- ステータス -->
                 <tr>
                   <tr-actor-status-select-component
-                    labelName="status"
+                    labelName="label.status"
                     :readonly="true"
-                    :actorId="actor.id"
-                    v-model="actor.data.statusId"
+                    :actorKey="actor.key"
+                    v-model="actor.data.statusKey"
                   />
                 </tr>
               </table>
@@ -106,23 +106,30 @@
                 <template v-for="sceneObject in getSceneObjectList(actor)">
                   <map-mask-piece-component
                     v-if="sceneObject.data.type === 'map-mask'"
-                    :key="sceneObject.id"
-                    :docId="sceneObject.id"
+                    :key="sceneObject.key"
+                    :docKey="sceneObject.key"
                     type="map-mask"
                   />
 
                   <chit-piece-component
                     v-if="sceneObject.data.type === 'chit'"
-                    :key="sceneObject.id"
-                    :docId="sceneObject.id"
+                    :key="sceneObject.key"
+                    :docKey="sceneObject.key"
                     type="chit"
                   />
 
                   <character-piece-component
                     v-if="sceneObject.data.type === 'character'"
-                    :key="sceneObject.id"
-                    :docId="sceneObject.id"
+                    :key="sceneObject.key"
+                    :docKey="sceneObject.key"
                     type="character"
+                  />
+
+                  <map-marker-piece-component
+                    v-if="sceneObject.data.type === 'map-marker'"
+                    :key="sceneObject.key"
+                    :docKey="sceneObject.key"
+                    type="map-marker"
                   />
                 </template>
               </div>
@@ -143,18 +150,16 @@ import { Mixins } from "vue-mixin-decorator";
 import { Task, TaskResult } from "task";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../core/task/TaskProcessor";
-import { ActorStore } from "../../../../@types/gameObject";
+import { ActorStore } from "@/@types/store-data";
 import SocketFacade, {
   permissionCheck
 } from "../../../core/api/app-server/SocketFacade";
 import VueEvent from "../../../core/decorator/VueEvent";
-import { StoreUseData } from "../../../../@types/store";
 import TaskManager from "../../../core/task/TaskManager";
 import WindowVue from "../../../core/window/WindowVue";
 import GameObjectManager from "../../GameObjectManager";
-import { TabInfo, WindowOpenInfo } from "../../../../@types/window";
+import { TabInfo, WindowOpenInfo } from "@/@types/window";
 import LanguageManager from "../../../../LanguageManager";
-import { DataReference } from "../../../../@types/data";
 import UserSelect from "../../common/components/select/UserSelect.vue";
 import PlayerBoxViewTypeRadio from "../../common/components/radio/PlayerBoxViewTypeRadio.vue";
 import SimpleTabComponent from "../../../core/component/SimpleTabComponent.vue";
@@ -165,12 +170,14 @@ import TrActorStatusSelectComponent from "../../common/components/TrActorStatusS
 import MapMaskPieceComponent from "../map-mask/MapMaskPieceComponent.vue";
 import ChitPieceComponent from "../chit/ChitPieceComponent.vue";
 import CharacterPieceComponent from "../character/CharacterPieceComponent.vue";
-import { findRequireById } from "../../../core/utility/Utility";
+import { findRequireByKey, questionDialog } from "@/app/core/utility/Utility";
 import App from "../../../../views/App.vue";
 import BaseInput from "@/app/core/component/BaseInput.vue";
+import MapMarkerPieceComponent from "@/app/basic/object/map-marker/MapMarkerPieceComponent.vue";
 
 @Component({
   components: {
+    MapMarkerPieceComponent,
     BaseInput,
     CharacterPieceComponent,
     ChitPieceComponent,
@@ -187,10 +194,10 @@ import BaseInput from "@/app/core/component/BaseInput.vue";
 export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   WindowVue
 ) {
+  private userKey = SocketFacade.instance.userKey;
   private userList = GameObjectManager.instance.userList;
   private actorCC = SocketFacade.instance.actorCC();
   private actorList = GameObjectManager.instance.actorList;
-  private userId: string = GameObjectManager.instance.mySelfUserId;
   private viewType: "actor" | "piece" = "actor";
   private searchText: string = "";
   private sceneObjectList = GameObjectManager.instance.sceneObjectList;
@@ -211,7 +218,7 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
         const regExp = new RegExp(this.searchText);
         if (!name.match(regExp)) return false;
       }
-      return !(this.userId && a.owner !== this.userId);
+      return a.owner === SocketFacade.instance.userKey;
     });
   }
 
@@ -231,32 +238,32 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
       ) {
         return false;
       }
-      return !(this.userId && a.owner !== this.userId);
+      return a.owner === SocketFacade.instance.userKey;
     });
   }
 
   @VueEvent
   private getSceneObjectList(actor: StoreUseData<ActorStore>) {
-    const sceneId = GameObjectManager.instance.roomData.sceneId;
+    const sceneKey = GameObjectManager.instance.roomData.sceneKey;
     return this.sceneAndObjectList
       .filter(
         sao =>
-          sao.data!.sceneId === sceneId &&
-          actor.data!.pieceIdList.filter(p => p === sao.data!.objectId).length
+          sao.data!.sceneKey === sceneKey &&
+          actor.data!.pieceKeyList.some(p => p === sao.data!.objectKey)
       )
-      .map(sao => findRequireById(this.sceneObjectList, sao.data!.objectId))
+      .map(sao => findRequireByKey(this.sceneObjectList, sao.data!.objectKey))
       .filter(so => so.data!.place === "field");
   }
 
   @VueEvent
-  private getOwnerType(userId: string): string {
-    const user = findRequireById(this.userList, userId);
-    return this.$t(`label.${user.data!.type}`)!.toString();
+  private getOwnerType(userKey: string): string {
+    const user = findRequireByKey(this.userList, userKey);
+    return this.$t(`selection.user-type.${user.data!.type}`)!.toString();
   }
 
   @VueEvent
-  private getOwnerName(userId: string): string {
-    return GameObjectManager.instance.getUserName(userId);
+  private getOwnerName(userKey: string): string {
+    return GameObjectManager.instance.getUserName(userKey);
   }
 
   private actorTabList: TabInfo[] = [
@@ -283,21 +290,22 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
     this.actorTabList = this.ownerActorList
       .map(a => a.data!.tag)
       .filter(
-        (tag: string, idx: number, list: string[]) => list.indexOf(tag) === idx
+        (tag: string, index: number, list: string[]) =>
+          list.indexOf(tag) === index
       )
-      .map((tag, idx) => ({
-        key: idx.toString(),
+      .map((tag, index) => ({
+        key: index.toString(),
         target: tag,
         text: tag || this.$t("label.non-tag")!.toString()
       }));
-    const idx = this.currentActorTabInfo
+    const index = this.currentActorTabInfo
       ? this.actorTabList.findIndex(
           at =>
             at.text === this.currentActorTabInfo!.text &&
             at.target === this.currentActorTabInfo!.target
         )
       : -1;
-    if (idx === -1) {
+    if (index === -1) {
       this.currentActorTabInfo = this.actorTabList[0];
     }
   }
@@ -323,7 +331,7 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
         type: "actor-edit-window",
         args: {
           type: "actor",
-          docId: actor.id!
+          key: actor.key
         }
       }
     });
@@ -344,8 +352,8 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
       value: {
         type: "chmod-window",
         args: {
-          type: "actor",
-          docId: actor.id!
+          type: actor.collection,
+          key: actor.key
         }
       }
     });
@@ -359,15 +367,20 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   @VueEvent
   private async deleteActor(actor: StoreUseData<ActorStore>) {
     if (!this.isDeletable(actor)) return;
-    const msg = PlayerBoxWindow.getDialogMessage("delete-actor").replace(
+    const text = PlayerBoxWindow.getDialogMessage("delete-actor").replace(
       "$1",
       actor.data!.name
     );
-    const result = window.confirm(msg);
-    if (!result) return;
+    const confirm = await questionDialog({
+      title: this.$t("button.delete").toString(),
+      text,
+      confirmButtonText: this.$t("button.delete").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
+    if (!confirm) return;
 
     try {
-      await this.actorCC.deletePackage([actor.id!]);
+      await this.actorCC.deletePackage([actor.key]);
     } catch (err) {
       // TODO error message.
       return;
@@ -382,9 +395,7 @@ export default class PlayerBoxWindow extends Mixins<WindowVue<string, never>>(
   @VueEvent
   private onHover(messageType: string, isHover: boolean) {
     this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
-          `chat-setting-window.message-list.${messageType}`
-        )
+      ? this.$t(`chat-setting-window.message-list.${messageType}`)!.toString()
       : "";
   }
 }

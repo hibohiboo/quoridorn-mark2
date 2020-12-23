@@ -6,10 +6,16 @@
     @wheel.stop
     ref="elm"
   >
+    <div class="title" v-if="otherTextViewInfo.title">
+      {{ otherTextViewInfo.title }}
+    </div>
     <other-text-component
       v-if="useMemoList.length"
       :value="useMemoList"
+      :docType="docType"
+      :docKey="docKey"
       :windowKey="windowKey"
+      @inputTextArea="inputTextArea"
     />
   </div>
 </template>
@@ -19,7 +25,7 @@ import { Component, Watch, Prop } from "vue-property-decorator";
 import { Mixins } from "vue-mixin-decorator";
 import LifeCycle from "@/app/core/decorator/LifeCycle";
 import TaskProcessor from "@/app/core/task/TaskProcessor";
-import { MemoStore, OtherTextViewInfo } from "@/@types/gameObject";
+import { MemoStore, SceneObjectStore } from "@/@types/store-data";
 import {
   createPoint,
   createRectangle,
@@ -27,13 +33,25 @@ import {
 } from "@/app/core/utility/CoordinateUtility";
 import ComponentVue from "@/app/core/window/ComponentVue";
 import OtherTextComponent from "@/app/basic/other-text/OtherTextComponent.vue";
-import { Point, Rectangle, Size } from "address";
 import { MouseMoveParam } from "@/app/core/task/TaskManager";
 import VueEvent from "@/app/core/decorator/VueEvent";
-import { StoreUseData } from "@/@types/store";
 import CssManager from "@/app/core/css/CssManager";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import { Task, TaskResult } from "task";
+import {
+  OtherTextViewInfo,
+  Point,
+  Rectangle,
+  Size
+} from "@/@types/store-data-optional";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
+import { OtherTextUpdateInfo } from "task-info";
+import {
+  createEmptyStoreUseData,
+  warningDialog
+} from "@/app/core/utility/Utility";
+import uuid from "uuid";
+import { getTrpgSystemHelper } from "@/app/core/utility/trpg_system/TrpgSystemFasade";
 
 @Component({ components: { OtherTextComponent } })
 export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
@@ -45,11 +63,13 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
 
   private static DEFAULT_FONT_SIZE = 14;
 
-  private useMemoList: StoreUseData<MemoStore>[] = [];
-  private docId: string | null = null;
+  private useMemoList: StoreData<MemoStore>[] = [];
+  private docKey: string | null = null;
+  private docType: string | null = null;
   private isMounted: boolean = false;
 
   private isHover: boolean = false;
+  private isHoverCover: boolean = false;
   private isChanged: boolean = false;
 
   private wheel = 0;
@@ -67,9 +87,7 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
   }
 
   @TaskProcessor("action-wheel-finished")
-  private async actionWheelFinished(
-    task: Task<boolean, never>
-  ): Promise<TaskResult<never> | void> {
+  private async actionWheelFinished(): Promise<TaskResult<never> | void> {
     if (this.otherTextViewInfo.isFix) return;
     setTimeout(() => {
       this.wheel = CssManager.instance.propMap.wheel;
@@ -102,7 +120,7 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
 
     const translateZ = this.otherTextViewInfo.isFix ? 0 : this.wheel;
 
-    this.translateX = x + info.rect.width;
+    this.translateX = x + info.rect.width - 3;
     this.translateY = y;
     if (!this.otherTextViewInfo.isFix) {
       this.translateX += marginColumns * gridSize + mapPoint.x;
@@ -166,20 +184,21 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
 
   @Watch("useMemoList", { deep: true })
   private async onChangeUseMemoList() {
-    if (this.docId) {
-      if (this.docId !== this.otherTextViewInfo.docId) {
+    if (this.docKey) {
+      if (this.docKey !== this.otherTextViewInfo.key) {
         this.isChanged = true;
       } else {
         const type = this.otherTextViewInfo.type;
-        const docId = this.otherTextViewInfo.docId;
+        const docKey = this.otherTextViewInfo.key;
         await GameObjectManager.instance.updateMemoList(
           this.useMemoList,
           type,
-          docId
+          docKey
         );
       }
     }
-    this.docId = this.otherTextViewInfo.docId;
+    this.docType = this.otherTextViewInfo.type;
+    this.docKey = this.otherTextViewInfo.key;
   }
 
   private get elm(): HTMLElement {
@@ -191,9 +210,22 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
     this.isHover = true;
   }
 
+  private inputTextAreaTimeoutKey: number | null = null;
+
+  @VueEvent
+  private inputTextArea() {
+    this.isHoverCover = true;
+    if (this.inputTextAreaTimeoutKey !== null) {
+      clearTimeout(this.inputTextAreaTimeoutKey);
+    }
+    this.inputTextAreaTimeoutKey = window.setTimeout(() => {
+      this.isHoverCover = false;
+    }, 50);
+  }
+
   @VueEvent
   private onMouseOut() {
-    this.isHover = false;
+    if (!this.isHoverCover) this.isHover = false;
     if (!this.isHover) this.$emit("hide");
   }
 
@@ -210,11 +242,81 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
 
   @TaskProcessor("mouse-moving-finished")
   private async mouseLeftUpFinished(
-    task: Task<Point, never>,
+    _task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
-    if (!param || param.key !== this.otherTextViewInfo.docId) return;
+    if (!param || param.key !== this.otherTextViewInfo.key) return;
     this.$emit("hide");
+  }
+
+  @TaskProcessor("other-text-update-finished")
+  private async otherTextUpdateFinished(
+    task: Task<OtherTextUpdateInfo, never>
+  ): Promise<TaskResult<never> | void> {
+    const docKey = task.value!.docKey;
+    const target = task.value!.target;
+
+    const sceneObjectData: StoreData<SceneObjectStore> = (await SocketFacade.instance
+      .sceneObjectCC()
+      .findSingle("key", docKey))!.data!;
+
+    const url = sceneObjectData.data!.url;
+    const helper = await getTrpgSystemHelper(url);
+    if (!helper) {
+      return await warningDialog({
+        title: "外部参照URLがキャラシのURLではありません。",
+        text: ""
+      });
+    }
+    if (!helper.isSupportedOtherText) {
+      return await warningDialog({
+        title: "このシステムはその他欄の生成に対応していません。",
+        text: ""
+      });
+    }
+
+    const memoList = await helper.createOtherText();
+    if (!memoList) return;
+
+    // 生成したデータからDB用データを生成
+    const otherTextDataList = memoList.map(r =>
+      createEmptyStoreUseData(uuid.v4(), r)
+    );
+
+    // 対象タブが指定されていたら、そのタブだけ更新
+    if (target) {
+      const targetData = this.useMemoList.find(d => d.key === target);
+      if (targetData) {
+        const otherTextData = otherTextDataList.find(
+          otd => otd.data!.tab === targetData.data!.tab
+        );
+        if (otherTextData) {
+          targetData.data!.text = otherTextData.data!.text;
+        }
+      }
+      return;
+    }
+
+    // タブ名が重複するものは上書き、そうでないものは追加
+    otherTextDataList.forEach(otd => {
+      const duplicateList = this.useMemoList.filter(
+        m => m.data!.tab === otd.data!.tab
+      );
+      if (!duplicateList.length) {
+        // 重複が無かったらそのまま追加
+        this.useMemoList.push(otd);
+      } else {
+        // 重複があったら、タイプがURLだったら更新
+        if (otd.data!.type === "url") {
+          const duplicate = duplicateList.find(d => d.data!.type === "url");
+          if (duplicate) {
+            duplicate.data!.text = otd.data!.text;
+          } else {
+            this.useMemoList.push(otd);
+          }
+        }
+      }
+    });
   }
 }
 </script>
@@ -223,8 +325,9 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
 @import "../../../assets/common";
 
 #other-text-frame {
-  @include inline-flex-box(row, flex-start, flex-start);
+  @include inline-flex-box(column, stretch, flex-start);
   position: fixed;
+  background-color: white;
   overflow: auto;
   left: 0;
   top: 0;
@@ -233,5 +336,12 @@ export default class OtherTextFrame extends Mixins<ComponentVue>(ComponentVue) {
   /* JavaScriptで設定されるプロパティ
   transform
   */
+}
+
+.title {
+  @include flex-box(row, center, center);
+  white-space: nowrap;
+  font-weight: bold;
+  font-size: 120%;
 }
 </style>

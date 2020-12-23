@@ -7,9 +7,9 @@
     <div class="create-container">
       <image-picker-component
         class="image-picker-component"
-        v-model="currentImageId"
+        v-model="currentImageKey"
         :windowKey="key"
-        :imageTag.sync="currentTag"
+        :mediaTag.sync="currentTag"
         :isSimple="true"
         :viewName="true"
         imageSize="20em"
@@ -17,44 +17,49 @@
       <div class="setting-container">
         <table>
           <tr>
-            <tr-string-input-component labelName="name" v-model="name" />
+            <tr-string-input-component labelName="label.name" v-model="name" />
           </tr>
           <tr>
             <tr-color-picker-component
-              labelName="background-color"
+              labelName="label.background-color"
               v-model="frontBackgroundColor"
               :useAlpha="false"
             />
           </tr>
           <tr v-if="nameHeight && textHeight">
             <tr-color-picker-component
-              labelName="font-color"
+              labelName="label.font-color"
               v-model="fontColor"
               :useAlpha="false"
             />
           </tr>
           <tr v-if="nameHeight">
             <tr-number-input-component
-              labelName="card-name-font-size"
+              labelName="card-deck-create-card-component.label.card-name-font-size"
               v-model="nameFontSize"
             />
           </tr>
           <tr v-if="nameHeight">
             <tr-color-picker-component
-              labelName="card-name-background-color"
+              labelName="card-deck-create-card-component.label.card-name-background-color"
               v-model="nameBackgroundColor"
               :useAlpha="true"
             />
           </tr>
           <tr v-if="textHeight">
             <tr-number-input-component
-              labelName="card-text-font-size"
+              labelName="card-deck-create-card-component.label.card-text-font-size"
               v-model="textFontSize"
             />
           </tr>
+          <tr-color-picker-component
+            labelName="card-deck-create-card-component.label.card-text-background-color"
+            v-model="textBackgroundColor"
+            :useAlpha="true"
+          />
           <tr v-if="textHeight">
             <tr-number-input-component
-              labelName="card-text-padding"
+              labelName="card-deck-create-card-component.label.card-text-padding"
               v-model="textPadding"
             />
           </tr>
@@ -74,7 +79,7 @@
           :radius="radius"
           :frontBackgroundColor="frontBackgroundColor"
           :fontColor="fontColor"
-          :imageSrc="getImageUrl(currentImageId)"
+          :imageSrc="getImageUrl(currentImageKey)"
           :name="name"
           :nameHeight="nameHeight"
           :nameFontSize="nameFontSize"
@@ -122,7 +127,7 @@
           <div
             class="card-container"
             v-for="cardMeta in useCardList"
-            :key="cardMeta.id"
+            :key="cardMeta.key"
             @mouseenter="onHoverCard(cardMeta, true, $event.target)"
             @mouseleave="onHoverCard(cardMeta, false, $event.target)"
             :style="{ width: `${width}px` }"
@@ -141,7 +146,7 @@
               class="delete-button"
               icon="bin"
               colorStyle="pink"
-              @click="deleteCard(cardMeta.id)"
+              @click="deleteCard(cardMeta.key)"
             />
           </div>
         </div>
@@ -153,16 +158,15 @@
 <script lang="ts">
 import { Component, Mixins } from "vue-mixin-decorator";
 import { Prop, Watch } from "vue-property-decorator";
-import { StoreUseData } from "../../../../@types/store";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import {
   createRectangle,
   createSize
-} from "../../../core/utility/CoordinateUtility";
+} from "@/app/core/utility/CoordinateUtility";
 import ComponentVue from "../../../core/window/ComponentVue";
 import GameObjectManager from "../../GameObjectManager";
-import { createEmptyStoreUseData } from "../../../core/utility/Utility";
-import { CardMeta } from "../../../../@types/gameObject";
+import { createEmptyStoreUseData, findByKey } from "@/app/core/utility/Utility";
+import { CardMetaStore } from "@/@types/store-data";
 import VueEvent from "../../../core/decorator/VueEvent";
 import CardDeckSubContainerComponent from "./CardDeckSubContainerComponent.vue";
 import ImagePickerComponent from "../../../core/component/ImagePickerComponent.vue";
@@ -216,10 +220,10 @@ export default class CardDeckCreateCardComponent extends Mixins<ComponentVue>(
   private backImage!: string;
 
   @Prop({ required: true })
-  private imageTag!: string | null;
-  @Watch("imageTag")
+  private mediaTag!: string | null;
+  @Watch("mediaTag")
   private onChangeImageTag() {
-    this.currentTag = this.imageTag;
+    this.currentTag = this.mediaTag;
   }
 
   @Prop({ type: String, required: true })
@@ -243,18 +247,19 @@ export default class CardDeckCreateCardComponent extends Mixins<ComponentVue>(
   @Prop({ type: Number, required: true })
   private textFontSizeDefault!: number;
 
+  @Prop({ type: String, required: true })
+  private textBackgroundColorDefault!: string;
+
   @Prop({ type: Number, required: true })
   private textPaddingDefault!: number;
 
-  @Prop({ type: String, required: true })
-  private textBackgroundColor!: string;
-
   @Prop({ type: Array, required: true })
-  private cardList!: StoreUseData<CardMeta>[];
+  private cardList!: StoreData<CardMetaStore>[];
 
   private frontBackgroundColor: string = "#ffffff";
   private nameFontSize: number = 20;
-  private nameBackgroundColor: string = "rgba(0, 0, 0, 0)";
+  private nameBackgroundColor: string = "rgba(255, 255, 255, 0.3)";
+  private textBackgroundColor: string = "rgba(255, 255, 255, 0.3)";
   private textFontSize: number = 11;
   private textPadding: number = 0;
   private name: string = "";
@@ -273,11 +278,11 @@ export default class CardDeckCreateCardComponent extends Mixins<ComponentVue>(
   @LifeCycle
   private mounted() {
     this.setDefault();
-    this.currentTag = this.imageTag;
+    this.currentTag = this.mediaTag;
   }
 
   @VueEvent
-  private getCardSize(cardMeta: CardMeta) {
+  private getCardSize(cardMeta: CardMetaStore) {
     return createSize(cardMeta.width, cardMeta.height);
   }
 
@@ -285,36 +290,37 @@ export default class CardDeckCreateCardComponent extends Mixins<ComponentVue>(
     this.frontBackgroundColor = this.frontBackgroundColorDefault;
     this.nameFontSize = this.nameFontSizeDefault;
     this.nameBackgroundColor = this.nameBackgroundColorDefault;
+    this.textBackgroundColor = this.textBackgroundColorDefault;
     this.textFontSize = this.textFontSizeDefault;
     this.textPadding = this.textPaddingDefault;
-    this.currentImageId = "";
+    this.currentImageKey = "";
     this.name = "";
     this.text = "";
   }
 
-  private currentImageId: string = "";
+  private currentImageKey: string = "";
   private currentTag: string | null = null;
   private mediaList = GameObjectManager.instance.mediaList;
 
   @VueEvent
-  private getImageUrl(mediaId: string): string {
-    const media = this.mediaList.filter(m => m.id === mediaId)[0];
+  private getImageUrl(mediaKey: string): string {
+    const media = findByKey(this.mediaList, mediaKey);
     if (!media) return "";
     return `url('${media.data!.url}')`;
   }
 
   @VueEvent
   private addCard() {
-    const id: string = uuid.v4();
+    const key: string = uuid.v4();
     this.cardList.push(
-      createEmptyStoreUseData(id, {
+      createEmptyStoreUseData(key, {
         width: this.width,
         height: this.height,
         padHorizontal: this.padHorizontal,
         padTop: this.padTop,
         padBottom: this.padBottom,
         radius: this.radius,
-        frontImage: this.getImageUrl(this.currentImageId),
+        frontImage: this.getImageUrl(this.currentImageKey),
         frontBackgroundColor: this.frontBackgroundColor,
         backImage: this.getImageUrl(this.backImage),
         backBackgroundColor: this.backBackgroundColor,
@@ -334,24 +340,24 @@ export default class CardDeckCreateCardComponent extends Mixins<ComponentVue>(
     console.log(JSON.stringify(this.cardList, null, "  "));
   }
 
-  private hoverCardId: string | null = null;
+  private hoverCardKey: string | null = null;
 
   @VueEvent
   private onHoverCard(
-    card: StoreUseData<CardMeta>,
+    card: StoreData<CardMetaStore>,
     isHover: boolean,
     elm: HTMLElement
   ) {
-    this.hoverCardId = isHover ? card.id! : null;
+    this.hoverCardKey = isHover ? card.key : null;
     const rect: any = elm.getBoundingClientRect();
     const r = createRectangle(rect.x, rect.y, rect.width, rect.height);
     this.$emit("hover-card", card, isHover, r);
   }
 
   @VueEvent
-  private deleteCard(cardId: string) {
-    const idx = this.cardList.findIndex(c => c.id === cardId);
-    this.cardList.splice(idx, 1);
+  private deleteCard(cardKey: string) {
+    const index = this.cardList.findIndex(c => c.key === cardKey);
+    this.cardList.splice(index, 1);
   }
 }
 </script>

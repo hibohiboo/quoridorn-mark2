@@ -1,8 +1,8 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
-    :id="id"
     :readonly="readonly"
     ref="component"
   />
@@ -17,13 +17,11 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class ResourceTypeSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -57,8 +55,8 @@ export default class ResourceTypeSelect extends Mixins<MultiMixin>(
 
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
-      const suffix = o.value ? `-${o.value}` : "";
-      o.text = this.$t(`label.resource-type${suffix}`)!.toString();
+      const suffix = o.value || "label";
+      o.text = this.$t(`selection.resource-type.${suffix}`)!.toString();
       o.key = o.value;
     });
   }

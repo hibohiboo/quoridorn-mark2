@@ -1,8 +1,8 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
-    :id="id"
     ref="component"
   />
 </template>
@@ -15,15 +15,12 @@ import { Prop, Watch } from "vue-property-decorator";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
-import LanguageManager from "../../../../../LanguageManager";
+import { HtmlOptionInfo } from "@/@types/window";
 import { Task, TaskResult } from "task";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class SelectionValueSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -52,14 +49,14 @@ export default class SelectionValueSelect extends Mixins<MultiMixin>(
       .map(s => s.trim())
       .map(s => ({ value: s, key: s, text: s, disabled: false }));
     const getDisabledValue = (v: string): string => {
-      const disabledOption = this.optionInfoList.filter(o => o.value === v)[0];
+      const disabledOption = this.optionInfoList.find(o => o.value === v);
       return disabledOption ? getDisabledValue("#" + v) : v;
     };
     const disabledValue = getDisabledValue("");
     this.optionInfoList.unshift({
       value: disabledValue,
       key: disabledValue,
-      text: LanguageManager.instance.getText("label.selection-value"),
+      text: this.$t("selection.selection-value.label")!.toString(),
       disabled: true
     });
     // setTimeout(() => {

@@ -48,9 +48,7 @@ import { Component, Watch } from "vue-property-decorator";
 import { Mixins } from "vue-mixin-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
 import WindowVue from "../../core/window/WindowVue";
-import { BcdiceVersionInfo } from "../../../@types/bcdice";
 import CtrlButton from "../../core/component/CtrlButton.vue";
-import LanguageManager from "../../../LanguageManager";
 import BcdiceManager from "../../core/api/bcdice/BcdiceManager";
 import BaseInput from "../../core/component/BaseInput.vue";
 import VueEvent from "../../core/decorator/VueEvent";
@@ -93,9 +91,9 @@ export default class BcdiceApiServerSettingWindow extends Mixins<
       this.bcdiceVersion = info.bcdice;
       this.testStatus = "success";
     } catch (err) {
-      this.testMessage = LanguageManager.instance.getText(
+      this.testMessage = this.$t(
         `${this.windowInfo.key}.error-messages.connect-error`
-      );
+      )!.toString();
       this.testStatus = "error";
     }
   }

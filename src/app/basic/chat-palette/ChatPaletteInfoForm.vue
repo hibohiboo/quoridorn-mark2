@@ -3,14 +3,14 @@
     <table>
       <tr>
         <tr-string-input-component
-          labelName="name"
+          labelName="label.name"
           width="100%"
           v-model="nameVolatile"
         />
       </tr>
       <tr>
         <tr-chat-color-input-component
-          labelName="chat-font-color"
+          labelName="label.chat-font-color"
           :type.sync="chatFontColorTypeVolatile"
           :color.sync="chatFontColorVolatile"
         />
@@ -18,35 +18,35 @@
       <!-- アクターID -->
       <tr>
         <tr-actor-select-component
-          labelName="actor"
-          v-model="actorIdVolatile"
+          labelName="label.actor"
+          v-model="actorKeyVolatile"
           :nullable="true"
         />
       </tr>
       <!-- コマID -->
       <tr>
         <tr-scene-object-select-component
-          labelName="scene-object"
-          :actorId="actorId"
-          v-model="sceneObjectIdVolatile"
+          labelName="label.scene-object"
+          :actorKey="actorKey"
+          v-model="sceneObjectKeyVolatile"
           :nullable="true"
         />
       </tr>
-      <!-- targetId -->
-      <!-- outputTabId -->
+      <!-- targetKey -->
+      <!-- outputTabKey -->
       <!-- ステータス -->
       <tr>
         <tr-actor-status-select-component
-          labelName="status"
-          :actorId="actorId"
-          v-model="statusIdVolatile"
+          labelName="label.status"
+          :actorKey="actorKey"
+          v-model="statusKeyVolatile"
           :nullable="true"
         />
       </tr>
       <!-- 秘匿フラグ -->
       <tr>
         <tr-checkbox-component
-          labelName="secret"
+          labelName="label.secret"
           :cLabel="$t('label.secret')"
           :nLabel="$t('label.non-secret')"
           v-model="isSecretVolatile"
@@ -155,69 +155,69 @@ export default class ChatPaletteInfoForm extends Mixins<ComponentVue>(
     this.$emit("update:chatFontColor", value);
   }
 
-  // actorId
+  // actorKey
   @Prop({ type: String, default: null })
-  private actorId!: string | null;
-  private actorIdVolatile: string | null = null;
-  @Watch("actorId", { immediate: true })
-  private onChangeActorId(value: string | null) {
-    this.actorIdVolatile = value;
+  private actorKey!: string | null;
+  private actorKeyVolatile: string | null = null;
+  @Watch("actorKey", { immediate: true })
+  private onChangeActorKey(value: string | null) {
+    this.actorKeyVolatile = value;
   }
-  @Watch("actorIdVolatile")
-  private onChangeActorIdVolatile(value: string | null) {
-    this.$emit("update:actorId", value);
+  @Watch("actorKeyVolatile")
+  private onChangeActorKeyVolatile(value: string | null) {
+    this.$emit("update:actorKey", value);
   }
 
-  // sceneObjectId
+  // sceneObjectKey
   @Prop({ type: String, default: null })
-  private sceneObjectId!: string | null;
-  private sceneObjectIdVolatile: string | null = null;
-  @Watch("sceneObjectId", { immediate: true })
-  private onChangeSceneObjectId(value: string | null) {
-    this.sceneObjectIdVolatile = value;
+  private sceneObjectKey!: string | null;
+  private sceneObjectKeyVolatile: string | null = null;
+  @Watch("sceneObjectKey", { immediate: true })
+  private onChangeSceneObjectKey(value: string | null) {
+    this.sceneObjectKeyVolatile = value;
   }
-  @Watch("sceneObjectIdVolatile")
-  private onChangeSceneObjectIdVolatile(value: string | null) {
-    this.$emit("update:sceneObjectId", value);
+  @Watch("sceneObjectKeyVolatile")
+  private onChangeSceneObjectKeyVolatile(value: string | null) {
+    this.$emit("update:sceneObjectKey", value);
   }
 
-  // targetId
+  // targetKey
   @Prop({ type: String, default: null })
-  private targetId!: string | null;
-  private targetIdVolatile: string | null = null;
-  @Watch("targetId", { immediate: true })
-  private onChangeTargetId(value: string | null) {
-    this.targetIdVolatile = value;
+  private targetKey!: string | null;
+  private targetKeyVolatile: string | null = null;
+  @Watch("targetKey", { immediate: true })
+  private onChangeTargetKey(value: string | null) {
+    this.targetKeyVolatile = value;
   }
-  @Watch("targetIdVolatile")
-  private onChangeTargetIdVolatile(value: string | null) {
-    this.$emit("update:targetId", value);
+  @Watch("targetKeyVolatile")
+  private onChangeTargetKeyVolatile(value: string | null) {
+    this.$emit("update:targetKey", value);
   }
 
-  // outputTabId
+  // outputTabKey
   @Prop({ type: String, default: null })
-  private outputTabId!: string | null;
-  private outputTabIdVolatile: string | null = null;
-  @Watch("outputTabId", { immediate: true })
-  private onChangeOutputTabId(value: string | null) {
-    this.outputTabIdVolatile = value;
+  private outputTabKey!: string | null;
+  private outputTabKeyVolatile: string | null = null;
+  @Watch("outputTabKey", { immediate: true })
+  private onChangeOutputTabKey(value: string | null) {
+    this.outputTabKeyVolatile = value;
   }
-  @Watch("outputTabIdVolatile")
-  private onChangeOutputTabIdVolatile(value: string | null) {
-    this.$emit("update:outputTabId", value);
+  @Watch("outputTabKeyVolatile")
+  private onChangeOutputTabKeyVolatile(value: string | null) {
+    this.$emit("update:outputTabKey", value);
   }
 
-  // statusId
+  // statusKey
   @Prop({ type: String, default: null })
-  private statusId!: string | null;
-  private statusIdVolatile: string | null = null;
-  @Watch("statusId", { immediate: true })
-  private onChangeStatusId(value: string | null) {
-    this.statusIdVolatile = value;
+  private statusKey!: string | null;
+  private statusKeyVolatile: string | null = null;
+  @Watch("statusKey", { immediate: true })
+  private onChangeStatusKey(value: string | null) {
+    this.statusKeyVolatile = value;
   }
-  @Watch("statusIdVolatile")
-  private onChangeStatusIdVolatile(value: string | null) {
-    this.$emit("update:statusId", value);
+  @Watch("statusKeyVolatile")
+  private onChangeStatusKeyVolatile(value: string | null) {
+    this.$emit("update:statusKey", value);
   }
 
   // system

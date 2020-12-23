@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     ref="component"
@@ -15,14 +16,12 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
-import LanguageManager from "../../../../../LanguageManager";
+import { HtmlOptionInfo } from "@/@types/window";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+// TODO 墓場やキャラクター待合室の概念の実装
+@Component({ components: { CtrlSelect } })
 export default class StartTimePlaceSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -51,14 +50,10 @@ export default class StartTimePlaceSelect extends Mixins<MultiMixin>(
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
       o.key = o.value;
-      o.text = LanguageManager.instance.getText(`label.${o.value}`);
+      o.text = this.$t(`label.${o.value}`)!.toString();
     });
-    this.optionInfoList[0].text = LanguageManager.instance.getText(
-      "label.place"
-    );
-    this.optionInfoList[1].text = LanguageManager.instance.getText(
-      "label.no-target"
-    );
+    this.optionInfoList[0].text = this.$t("label.place")!.toString();
+    this.optionInfoList[1].text = this.$t("label.no-target")!.toString();
   }
 }
 </script>

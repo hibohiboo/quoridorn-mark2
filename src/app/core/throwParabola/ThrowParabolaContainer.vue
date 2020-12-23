@@ -11,10 +11,10 @@ import { Component, Mixins } from "vue-mixin-decorator";
 import { Task, TaskResult } from "task";
 import animations from "create-keyframe-animation";
 import { ThrowParabolaInfo } from "task-info";
-import { Point } from "address";
 import TaskProcessor from "../task/TaskProcessor";
 import ComponentVue from "../window/ComponentVue";
 import { calcParabola } from "./parabolaUtil";
+import { Point } from "@/@types/store-data-optional";
 const uuid = require("uuid");
 
 @Component
@@ -31,8 +31,12 @@ export default class ThrowParabolaContainer extends Mixins<ComponentVue>(
     const key = uuid.v4();
     tpObj.key = key;
 
-    const radius = task.value!.radius;
-    const ratio = task.value!.ratio;
+    let radius = task.value!.radius;
+    if (!radius) {
+      radius = Math.random() / 2 + 0.5;
+      if (Math.random() < 0.5) radius = -radius;
+    }
+    const ratio = task.value!.ratio || 0.8;
 
     const obj1: any = {};
     const obj2: any = {
@@ -48,8 +52,8 @@ export default class ThrowParabolaContainer extends Mixins<ComponentVue>(
       }
     };
     const parabolaResult = calcParabola(radius, ratio);
-    parabolaResult.points.forEach((o: Point, idx: number, list: Point[]) => {
-      const per = (100 * idx) / (list.length - 1);
+    parabolaResult.points.forEach((o: Point, index: number, list: Point[]) => {
+      const per = (100 * index) / (list.length - 1);
       obj1[`${per}%`] = {
         translate: [o.x, o.y],
         opacity: 1

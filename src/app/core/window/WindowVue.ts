@@ -4,7 +4,7 @@ import { Mixin } from "vue-mixin-decorator";
 import { Task, TaskResult } from "task";
 import TaskProcessor from "../task/TaskProcessor";
 import TaskManager from "../task/TaskManager";
-import { WindowInfo } from "../../../@types/window";
+import { WindowInfo } from "@/@types/window";
 
 // @ts-ignore
 @Mixin
@@ -52,8 +52,8 @@ export default class WindowVue<T, U> extends Vue {
       const inputElmList = Array.prototype.slice.call(
         windowContainerElm.getElementsByClassName("input")
       );
-      const idx = inputElmList.findIndex(elm => !elm.disabled);
-      if (idx >= 0) inputElmList[idx].focus();
+      const index = inputElmList.findIndex(elm => !elm.disabled);
+      if (index >= 0) inputElmList[index].focus();
     });
   }
 

@@ -16,12 +16,11 @@
 
 <script lang="ts">
 import { Component, Watch, Prop } from "vue-property-decorator";
-import { Point, Rectangle, Size } from "address";
 import { Task, TaskResult } from "task";
 import { Mixins } from "vue-mixin-decorator";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../core/task/TaskProcessor";
-import { MemoStore, OtherTextViewInfo } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import {
   createPoint,
   createRectangle,
@@ -32,8 +31,13 @@ import OtherTextComponent from "../../other-text/OtherTextComponent.vue";
 import CssManager from "../../../core/css/CssManager";
 import { MouseMoveParam } from "@/app/core/task/TaskManager";
 import VueEvent from "../../../core/decorator/VueEvent";
-import { StoreUseData } from "@/@types/store";
 import GameObjectManager from "@/app/basic/GameObjectManager";
+import {
+  OtherTextViewInfo,
+  Point,
+  Rectangle,
+  Size
+} from "@/@types/store-data-optional";
 
 @Component({
   components: { OtherTextComponent }
@@ -47,7 +51,7 @@ export default class TextFrame extends Mixins<ComponentVue>(ComponentVue) {
 
   private static DEFAULT_FONT_SIZE = 14;
 
-  private useMemoList: StoreUseData<MemoStore>[] = [];
+  private useMemoList: StoreData<MemoStore>[] = [];
   private docId: string | null = null;
   private isMounted: boolean = false;
 
@@ -69,9 +73,7 @@ export default class TextFrame extends Mixins<ComponentVue>(ComponentVue) {
   }
 
   @TaskProcessor("action-wheel-finished")
-  private async actionWheelFinished(
-    task: Task<boolean, never>
-  ): Promise<TaskResult<never> | void> {
+  private async actionWheelFinished(): Promise<TaskResult<never> | void> {
     if (this.otherTextViewInfo.isFix) return;
     setTimeout(() => {
       this.wheel = CssManager.instance.propMap.wheel;
@@ -169,11 +171,11 @@ export default class TextFrame extends Mixins<ComponentVue>(ComponentVue) {
   @Watch("useMemoList", { deep: true })
   private async onChangeUseMemoList() {
     if (this.docId) {
-      if (this.docId !== this.otherTextViewInfo.docId) {
+      if (this.docId !== this.otherTextViewInfo.key) {
         this.isChanged = true;
       } else {
         const type = this.otherTextViewInfo.type;
-        const docId = this.otherTextViewInfo.docId;
+        const docId = this.otherTextViewInfo.key;
         await GameObjectManager.instance.updateMemoList(
           this.useMemoList,
           type,
@@ -181,7 +183,7 @@ export default class TextFrame extends Mixins<ComponentVue>(ComponentVue) {
         );
       }
     }
-    this.docId = this.otherTextViewInfo.docId;
+    this.docId = this.otherTextViewInfo.key;
   }
 
   private get elm(): HTMLElement {
@@ -210,12 +212,17 @@ export default class TextFrame extends Mixins<ComponentVue>(ComponentVue) {
     task.resolve();
   }
 
+  /**
+   *
+   * @param _task
+   * @param param
+   */
   @TaskProcessor("mouse-moving-finished")
   private async mouseLeftUpFinished(
-    task: Task<Point, never>,
+    _task: Task<Point, never>,
     param: MouseMoveParam
   ): Promise<TaskResult<never> | void> {
-    if (!param || param.key !== this.otherTextViewInfo.docId) return;
+    if (!param || param.key !== this.otherTextViewInfo.key) return;
     this.$emit("hide");
   }
 }

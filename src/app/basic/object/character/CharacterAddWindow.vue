@@ -9,11 +9,11 @@
       :otherTextList.sync="otherTextList"
       :url.sync="url"
       :size.sync="size"
-      :imageDocId.sync="imageDocId"
-      :imageTag.sync="imageTag"
+      :mediaKey.sync="mediaKey"
+      :mediaTag.sync="mediaTag"
       :direction.sync="direction"
       :backgroundSize.sync="backgroundSize"
-      :layerId.sync="layerId"
+      :layerKey.sync="layerKey"
       @drag-start="dragStart"
       @drag-end="dragEnd"
     />
@@ -28,7 +28,6 @@ import { ModeInfo } from "mode";
 import LifeCycle from "../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../core/task/TaskProcessor";
 import CharacterInfoForm from "./CharacterInfoForm.vue";
-import { BackgroundSize, Direction } from "@/@types/room";
 import TaskManager from "../../../core/task/TaskManager";
 import WindowVue from "../../../core/window/WindowVue";
 import GameObjectManager from "../../GameObjectManager";
@@ -36,48 +35,79 @@ import LanguageManager from "../../../../LanguageManager";
 import { AddObjectInfo } from "@/@types/data";
 import VueEvent from "../../../core/decorator/VueEvent";
 import SocketFacade from "../../../core/api/app-server/SocketFacade";
-import { StoreUseData } from "@/@types/store";
-import { MemoStore } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import { createEmptyStoreUseData } from "@/app/core/utility/Utility";
+import { BackgroundSize, Direction } from "@/@types/store-data-optional";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
 const uuid = require("uuid");
 
 @Component({ components: { CharacterInfoForm } })
-export default class CharacterAddWindow extends Mixins<
-  WindowVue<string, never>
->(WindowVue) {
+export default class CharacterAddWindow extends Mixins<WindowVue<string, void>>(
+  WindowVue
+) {
   private name: string = LanguageManager.instance.getText("type.character");
   private tag: string = "";
-  private otherTextList: StoreUseData<MemoStore>[] = [
+  private actorList = GameObjectManager.instance.actorList;
+  private otherTextList: StoreData<MemoStore>[] = [
     createEmptyStoreUseData(uuid.v4(), {
       tab: "",
+      type: "normal",
       text: ""
     })
   ];
   private url: string = "";
   private size: number = 1;
-  private imageDocId: string | null = null;
-  private imageTag: string | null = null;
+  private mediaKey: string | null = null;
+  private mediaTag: string | null = null;
   private direction: Direction = "none";
   private isMounted: boolean = false;
   private backgroundSize: BackgroundSize = "contain";
-  private layerId: string = GameObjectManager.instance.sceneLayerList.filter(
+  private layerKey: string = GameObjectManager.instance.sceneLayerList.find(
     ml => ml.data!.type === "character"
-  )[0].id!;
+  )!.key;
 
   @LifeCycle
   public async mounted() {
     await this.init();
-    this.imageTag = LanguageManager.instance.getText("type.character");
+    this.mediaTag = this.$t("type.character")!.toString();
+    this.name = this.getUnDuplicateName();
     this.isMounted = true;
   }
 
-  @Watch("imageDocId", { immediate: true })
-  private onChangeImageDocId() {
-    this.windowInfo.message = LanguageManager.instance.getText(
-      `${this.windowInfo.type}.message-list.${
-        this.imageDocId ? "drag-piece" : "choose-image"
-      }`
-    );
+  private setNextName() {
+    const numberSuffixRegExp = /(.+)([0-9]+)/;
+    if (numberSuffixRegExp.test(this.name)) {
+      this.name = this.name.replace(
+        numberSuffixRegExp,
+        (m, p1, p2) => `${p1}${convertNumberZero(p2) + 1}`
+      );
+    } else {
+      this.name = `${this.name}2`;
+    }
+  }
+
+  private getUnDuplicateName(): string {
+    if (!this.actorList.some(ct => ct.data!.name === this.name))
+      return this.name;
+
+    this.setNextName();
+    return this.getUnDuplicateName();
+  }
+
+  @Watch("isDuplicate")
+  @Watch("mediaKey", { immediate: true })
+  private onChangeImageDocKey() {
+    this.windowInfo.message = this.$t(
+      this.isDuplicate
+        ? "message.name-duplicate"
+        : this.mediaKey
+        ? "message.drag-piece"
+        : "message.choose-image"
+    )!.toString();
+  }
+
+  private get isDuplicate(): boolean {
+    return this.actorList.some(ct => ct.data!.name === this.name);
   }
 
   @VueEvent
@@ -104,6 +134,7 @@ export default class CharacterAddWindow extends Mixins<
         value: "off" as "off"
       }
     });
+    this.setNextName();
   }
 
   @TaskProcessor("added-object-finished")
@@ -114,48 +145,50 @@ export default class CharacterAddWindow extends Mixins<
     const point = task.value!.point;
     const matrix = task.value!.matrix;
 
-    const sceneObjectId: string = (
+    const sceneObjectKey: string = (
       await SocketFacade.instance.sceneObjectCC().addDirect([
         {
-          type: "character",
-          tag: this.tag,
-          name: this.name,
-          x: point.x,
-          y: point.y,
-          row: matrix.row,
-          column: matrix.column,
-          actorId: null,
-          columns: this.size,
-          rows: this.size,
-          place: "field",
-          isHideBorder: false,
-          isHideHighlight: false,
-          isLock: false,
-          layerId: this.layerId,
-          textures: [
-            {
-              type: "image",
-              imageTag: this.imageTag!,
-              imageId: this.imageDocId!,
-              direction: this.direction,
-              backgroundSize: this.backgroundSize!
-            }
-          ],
-          textureIndex: 0,
-          angle: 0,
-          url: this.url,
-          subTypeId: "",
-          subTypeValue: "",
-          isHideSubType: false
+          data: {
+            type: "character",
+            tag: this.tag,
+            name: this.name,
+            x: point.x,
+            y: point.y,
+            row: matrix.row,
+            column: matrix.column,
+            actorKey: null,
+            columns: this.size,
+            rows: this.size,
+            place: "field",
+            isHideBorder: false,
+            isHideHighlight: false,
+            isLock: false,
+            layerKey: this.layerKey,
+            textures: [
+              {
+                type: "image",
+                mediaTag: this.mediaTag!,
+                mediaKey: this.mediaKey!,
+                direction: this.direction,
+                backgroundSize: this.backgroundSize!
+              }
+            ],
+            textureIndex: 0,
+            angle: 0,
+            url: this.url,
+            subTypeKey: "",
+            subTypeValue: "",
+            isHideSubType: false
+          }
         }
       ])
     )[0];
 
     await SocketFacade.instance.memoCC().addDirect(
-      this.otherTextList.map(ot => ot.data!),
-      this.otherTextList.map(() => ({
-        ownerType: "scene-object",
-        owner: sceneObjectId
+      this.otherTextList.map(data => ({
+        ownerType: "scene-object-list",
+        owner: sceneObjectKey,
+        data: data.data!
       }))
     );
 

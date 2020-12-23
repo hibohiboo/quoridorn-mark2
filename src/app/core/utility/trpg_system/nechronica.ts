@@ -1,27 +1,237 @@
-import { getJsonForTrpgSystemData } from "@/app/core/utility/Utility";
-import { MemoStore } from "@/@types/gameObject";
-import { listToEmpty } from "@/app/core/utility/PrimaryDataUtility";
+import { MemoStore } from "@/@types/store-data";
+import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
+import { outputTableList } from "@/app/core/utility/trpg_system/SaikoroFiction";
+import { TrpgSystemHelper } from "@/app/core/utility/trpg_system/TrpgSystemHelper";
 
-type NechronicaClass =
-  | ""
-  | "ステーシー"
-  | "タナトス"
-  | "ゴシック"
-  | "レクイエム"
-  | "バロック"
-  | "ロマネスク"
-  | "サイケデリック";
+export class NechronicaHelper extends TrpgSystemHelper<Nechornica> {
+  public readonly isSupportedOtherText = true;
+  public readonly isSupportedChatPalette = true;
 
-type NechronicaPowerType =
-  | ""
-  | "通常技"
-  | "必殺技"
-  | "行動値増加"
-  | "補助"
-  | "妨害"
-  | "防御/生贄"
-  | "移動";
-const nechronicaPowerTypeList: NechronicaPowerType[] = [
+  public constructor(url: string) {
+    super(
+      url,
+      /https?:\/\/charasheet\.vampire-blood\.net\/(.+)/,
+      "https://charasheet.vampire-blood.net/{key}.js"
+    );
+  }
+
+  /**
+   * このシステムに対応しているキャラシのURLかどうかを判定する
+   * @return true: 対応したキャラシである, false: 対応したキャラシではない
+   */
+  public async isThis(): Promise<boolean> {
+    if (!this.urlRegExp.test(this.url)) return false;
+    const json = await this.getJsonData();
+    return json["game"] === "nechro";
+  }
+
+  /**
+   * その他欄の情報を生成する
+   */
+  public async createOtherText(): Promise<MemoStore[] | null> {
+    const { data, list } = await this.createResultList<MemoStore>();
+    if (!data) return null;
+
+    // メモ
+    addMemo(data, list);
+    // パーソナルデータ
+    addPersonal(data, list);
+    // 管理
+    addManagement(data, list);
+    // マニューバ
+    addManeuver(data, list);
+
+    return list;
+  }
+
+  /**
+   * チャットパレットの情報を生成する
+   */
+  public async createChatPalette(): Promise<
+    {
+      name: string;
+      paletteText: string;
+    }[]
+  > {
+    const { data } = await this.createResultList<string>();
+    if (!data) return [];
+
+    const characterName = data.characterName.substr(0, 4);
+
+    const outputCommand = (afterText: string): string[] => {
+      const suffix = afterText ? " " + afterText : "";
+      return [
+        "",
+        `1nc+2${suffix}`,
+        `1nc+1${suffix}`,
+        `1nc${suffix}`,
+        `1nc-1${suffix}`,
+        `1nc-2${suffix}`
+      ];
+    };
+
+    return [
+      {
+        name: `◆${characterName}１`,
+        paletteText: [
+          "nm 未練決定",
+          ...outputCommand(""),
+          ...outputCommand("対話判定："),
+          ...outputCommand("行動判定"),
+          ...outputCommand("狂気判定"),
+          "",
+          "たからものへの未練【依存】に狂気点＋１",
+          "たからものへの未練【依存】から狂気点－１",
+          "たからものへの未練【依存】が発狂（[幼児退行]最大行動値減少(-2)）",
+          "",
+          ...loisTypeList
+            .filter(l => l)
+            .flatMap(l => [
+              `への未練【${l}】に狂気点＋１`,
+              `への未練【${l}】から狂気点－１`,
+              `への未練【${l}】が発狂`
+            ]),
+          "",
+          "精神崩壊(未練が全て発狂状態)"
+        ]
+          .map(text => text.replaceAll(/\r?\n/g, ""))
+          .join("\n")
+      },
+      {
+        name: `◆${characterName}２`,
+        paletteText: [
+          "対象：",
+          "対象：",
+          "を攻撃",
+          "を攻撃",
+          "",
+          ...hanteiTypeList
+            .filter((_, ind) => ind >= 4)
+            .map(h => `損傷：${h} 全損`),
+          "損傷：完全解体",
+          ...data.powerList.flatMap(p => {
+            const resultList = [
+              "",
+              `【${p.name}】${p.hantei || "なし"}／${p.timing ||
+                "なし"}／${p.cost || "なし"}／${p.range || "なし"}`
+            ];
+            if (hanteiTypeList.findIndex(h => h === p.hantei) >= 4) {
+              resultList.push(`損傷：${p.hantei}【${p.name}】`);
+              resultList.push(`修復：${p.hantei}【${p.name}】`);
+            }
+            resultList.push(`${p.memo}`);
+            return resultList;
+          })
+        ]
+          .map(text => text.replaceAll(/\r?\n/g, ""))
+          .join("\n")
+      }
+    ];
+  }
+
+  /**
+   * JSONPから取得した生データから処理用のデータを生成する
+   * @param json JSONPから取得した生データ
+   * @protected
+   */
+  protected createData(json: any): Nechornica | null {
+    if (!json) return null;
+    const textFilter = (text: string | null) => {
+      if (!text) return "";
+      return text.trim().replace(/\r?\n/g, "\n");
+    };
+    const getFlatNumberValue = (type: string) => [
+      convertNumberZero(json[`${type}1`]),
+      convertNumberZero(json[`${type}2`]),
+      convertNumberZero(json[`${type}3`])
+    ];
+    return {
+      url: this.url,
+      characterName: textFilter(json["pc_name"]),
+      tag: textFilter(json["pc_tags"]),
+      positionName: textFilter(json["Position_Name"]),
+      mainClass: textFilter(json["MCLS_Name"]),
+      mainClassStatus: getFlatNumberValue("MC"),
+      subClass: textFilter(json["SCLS_Name"]),
+      subClassStatus: getFlatNumberValue("SC"),
+      statusBonus:
+        statusBonusList[convertNumberZero(json["ST_Bonus"]) - 1] || "",
+      loveBonus: getFlatNumberValue("TM"),
+      status: getFlatNumberValue("NP"),
+      action: {
+        total: convertNumberZero(json["Act_Total"]),
+        partsList: ["A", "B", "C"]
+          .map(type => ({
+            name: json[`Act_parts_${type}`],
+            isAlive: json[`Act_parts${type}_alive`] === "1",
+            value: json[`Act_Parts${type}_Ef`]
+          }))
+          .filter(o => o.name || o.value),
+        isAliveEyeball: json["medama_alive"] === "1",
+        isAliveBrain: json["nou_alive"] === "1"
+      },
+      powerList: (json["Power_Lost"] as any[]).map((p, i) => ({
+        name: textFilter(json["Power_name"][i]),
+        isLost: textFilter(json["Power_Lost"][i]) === "1",
+        isUsed: textFilter(json["Power_Used"][i]) === "1",
+        type: powerTypeList[convertNumberZero(json["Power_Type"][i])] || "",
+        hantei:
+          hanteiTypeList[convertNumberZero(json["Power_hantei"][i])] || "",
+        timing:
+          timingTypeList[convertNumberZero(json["Power_timing"][i])] || "",
+        cost: textFilter(json["Power_cost"][i]),
+        range: textFilter(json["Power_range"][i]),
+        shozoku: textFilter(json["Power_shozoku"][i]),
+        memo: textFilter(json["Power_memo"][i])
+      })),
+      carmaList: (json["carma_name"] as any[])
+        .map((_, i) => ({
+          isCompleted: textFilter(json["carma_completed"][i]) === "1",
+          memo: textFilter(json["carma_memo"][i]),
+          name: textFilter(json["carma_name"][i])
+        }))
+        .filter(o => o.name || o.memo),
+      kakeraList: (json["kakera_name"] as any[])
+        .map((_, i) => ({
+          name: textFilter(json["kakera_name"][i]),
+          memo: textFilter(json["kakera_memo"][i])
+        }))
+        .filter(o => o.memo || o.name),
+      loisList: (json["roice_break"] as any[])
+        .map((_, i) => ({
+          name: textFilter(json["roice_name"][i]),
+          pos: textFilter(json["roice_pos"][i]),
+          damage: loisDamageList[convertNumberZero(json["roice_damage"][i])],
+          negative: textFilter(json["roice_neg"][i]),
+          break: textFilter(json["roice_break"][i]),
+          memo: textFilter(json["roice_memo"][i])
+        }))
+        .filter(o => o.name || o.pos || o.negative || o.break || o.memo),
+      exp: textFilter(json["exp_his_sum"]),
+      sessionList: (json["adv_exp_his"] as any[])
+        .map((_, i) => ({
+          advanceExp: textFilter(json["adv_exp_his"][i]),
+          bonusExp: textFilter(json["bns_exp_his"][i]),
+          sumExp: textFilter(json["get_exp_his"][i]),
+          memo: textFilter(json["seicho_memo_his"][i])
+        }))
+        .filter(o => o.advanceExp || o.bonusExp || o.memo),
+      shuzoku: textFilter(json["shuzoku"]),
+      age: textFilter(json["age"]),
+      initLocate: "煉獄",
+      height: textFilter(json["pc_height"]),
+      weight: textFilter(json["pc_weight"]),
+      carma: textFilter(json["pc_carma"]),
+      hairColor: textFilter(json["color_hair"]),
+      eyeColor: textFilter(json["color_eye"]),
+      skinColor: textFilter(json["color_skin"]),
+      memo: textFilter(json["pc_making_memo"]),
+      memoRows: convertNumberZero(json["pc_making_memo_rows"])
+    };
+  }
+}
+
+const powerTypeList: string[] = [
   "",
   "通常技",
   "必殺技",
@@ -32,16 +242,38 @@ const nechronicaPowerTypeList: NechronicaPowerType[] = [
   "移動"
 ];
 
-type NechronicaHanteiType =
-  | ""
-  | "ﾎﾟｼﾞｼｮﾝ"
-  | "ﾒｲﾝｸﾗｽ"
-  | "ｻﾌﾞｸﾗｽ"
-  | "頭"
-  | "腕"
-  | "胴"
-  | "足";
-const nechronicaHanteiTypeList: NechronicaHanteiType[] = [
+const loisTypeList: string[] = [
+  "",
+  "嫌悪",
+  "独占",
+  "依存",
+  "執着",
+  "恋心",
+  "対抗",
+  "友情",
+  "保護",
+  "憧憬",
+  "信頼",
+  "恐怖",
+  "隷属",
+  "不安",
+  "憐憫",
+  "愛憎",
+  "悔恨",
+  "軽蔑",
+  "憤怒",
+  "怨念",
+  "憎悪",
+  "忌避",
+  "嫉妬",
+  "感謝",
+  "期待",
+  "尊敬"
+];
+
+const statusBonusList: string[] = ["武装", "変異", "改造", ""];
+
+const hanteiTypeList: string[] = [
   "",
   "ﾎﾟｼﾞｼｮﾝ",
   "ﾒｲﾝｸﾗｽ",
@@ -52,13 +284,7 @@ const nechronicaHanteiTypeList: NechronicaHanteiType[] = [
   "足"
 ];
 
-type NechronicaTimingType =
-  | "オート"
-  | "アクション"
-  | "ジャッジ"
-  | "ダメージ"
-  | "ラピッド";
-const nechronicaTimingTypeList: NechronicaTimingType[] = [
+const timingTypeList: string[] = [
   "オート",
   "アクション",
   "ジャッジ",
@@ -66,55 +292,48 @@ const nechronicaTimingTypeList: NechronicaTimingType[] = [
   "ラピッド"
 ];
 
-type NechronicaActionParts = {
+type ActionParts = {
   name: string;
   isAlive: boolean;
   value: string;
 };
 
-type NechronicaPower = {
+type Power = {
   name: string;
   isLost: boolean;
   isUsed: boolean;
-  type: NechronicaPowerType;
-  hantei: NechronicaHanteiType;
-  timing: NechronicaTimingType;
+  type: string;
+  hantei: string;
+  timing: string;
   cost: string;
   range: string;
   shozoku: string;
   memo: string;
 };
 
-type NechronicaCarma = {
+type Carma = {
   isCompleted: boolean;
   name: string;
   memo: string;
 };
 
-type NechronicaKakera = {
+type Kakera = {
   name: string;
   memo: string;
 };
 
-type NechronicaRoiceDamage = "0" | "1" | "2" | "3" | "発狂";
-const nechronicaRoiceDamageList: NechronicaRoiceDamage[] = [
-  "0",
-  "1",
-  "2",
-  "3",
-  "発狂"
-];
+const loisDamageList: string[] = ["0", "1", "2", "3", "発狂"];
 
-type NechronicaRoice = {
+type Lois = {
   name: string;
   pos: string;
-  damage: NechronicaRoiceDamage;
+  damage: string;
   negative: string;
   break: string;
   memo: string;
 };
 
-type NechronicaSession = {
+type Session = {
   advanceExp: string;
   bonusExp: string;
   sumExp: string;
@@ -126,25 +345,25 @@ type Nechornica = {
   characterName: string;
   tag: string;
   positionName: string;
-  mainClass: NechronicaClass;
+  mainClass: string;
   mainClassStatus: number[]; // arr[0]: 武装, arr[1]: 変異, arr[2]: 改造
-  subClass: NechronicaClass;
+  subClass: string;
   subClassStatus: number[]; // arr[0]: 武装, arr[1]: 変異, arr[2]: 改造
-  statusBonus: "武装" | "変異" | "改造" | ""; // 1: 武装, 2: 変異, 3: 改造
+  statusBonus: string; // 1: 武装, 2: 変異, 3: 改造
   loveBonus: number[]; // arr[0]: 武装, arr[1]: 変異, arr[2]: 改造
   status: number[]; // arr[0]: 武装, arr[1]: 変異, arr[2]: 改造
   action: {
     total: number;
-    partsList: NechronicaActionParts[];
+    partsList: ActionParts[];
     isAliveEyeball: boolean;
     isAliveBrain: boolean;
   };
-  powerList: NechronicaPower[];
-  carmaList: NechronicaCarma[];
-  kakeraList: NechronicaKakera[];
-  roiceList: NechronicaRoice[];
+  powerList: Power[];
+  carmaList: Carma[];
+  kakeraList: Kakera[];
+  loisList: Lois[];
   exp: string;
-  sessionList: NechronicaSession[];
+  sessionList: Session[];
   shuzoku: string;
   age: string;
   initLocate: "煉獄" | "花園" | "楽園";
@@ -158,262 +377,96 @@ type Nechornica = {
   memoRows: number;
 };
 
-export async function isNechronicaUrl(url: string): Promise<boolean> {
-  if (!url.match(/https?:\/\/charasheet\.vampire-blood\.net\/(.+)/))
-    return false;
-  const json = await getJsonForTrpgSystemData<any>(
-    url,
-    /https?:\/\/charasheet\.vampire-blood\.net\/(.+)/,
-    "https://charasheet.vampire-blood.net/{key}.js"
-  );
-  return json["game"] === "nechro";
+function addMemo(data: Nechornica, resultList: MemoStore[]) {
+  resultList.push({
+    tab: "メモ",
+    type: "normal",
+    text: ["### メモ", ":::200px:100px", ":::END;;;"].join("\r\n")
+  });
 }
 
-function createNechronicaData(url: string, json: any): Nechornica {
-  const nechronicaData: Nechornica = {
-    url,
-    characterName: json["pc_name"],
-    tag: json["pc_tags"],
-    positionName: json["Position_Name"],
-    mainClass: json["MCLS_Name"],
-    mainClassStatus: [
-      parseInt(json["MC1"]),
-      parseInt(json["MC2"]),
-      parseInt(json["MC3"])
-    ],
-    subClass: json["SCLS_Name"],
-    subClassStatus: [
-      parseInt(json["SC1"]),
-      parseInt(json["SC2"]),
-      parseInt(json["SC3"])
-    ],
-    statusBonus: "",
-    loveBonus: [
-      parseInt(json["TM1"]) || 0,
-      parseInt(json["TM2"]) || 0,
-      parseInt(json["TM3"]) || 0
-    ],
-    status: [
-      parseInt(json["NP1"]),
-      parseInt(json["NP2"]),
-      parseInt(json["NP3"])
-    ],
-    action: {
-      total: json["Act_Total"],
-      partsList: [],
-      isAliveEyeball: json["medama_alive"] === "1",
-      isAliveBrain: json["nou_alive"] === "1"
-    },
-    powerList: [],
-    carmaList: [],
-    kakeraList: [],
-    roiceList: [],
-    exp: json["exp_his_sum"],
-    sessionList: [],
-    shuzoku: json["shuzoku"],
-    age: json["age"],
-    initLocate: "煉獄",
-    height: json["pc_height"],
-    weight: json["pc_weight"],
-    carma: json["pc_carma"],
-    hairColor: json["color_hair"],
-    eyeColor: json["color_eye"],
-    skinColor: json["color_skin"],
-    memo: json["pc_making_memo"],
-    memoRows: json["pc_making_memo_rows"]
-  };
-  switch (json["ST_Bonus"]) {
-    case "1":
-      nechronicaData.statusBonus = "武装";
-      break;
-    case "2":
-      nechronicaData.statusBonus = "変異";
-      break;
-    case "3":
-      nechronicaData.statusBonus = "改造";
-      break;
-    default:
-      nechronicaData.statusBonus = "";
-  }
-  const addActionParts = (
-    nameProperty: string,
-    aliveProperty: string,
-    effectProperty: string
-  ) => {
-    const name = json[nameProperty];
-    const isAlive = json[aliveProperty] === "1";
-    const value = json[effectProperty];
-    if (name || value) {
-      nechronicaData.action.partsList.push({ name, isAlive, value });
-    }
-  };
-  addActionParts("Act_parts_A", "Act_partsA_alive", "Act_PartsA_Ef");
-  addActionParts("Act_parts_B", "Act_partsB_alive", "Act_PartsB_Ef");
-  addActionParts("Act_parts_C", "Act_partsC_alive", "Act_PartsC_Ef");
-  for (let i = 0; i < json["Power_Lost"].length; i++) {
-    const isLost = json["Power_Lost"][i] === "1";
-    const isUsed = json["Power_Used"][i] === "1";
-    const type = nechronicaPowerTypeList[json["Power_Type"][i]];
-    const cost = json["Power_cost"][i];
-    const hantei = nechronicaHanteiTypeList[json["Power_hantei"][i]];
-    const memo = json["Power_memo"][i];
-    const name = json["Power_name"][i];
-    const range = json["Power_range"][i];
-    const shozoku = json["Power_shozoku"][i];
-    const timing = nechronicaTimingTypeList[json["Power_timing"][i]];
-    nechronicaData.powerList.push({
-      name,
-      isLost,
-      isUsed,
-      type,
-      hantei,
-      timing,
-      cost,
-      range,
-      shozoku,
-      memo
-    });
-  }
-  for (let i = 0; i < json["carma_name"].length; i++) {
-    const isCompleted = json["carma_completed"][i] === "1";
-    const name = json["carma_name"][i];
-    const memo = json["carma_memo"][i];
-    if (name || memo) {
-      nechronicaData.carmaList.push({ isCompleted, name, memo });
-    }
-  }
-  for (let i = 0; i < json["kakera_name"].length; i++) {
-    const name = json["kakera_name"][i];
-    const memo = json["kakera_memo"][i];
-    if (name || memo) {
-      nechronicaData.kakeraList.push({ name, memo });
-    }
-  }
-  for (let i = 0; i < json["roice_break"].length; i++) {
-    const name = json["roice_name"][i];
-    const pos = json["roice_pos"][i];
-    const damage = nechronicaRoiceDamageList[json["roice_damage"][i]];
-    const negative = json["roice_neg"][i];
-    const breakValue = json["roice_break"][i];
-    const memo = json["roice_memo"][i];
-    if (name || pos || negative || breakValue || memo) {
-      nechronicaData.roiceList.push({
-        name,
-        pos,
-        damage,
-        negative,
-        break: breakValue,
-        memo
-      });
-    }
-  }
-  for (let i = 0; i < json["adv_exp_his"].length; i++) {
-    const advanceExp = json["adv_exp_his"][i];
-    const bonusExp = json["bns_exp_his"][i];
-    const sumExp = json["get_exp_his"][i];
-    const memo = json["seicho_memo_his"][i];
-    if (advanceExp || bonusExp || memo) {
-      nechronicaData.sessionList.push({ advanceExp, bonusExp, sumExp, memo });
-    }
-  }
-  return nechronicaData;
-}
-
-export async function createNechronicaChatPalette(
-  url: string
-): Promise<MemoStore[] | null> {
-  const json = await getJsonForTrpgSystemData<any>(
-    url,
-    /https?:\/\/charasheet\.vampire-blood\.net\/(.+)/,
-    "https://charasheet.vampire-blood.net/{key}.js"
-  );
-  if (!json) return null;
-  console.log(json);
-
-  const nechronicaData = createNechronicaData(url, json);
-
-  console.log(JSON.stringify(nechronicaData, null, "  "));
-
-  const resultList: MemoStore[] = [];
+function addPersonal(data: Nechornica, resultList: MemoStore[]) {
   const strList: string[] = [];
+
+  strList.push("@@@RELOAD-CHARACTER-SHEET@@@");
+  strList.push("@@@RELOAD-CHARACTER-SHEET-ALL@@@");
 
   // 基本情報
   strList.push("## 基本情報");
-  strList.push(`PC: ${nechronicaData.characterName}`);
-  strList.push(`タグ: ${nechronicaData.tag}`);
+  strList.push(`PC: ${data.characterName}`);
+  strList.push(`タグ: ${data.tag}`);
 
   strList.push("|||||||");
   strList.push("|--:|:--|--:|:--|--:|:--|");
   strList.push(
-    `|種族|${nechronicaData.shuzoku}|享年|${nechronicaData.age}|初期配置|${nechronicaData.initLocate}|`
+    `|◇種族|${data.shuzoku}|◇享年|${data.age}|◇初期配置|${data.initLocate}|`
   );
   strList.push(
-    `|身長|${nechronicaData.height}|体重|${nechronicaData.weight}|暗示|${nechronicaData.carma}|`
+    `|◇身長|${data.height}|◇体重|${data.weight}|◇暗示|${data.carma}|`
   );
   strList.push(
-    `|髪の色|${nechronicaData.hairColor}|瞳の色|${nechronicaData.eyeColor}|肌の色|${nechronicaData.skinColor}|`
+    `|◇髪の色|${data.hairColor}|◇瞳の色|${data.eyeColor}|◇肌の色|${data.skinColor}|`
   );
   strList.push("");
 
   // 記憶のカケラ
   strList.push("## 記憶のカケラ");
-  strList.push("|名前|詳細|");
-  strList.push("|:--|:--|");
-  nechronicaData.kakeraList.forEach(k => {
-    strList.push(`|${k.name}|${k.memo}|`);
-  });
+  strList.push(
+    ...outputTableList<Kakera>(data.kakeraList, [
+      { label: "名前", prop: "name", align: "left" },
+      { label: "詳細", prop: "memo", align: "left" }
+    ])
+  );
   strList.push("");
 
   // 基本設計
   strList.push("## 基本設計");
   strList.push("||武装|変異|改造|");
   strList.push("|:--|:--:|:--:|:--:|");
-  strList.push(`|ﾎﾟｼﾞｼｮﾝ：${nechronicaData.positionName}|-|-|-|`);
+  strList.push(`|ﾎﾟｼﾞｼｮﾝ：${data.positionName}|-|-|-|`);
+  strList.push(`|ﾒｲﾝｸﾗｽ：${data.mainClass}|${data.mainClassStatus.join("|")}|`);
+  strList.push(`|ｻﾌﾞｸﾗｽ：${data.subClass}|${data.subClassStatus.join("|")}|`);
   strList.push(
-    `|ﾒｲﾝｸﾗｽ：${nechronicaData.mainClass}|${nechronicaData.mainClassStatus.join(
-      "|"
-    )}|`
+    `|ﾎﾞｰﾅｽ|${data.statusBonus === "武装" ? "●" : ""}|${
+      data.statusBonus === "変異" ? "●" : ""
+    }|${data.statusBonus === "改造" ? "●" : ""}|`
   );
-  strList.push(
-    `|ｻﾌﾞｸﾗｽ：${nechronicaData.subClass}|${nechronicaData.subClassStatus.join(
-      "|"
-    )}|`
-  );
-  strList.push(
-    `|ﾎﾞｰﾅｽ|${nechronicaData.statusBonus === "武装" ? "●" : ""}|${
-      nechronicaData.statusBonus === "変異" ? "●" : ""
-    }|${nechronicaData.statusBonus === "改造" ? "●" : ""}|`
-  );
-  strList.push(`|寵愛による修正|${nechronicaData.loveBonus.join("|")}|`);
-  strList.push(`|総計|${nechronicaData.status.join("|")}|`);
+  strList.push(`|寵愛による修正|${data.loveBonus.join("|")}|`);
+  strList.push(`|総計|${data.status.join("|")}|`);
 
-  resultList.push({ tab: "パーソナルデータ", text: strList.join("\r\n") });
-  listToEmpty(strList);
+  resultList.push({
+    tab: "パーソナルデータ",
+    type: "url",
+    text: strList.join("\r\n")
+  });
+}
+
+function addManagement(data: Nechornica, resultList: MemoStore[]) {
+  const strList: string[] = [];
+
+  strList.push("@@@RELOAD-CHARACTER-SHEET@@@");
+  strList.push("@@@RELOAD-CHARACTER-SHEET-ALL@@@");
 
   // 行動値
   strList.push("## 行動値");
   strList.push(
-    `|パーツ名|合計|基本|のうみそ|めだま|${nechronicaData.action.partsList
+    `|パーツ名|合計|基本|のうみそ|めだま|${data.action.partsList
       .map(p => p.name)
       .join("|")}||`
   );
   strList.push(
-    `|:--:|:--:|:--:|:--:|:--:|${nechronicaData.action.partsList
+    `|:--:|:--:|:--:|:--:|:--:|${data.action.partsList
       .map(() => ":--:")
       .join("|")}|:--:|`
   );
-  const selectStr = `{合計}[${new Array(
-    (nechronicaData.action.partsList.length + 3) * 2
-  )
+  const selectStr = `{合計}[${new Array((data.action.partsList.length + 3) * 2)
     .fill("")
-    .map((_: string, idx: number) => idx + 6)
-    .join("|")}](${nechronicaData.action.total})`;
+    .map((_: string, index: number) => index + 6)
+    .join("|")}](${data.action.total})`;
   strList.push(
-    `|行動値|${selectStr}|6|[${
-      nechronicaData.action.isAliveBrain ? "x" : " "
-    }]+2|[${
-      nechronicaData.action.isAliveEyeball ? "x" : " "
-    }]+1|${nechronicaData.action.partsList
+    `|行動値|${selectStr}|6|[${data.action.isAliveBrain ? "x" : " "}]+2|[${
+      data.action.isAliveEyeball ? "x" : " "
+    }]+1|${data.action.partsList
       .map(p => `[${p.isAlive ? "x" : " "}]+${p.value}`)
       .join("|")}|[x]+{行動値}[0|1|2|3](0)|`
   );
@@ -421,47 +474,22 @@ export async function createNechronicaChatPalette(
 
   // カルマ
   strList.push("## カルマ");
-  strList.push("|達成|条件|詳細|");
-  strList.push("|:--:|:--|:--|");
-  nechronicaData.carmaList.forEach(c => {
-    strList.push(`|[${c.isCompleted ? "x" : " "}]|${c.name}|${c.memo}|`);
-  });
+  strList.push(
+    ...outputTableList<Carma>(data.carmaList, [
+      { label: "達成", prop: "isCompleted", align: "center" },
+      { label: "条件", prop: "name", align: "left" },
+      { label: "詳細", prop: "memo", align: "left" }
+    ])
+  );
   strList.push("");
 
   // 未練
   strList.push("## 未練");
   strList.push("|対象|種類|狂気度|発狂|発狂効果|備考など|");
   strList.push("|:--|:--|:--|:--|:--|:--|");
-  nechronicaData.roiceList.forEach(r => {
-    const selectStrList: string[] = [];
-    selectStrList.push("");
-    selectStrList.push("嫌悪");
-    selectStrList.push("独占");
-    selectStrList.push("依存");
-    selectStrList.push("執着");
-    selectStrList.push("恋心");
-    selectStrList.push("対抗");
-    selectStrList.push("友情");
-    selectStrList.push("保護");
-    selectStrList.push("憧憬");
-    selectStrList.push("信頼");
-    selectStrList.push("恐怖");
-    selectStrList.push("隷属");
-    selectStrList.push("不安");
-    selectStrList.push("憐憫");
-    selectStrList.push("愛憎");
-    selectStrList.push("悔恨");
-    selectStrList.push("軽蔑");
-    selectStrList.push("憤怒");
-    selectStrList.push("怨念");
-    selectStrList.push("憎悪");
-    selectStrList.push("忌避");
-    selectStrList.push("嫉妬");
-    selectStrList.push("感謝");
-    selectStrList.push("期待");
-    selectStrList.push("尊敬");
+  data.loisList.forEach(r => {
     strList.push(
-      `|${r.name}|{種類}[${selectStrList.join("|")}](${
+      `|${r.name}|{種類}[${loisTypeList.join("|")}](${
         r.pos
       })|{狂気度}[0|1|2|3|発狂](${r.damage})|${r.negative}|${r.break}|${
         r.memo
@@ -469,32 +497,35 @@ export async function createNechronicaChatPalette(
     );
   });
 
-  resultList.push({ tab: "管理", text: strList.join("\r\n") });
-  listToEmpty(strList);
+  resultList.push({ tab: "管理", type: "url", text: strList.join("\r\n") });
+}
+
+function addManeuver(data: Nechornica, resultList: MemoStore[]) {
+  const strList: string[] = [];
+
+  strList.push("@@@RELOAD-CHARACTER-SHEET@@@");
+  strList.push("@@@RELOAD-CHARACTER-SHEET-ALL@@@");
 
   // マニューバ
   strList.push("## マニューバ");
   strList.push(
-    "|損傷|使用|カテゴリ|部位|○マニューバ|タイミング|ｺｽﾄ|射程|効果|取得先|"
+    ...outputTableList<Power>(data.powerList, [
+      { label: "損傷", prop: "isLost", align: "center" },
+      { label: "使用", prop: "isUsed", align: "center" },
+      { label: "カテゴリ", prop: "type", align: "center" },
+      { label: "部位", prop: "hantei", align: "center" },
+      { label: "マニューバ", prop: "name", align: "left" },
+      { label: "タイミング", prop: "timing", align: "center" },
+      { label: "ｺｽﾄ", prop: "cost", align: "right" },
+      { label: "射程", prop: "range", align: "center" },
+      { label: "効果", prop: "memo", align: "left" },
+      { label: "取得先", prop: "shozoku", align: "left" }
+    ])
   );
-  strList.push("|:--:|:--:|:--:|:--:|:--|:--:|--:|:--:|:--|:--|");
-  nechronicaData.powerList.forEach(p => {
-    const powerTextList: string[] = [];
-    powerTextList.push(`|[${p.isLost ? "x" : " "}]`);
-    powerTextList.push(`|[${p.isUsed ? "x" : " "}]`);
-    powerTextList.push(`|${p.type}`);
-    powerTextList.push(`|${p.hantei}`);
-    powerTextList.push(`|${p.name}`);
-    powerTextList.push(`|${p.timing}`);
-    powerTextList.push(`|${p.cost}`);
-    powerTextList.push(`|${p.range}`);
-    powerTextList.push(`|${p.memo}`);
-    powerTextList.push(`|${p.shozoku}|`);
-    strList.push(powerTextList.join(""));
+
+  resultList.push({
+    tab: "マニューバ",
+    type: "url",
+    text: strList.join("\r\n")
   });
-
-  resultList.push({ tab: "マニューバ", text: strList.join("\r\n") });
-  listToEmpty(strList);
-
-  return resultList;
 }

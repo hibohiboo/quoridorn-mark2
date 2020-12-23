@@ -38,19 +38,16 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue, Watch } from "vue-property-decorator";
+import { Component, Prop, Watch } from "vue-property-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
 import { listToEmpty } from "../../core/utility/PrimaryDataUtility";
-import {
-  PermissionNodeType,
-  PermissionRule,
-  PermissionRuleType
-} from "../../../@types/store";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import ActorGroupSelect from "../common/components/select/ActorGroupSelect.vue";
 import SCheck from "../common/components/SCheck.vue";
 import ActorSelect from "../common/components/select/ActorSelect.vue";
 import PermissionTypeSelect from "../common/components/select/PermissionTypeSelect.vue";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
 
 @Component({
   components: {
@@ -61,7 +58,9 @@ import PermissionTypeSelect from "../common/components/select/PermissionTypeSele
     PermissionTypeSelect
   }
 })
-export default class ChmodRuleEditComponent extends Vue {
+export default class ChmodRuleEditComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: Object, required: true })
   private permissionRule!: PermissionRule;
 
@@ -87,7 +86,7 @@ export default class ChmodRuleEditComponent extends Vue {
       let list: string[] = [];
       if (pr.type === "group") list = this.groupListInput;
       else if (pr.type === "actor") list = this.actorListInput;
-      if (pr.id) list.push(pr.id);
+      if (pr.key) list.push(pr.key);
     });
   }
 
@@ -107,7 +106,7 @@ export default class ChmodRuleEditComponent extends Vue {
   private mergeInputList() {
     listToEmpty(this.permissionRule.list);
     const addList = (list: string[], type: PermissionNodeType) => {
-      this.permissionRule.list.push(...list.map(id => ({ type, id })));
+      this.permissionRule.list.push(...list.map(key => ({ type, key })));
     };
     addList(this.groupListInput, "group");
     addList(this.actorListInput, "actor");

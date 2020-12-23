@@ -1,7 +1,7 @@
-import { Size } from "address";
-import { createSize } from "../../../core/utility/CoordinateUtility";
-import { CutInDeclareInfo } from "../../../../@types/room";
-import { getUrlParam } from "../../../core/utility/PrimaryDataUtility";
+import { createSize } from "@/app/core/utility/CoordinateUtility";
+import { CutInStore } from "@/@types/store-data";
+import { getUrlParam } from "@/app/core/utility/PrimaryDataUtility";
+import { Size } from "@/@types/store-data-optional";
 
 type PlayerInfo = {
   player: any;
@@ -72,7 +72,7 @@ export default class YoutubeManager {
 
   public open(
     elementId: string,
-    { url, start, end }: CutInDeclareInfo,
+    { url, start, end }: CutInStore,
     eventHandler: YoutubeEventHandler
   ) {
     let playerObj = this.playerMapping[elementId];
@@ -92,7 +92,9 @@ export default class YoutubeManager {
         height: YoutubeManager.playerElementSize.height,
         videoId,
         events: {
-          onReady: () => this.eventHandler.onReady(elementId),
+          onReady: () => {
+            this.eventHandler.onReady(elementId);
+          },
           onStateChange: (event: any) => {
             switch (event.data) {
               case YT.PlayerState.ENDED:
@@ -129,6 +131,7 @@ export default class YoutubeManager {
         playerVars: {
           origin: location.protocol + "//" + location.hostname + ":8080/",
           playlist: videoId,
+          html5: 1,
           autoplay: 1, // 0:自動再生しない or 1:自動再生
           controls: 0, // 再生ボタンとか出さない
           disablekb: 1, // ショートカットキー無効
@@ -193,7 +196,7 @@ export default class YoutubeManager {
   /** IDを指定して読み込ませる */
   public loadVideoById(
     elementId: string,
-    { url, start, end }: CutInDeclareInfo,
+    { url, start, end }: CutInStore,
     suggestedQuality: string = "small"
   ) {
     let playerObj = this.playerMapping[elementId];

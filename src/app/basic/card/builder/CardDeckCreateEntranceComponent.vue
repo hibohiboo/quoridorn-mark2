@@ -26,18 +26,20 @@
 <script lang="ts">
 import { Component, Mixins } from "vue-mixin-decorator";
 import { Prop, Watch } from "vue-property-decorator";
-import { StoreUseData } from "../../../../@types/store";
 import CardDeckSubContainerComponent from "./CardDeckSubContainerComponent.vue";
 import ComponentVue from "../../../core/window/ComponentVue";
 import GameObjectManager from "../../GameObjectManager";
-import LanguageManager from "../../../../LanguageManager";
-import { createEmptyStoreUseData } from "../../../core/utility/Utility";
+import {
+  createEmptyStoreUseData,
+  errorDialog
+} from "@/app/core/utility/Utility";
 import SButton from "../../common/components/SButton.vue";
 import BaseInput from "../../../core/component/BaseInput.vue";
-import { CardMeta } from "../../../../@types/gameObject";
+import { CardMetaStore } from "@/@types/store-data";
 import CardDeckBuilder from "./CardDeckBuilder.vue";
-import { importText } from "../../../core/utility/FileUtility";
+import { importText } from "@/app/core/utility/FileUtility";
 import VueEvent from "../../../core/decorator/VueEvent";
+import LanguageManager from "@/LanguageManager";
 const uuid = require("uuid");
 
 @Component({
@@ -47,7 +49,7 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
   ComponentVue
 >(ComponentVue) {
   @Prop({ type: Array, required: true })
-  private cardList!: StoreUseData<CardMeta>[];
+  private cardList!: StoreData<CardMetaStore>[];
 
   // width
   @Prop({ type: Number, required: true })
@@ -153,30 +155,30 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
     this.$emit("update:backBackgroundColor", value);
   }
 
-  // backImageId
+  // backImageKey
   @Prop({ type: String, required: true })
-  private backImageId!: string;
-  private backImageIdVolatile: string = "";
-  @Watch("backImageId", { immediate: true })
-  private onChangeBackImageId(value: string) {
-    this.backImageIdVolatile = value;
+  private backImageKey!: string;
+  private backImageKeyVolatile: string = "";
+  @Watch("backImageKey", { immediate: true })
+  private onChangeBackImageKey(value: string) {
+    this.backImageKeyVolatile = value;
   }
-  @Watch("backImageIdVolatile")
-  private onChangeBackImageIdVolatile(value: string) {
-    this.$emit("update:backImageId", value);
+  @Watch("backImageKeyVolatile")
+  private onChangeBackImageKeyVolatile(value: string) {
+    this.$emit("update:backImageKey", value);
   }
 
-  // imageTag
+  // mediaTag
   @Prop({ required: true })
-  private imageTag!: string | null;
-  private imageTagVolatile: string | null = null;
-  @Watch("imageTag", { immediate: true })
+  private mediaTag!: string | null;
+  private mediaTagVolatile: string | null = null;
+  @Watch("mediaTag", { immediate: true })
   private onChangeImageTag(value: string | null) {
-    this.imageTagVolatile = value;
+    this.mediaTagVolatile = value;
   }
-  @Watch("imageTagVolatile")
+  @Watch("mediaTagVolatile")
   private onChangeImageTagVolatile(value: string | null) {
-    this.$emit("update:imageTag", value);
+    this.$emit("update:mediaTag", value);
   }
 
   // fontColor
@@ -289,9 +291,9 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
   @VueEvent
   private onHoverParanoiaRebooted(isHover: boolean) {
     this.description = isHover
-      ? LanguageManager.instance.getText(
+      ? this.$t(
           "card-deck-builder.description.import-text-paranoia-rebooted"
-        )
+        )!.toString()
       : "";
   }
 
@@ -299,7 +301,10 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
   private async importParanoiaRebooted() {
     const text = await importText();
     const failure = (reason: string) => {
-      alert(LanguageManager.instance.getText("label.importFailure"));
+      errorDialog({
+        title: LanguageManager.instance.getText("message.error"),
+        text: this.$t("lathis\\.\\$t\\([^)]+\\);bel.importFailure").toString()
+      }).then();
       console.warn(`import failure. [${reason}]`);
       this.cardList.splice(0, this.cardList.length);
     };
@@ -309,11 +314,11 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
     };
     const getImageUrl = (
       name: string
-    ): { id: string; tag: string; url: string } | null => {
-      const media = this.mediaList.filter(m => m.data!.name.endsWith(name))[0];
+    ): { key: string; tag: string; url: string } | null => {
+      const media = this.mediaList.find(m => m.data!.name.endsWith(name));
       return media
         ? {
-            id: media.id!,
+            key: media.key,
             tag: media.data!.tag,
             url: `url(${media.data!.url})`
           }
@@ -343,12 +348,12 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
       if (!imageUrl) return failure("imageUrl is empty");
       if (i === 1) {
         backImageUrl = imageUrl.url;
-        this.backImageIdVolatile = imageUrl.id;
-        this.imageTagVolatile = imageUrl.tag;
+        this.backImageKeyVolatile = imageUrl.key;
+        this.mediaTagVolatile = imageUrl.tag;
         continue;
       }
 
-      const id: string = uuid.v4();
+      const key: string = uuid.v4();
       const base = CardDeckBuilder.DEFAULT_CARD_FRAME_PARANOIA_REBOOTED;
       this.setFramePreset(base);
 
@@ -363,7 +368,7 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
       if (nameSplit[1]) contents = `■${nameSplit[1]}\n${contents}`;
 
       this.cardList.push(
-        createEmptyStoreUseData(id, {
+        createEmptyStoreUseData(key, {
           width: base.width,
           height: base.height,
           padHorizontal: base.padHorizontal,
@@ -390,7 +395,7 @@ export default class CardDeckCreateEntranceComponent extends Mixins<
     this.$emit("import-direct");
   }
 
-  private setFramePreset(preset: CardMeta) {
+  private setFramePreset(preset: CardMetaStore) {
     this.widthVolatile = preset.width;
     this.heightVolatile = preset.height;
     this.radiusVolatile = preset.radius;

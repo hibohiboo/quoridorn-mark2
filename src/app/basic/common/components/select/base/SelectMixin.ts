@@ -1,4 +1,4 @@
-import { Vue, Prop } from "vue-property-decorator";
+import { Prop, Vue } from "vue-property-decorator";
 import { Component } from "vue-mixin-decorator";
 
 @Component
@@ -7,7 +7,7 @@ export default class SelectMixin extends Vue {
   public value!: string | string[] | null;
 
   @Prop({ type: String, default: null })
-  public id!: string | null;
+  public elmId!: string | null;
 
   @Prop({ type: Boolean, default: false })
   protected multiple!: boolean;

@@ -15,7 +15,7 @@
         <datalist :id="`${key}-user-list`">
           <option
             v-for="user in userList"
-            :key="user.id"
+            :key="user.key"
             :value="user.data.name"
           >
             {{ user.data.name }}
@@ -29,10 +29,11 @@
           v-model="password"
           :isPending="!name"
           :setting="isSetting"
+          :placeholder="$t('label.password-placeholder')"
         />
       </label>
       <label>
-        <span class="label-input" v-t="'label.user-type'"></span>
+        <span class="label-input" v-t="'selection.user-type.label'"></span>
         <user-type-select
           v-model="type"
           :isPending="!name"
@@ -55,20 +56,16 @@
 import { Watch } from "vue-property-decorator";
 import { Component, Mixins } from "vue-mixin-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
-import { UserData } from "@/@types/room";
+import { UserStore } from "@/@types/store-data";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
 import BaseInput from "../../core/component/BaseInput.vue";
 import VueEvent from "../../core/decorator/VueEvent";
-import {
-  UserLoginInput,
-  UserLoginWindowInput,
-  UserType
-} from "@/@types/socket";
-import { StoreUseData } from "@/@types/store";
+import { UserLoginInput, UserLoginWindowInput } from "@/@types/socket";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import UserTypeSelect from "../common/components/select/UserTypeSelect.vue";
 import InputPasswordComponent from "../../core/component/InputPasswordComponent.vue";
+import { UserType } from "@/@types/store-data-optional";
 
 @Component({
   components: {
@@ -87,7 +84,7 @@ export default class UserLoginWindow extends Mixins<
   private isMounted: boolean = false;
   private isSetting: boolean = false;
   private visitable: boolean = false;
-  private userList: StoreUseData<UserData>[] | null = null;
+  private userList: StoreData<UserStore>[] | null = null;
 
   @LifeCycle
   public async created() {
@@ -115,8 +112,8 @@ export default class UserLoginWindow extends Mixins<
   @Watch("name")
   private onChangeName() {
     if (!this.isMounted) return;
-    const idx = this.userList!.findIndex(u => u.data!.name === this.name);
-    if (idx >= 0) this.type = this.userList![idx]!.data!.type;
+    const index = this.userList!.findIndex(u => u.data!.name === this.name);
+    if (index >= 0) this.type = this.userList![index]!.data!.type;
   }
 
   @Watch("currentDiceBotSystem")

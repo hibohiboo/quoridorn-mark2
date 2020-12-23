@@ -3,7 +3,10 @@
     <div class="base-area">
       <div class="basic">
         <label>
-          <span class="label-input" v-t="'label.room-no'"></span>
+          <span
+            class="label-input"
+            v-t="'room-info-window.label.room-no'"
+          ></span>
           <span class="selectable" v-if="clientRoomInfo">{{
             clientRoomInfo.roomNo
           }}</span>
@@ -16,16 +19,25 @@
         </label>
       </div>
       <label>
-        <span class="label-input" v-t="'label.bcdice-api-url'"></span>
+        <span
+          class="label-input"
+          v-t="'room-info-window.label.bcdice-api-url'"
+        ></span>
         <span class="selectable" v-if="clientRoomInfo">{{ systemName }}</span>
       </label>
       <label>
-        <span class="label-input" v-t="'label.game-system-view'"></span>
+        <span
+          class="label-input"
+          v-t="'room-info-window.label.game-system-view'"
+        ></span>
         <span class="selectable" v-if="clientRoomInfo">{{ systemName }}</span>
       </label>
       <div class="invite">
         <label>
-          <span class="label-input" v-t="'label.invite-url'"></span>
+          <span
+            class="label-input"
+            v-t="'room-info-window.label.invite-url'"
+          ></span>
           <base-input
             type="text"
             v-if="clientRoomInfo"
@@ -43,26 +55,26 @@
           <tr>
             <th v-t="'label.user-name'"></th>
             <th v-t="'label.permission'"></th>
-            <th v-t="'label.room-member-num'"></th>
-            <th colspan="2" v-t="'label.comeback-url'"></th>
+            <th v-t="'room-info-window.label.room-member-num'"></th>
+            <th colspan="2" v-t="'room-info-window.label.comeback-url'"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in useUserList" :key="user.id">
+          <tr v-for="user in useUserList" :key="user.key">
             <td class="left">{{ user.data.name }}</td>
             <td
               class="center"
-              v-t="'label.gameMaster'"
+              v-t="'selection.user-type.GM'"
               v-if="user.data.type === 'GM'"
             ></td>
             <td
               class="center"
-              v-t="'label.player'"
+              v-t="'selection.user-type.PL'"
               v-if="user.data.type === 'PL'"
             ></td>
             <td
               class="center"
-              v-t="'label.visitor'"
+              v-t="'selection.user-type.VISITOR'"
               v-if="user.data.type === 'VISITOR'"
             ></td>
             <td class="center">{{ user.data.login }}</td>
@@ -99,17 +111,17 @@
 import { Component, Watch } from "vue-property-decorator";
 import { Mixins } from "vue-mixin-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
-import { UserData } from "../../../@types/room";
+import { UserStore } from "@/@types/store-data";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
 import { execCopy } from "../../core/utility/Utility";
 import BaseInput from "../../core/component/BaseInput.vue";
-import { ClientRoomInfo, UserType } from "../../../@types/socket";
+import { ClientRoomInfo } from "@/@types/socket";
 import VueEvent from "../../core/decorator/VueEvent";
-import { StoreUseData } from "../../../@types/store";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import GameObjectManager from "../GameObjectManager";
 import BcdiceManager from "../../core/api/bcdice/BcdiceManager";
+import { UserType } from "@/@types/store-data-optional";
 
 @Component({
   components: {
@@ -121,25 +133,25 @@ export default class RoomInfoWindow extends Mixins<WindowVue<never, never>>(
   WindowVue
 ) {
   private clientRoomInfo: ClientRoomInfo | null = null;
-  private userList: StoreUseData<UserData>[] =
+  private userList: StoreData<UserStore>[] =
     GameObjectManager.instance.userList;
-  private systemId: string | null = null;
+  private systemKey: string | null = null;
   private systemName: string | null = null;
 
   @Watch("clientRoomInfo", { deep: true })
   private async onChangeClientRoomInfo() {
-    this.systemId = this.clientRoomInfo ? this.clientRoomInfo.system : null;
+    this.systemKey = this.clientRoomInfo ? this.clientRoomInfo.system : null;
   }
 
-  @Watch("systemId")
-  private async onChangeSystemId() {
+  @Watch("systemKey")
+  private async onChangeSystemKey() {
     this.systemName = await BcdiceManager.getBcdiceSystemName(
       SocketFacade.instance.connectInfo.bcdiceServer,
-      this.systemId
+      this.systemKey
     );
   }
 
-  private get useUserList(): StoreUseData<UserData>[] {
+  private get useUserList(): StoreData<UserStore>[] {
     const typeOrder: UserType[] = ["VISITOR", "PL", "GM"];
     return this.userList.concat().sort((u1, u2) => {
       const u1Index = typeOrder.findIndex(t => t === u1.data!.type);
@@ -152,7 +164,7 @@ export default class RoomInfoWindow extends Mixins<WindowVue<never, never>>(
     });
   }
 
-  public getInviteUrl(user?: StoreUseData<UserData>) {
+  public getInviteUrl(user?: StoreData<UserStore>) {
     if (!this.clientRoomInfo) return "";
     const roomNo = this.clientRoomInfo.roomNo;
     const name = user ? user.data!.name : "";

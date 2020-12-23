@@ -1,53 +1,45 @@
 import * as Socket from "socket.io-client";
 import SocketDriver from "nekostore/lib/driver/socket";
 import Nekostore from "nekostore/lib/Nekostore";
-import DocumentSnapshot from "nekostore/lib/DocumentSnapshot";
 import yaml from "js-yaml";
-import {
-  PermissionNode,
-  PermissionRule,
-  StoreObj,
-  StoreUseData
-} from "@/@types/store";
 import { compareVersion, getFileRow, TargetVersion } from "../Github";
 import {
   ActorStatusStore,
   ActorStore,
-  CardDeckBig,
-  CardDeckSmall,
-  CardMeta,
-  CardObject,
-  KeepBcdiceDiceRollResult,
+  CardDeckBigStore,
+  CardDeckSmallStore,
+  CardMetaStore,
+  CardObjectStore,
+  KeepBcdiceDiceRollResultStore,
   ChatPaletteStore,
   InitiativeColumnStore,
   PropertySelectionStore,
   ResourceMasterStore,
   ResourceStore,
-  SceneObject,
-  TagNoteStore,
-  MemoStore
-} from "@/@types/gameObject";
-import {
-  ActorGroup,
-  ChatInfo,
-  ChatTabInfo,
-  CutInDeclareInfo,
-  GroupChatTabInfo,
-  MediaInfo,
-  RoomData,
-  Scene,
-  SceneAndLayer,
-  SceneAndObject,
-  SceneLayer,
-  SocketUserData,
-  UserData
-} from "@/@types/room";
+  SceneObjectStore,
+  MemoStore,
+  PublicMemoStore,
+  LikeStore,
+  ActorGroupStore,
+  ChatStore,
+  ChatTabStore,
+  CutInStore,
+  GroupChatTabStore,
+  MediaStore,
+  RoomDataStore,
+  SceneStore,
+  SceneAndLayerStore,
+  SceneAndObjectStore,
+  SceneLayerStore,
+  SocketUserStore,
+  UserStore,
+  DiceTypeStore,
+  DiceAndPipsStore
+} from "@/@types/store-data";
 import GameObjectManager from "../../../basic/GameObjectManager";
 import { ApplicationError } from "../../error/ApplicationError";
 import {
   DefaultServerInfo,
-  DiceAndPips,
-  DiceType,
   GetVersionResponse,
   SendDataRequest,
   ServerTestResult
@@ -56,6 +48,7 @@ import NekostoreCollectionController from "./NekostoreCollectionController";
 import { loadYaml } from "../../utility/FileUtility";
 import TaskManager from "../../task/TaskManager";
 import { ModeInfo } from "mode";
+import { errorDialog, findByKey } from "@/app/core/utility/Utility";
 
 export type ConnectInfo = {
   quoridornServer: string | string[];
@@ -70,21 +63,6 @@ export type Interoperability = {
   client: string;
 };
 
-export function getStoreObj<T>(
-  doc: DocumentSnapshot<StoreObj<T>>
-): StoreUseData<T> | null {
-  if (doc.exists()) {
-    const data: StoreObj<T> = doc.data;
-    if (!data) return null;
-    return {
-      ...data,
-      id: doc.ref.id
-    };
-  } else {
-    return null;
-  }
-}
-
 /**
  * パーミッションチェックを行う。
  * @param data
@@ -93,7 +71,7 @@ export function getStoreObj<T>(
  * @return 許可されているならtrue
  */
 export function permissionCheck(
-  data: StoreObj<unknown>,
+  data: StoreData<any>,
   type: "view" | "edit" | "chmod",
   ownerLevel: number = 0
 ): boolean {
@@ -111,32 +89,33 @@ export function permissionCheck(
   if (permissionRule.list.length) {
     const check = (pn: PermissionNode) => {
       if (pn.type === "group") {
-        const roleGroup = GameObjectManager.instance.actorGroupList.filter(
-          r => r.id === pn.id
-        )[0];
+        const roleGroup = findByKey(
+          GameObjectManager.instance.actorGroupList,
+          pn.key || null
+        );
         if (!roleGroup) return false;
         return (
           roleGroup.data!.list.findIndex(actorRef => {
             if (actorRef.type === "user")
-              return SocketFacade.instance.userId === actorRef.id;
+              return SocketFacade.instance.userKey === actorRef.userKey;
 
-            return !!GameObjectManager.instance.actorList.filter(
+            return GameObjectManager.instance.actorList.some(
               a =>
-                a.id === actorRef.id ||
-                a.owner === GameObjectManager.instance.mySelfUserId
-            )[0];
+                a.key === actorRef.actorKey ||
+                a.owner === SocketFacade.instance.userKey
+            );
           }) > -1
         );
       }
       if (pn.type === "actor") {
-        if (pn.id === GameObjectManager.instance.mySelfActorId) return true;
+        if (pn.key === GameObjectManager.instance.mySelfActorKey) return true;
       }
       if (pn.type === "owner") {
         let obj = data;
         for (let i = 0; i < ownerLevel; i++) {
           obj = GameObjectManager.instance.getOwner(obj)!;
         }
-        if (obj.owner === SocketFacade.instance.userId) return true;
+        if (obj.owner === SocketFacade.instance.userKey) return true;
       }
       return false;
     };
@@ -162,7 +141,7 @@ export default class SocketFacade {
     [name: string]: NekostoreCollectionController<unknown>;
   } = {};
   private __roomCollectionPrefix: string | null = null;
-  private __userId: string | null = null;
+  private __userKey: string | null = null;
   private __connectInfo: ConnectInfo | null = null;
   private __interoperability: Interoperability[] | null = null;
   private targetServer: TargetVersion = {
@@ -223,10 +202,9 @@ export default class SocketFacade {
     await this.setDefaultServerUrlList();
     const serverInfo = this.appServerUrlList[0];
     if (!serverInfo) {
-      await swal({
+      await errorDialog({
         title: "通信エラー",
-        text: "有効なアプリケーションサーバに接続できませんでした。",
-        icon: "error"
+        text: "有効なアプリケーションサーバに接続できませんでした。"
       });
 
       await TaskManager.instance.ignition<ModeInfo, never>({
@@ -321,12 +299,12 @@ export default class SocketFacade {
     this.__roomCollectionPrefix = val;
   }
 
-  public set userId(val: string | null) {
-    this.__userId = val;
+  public set userKey(val: string | null) {
+    this.__userKey = val;
   }
 
-  public get userId(): string | null {
-    return this.__userId;
+  public get userKey(): string | null {
+    return this.__userKey;
   }
 
   public async socketCommunication<T, U>(event: string, args?: T): Promise<U> {
@@ -347,9 +325,9 @@ export default class SocketFacade {
   public async sendData<T>(args: Partial<SendDataRequest<T>>) {
     if (!args.data) args.data = null;
     if (!args.targetList)
-      args.targetList = GameObjectManager.instance.userList.map(u => u.id!);
+      args.targetList = GameObjectManager.instance.userList.map(u => u.key);
     if (!args.dataType) args.dataType = "general-data";
-    if (!args.owner) args.owner = GameObjectManager.instance.mySelfUserId;
+    if (!args.owner) args.owner = SocketFacade.instance.userKey!;
     await this.socketCommunication<SendDataRequest<T>, void>(
       "send-data",
       args as SendDataRequest<T>
@@ -451,228 +429,211 @@ export default class SocketFacade {
   }
 
   private roomCollectionController<T>(
-    collectionNamePrefix: string
+    suffix: string
   ): NekostoreCollectionController<T> {
-    const collectionName = `${this.__roomCollectionPrefix}-DATA-${collectionNamePrefix}`;
+    const collectionName = `${this.__roomCollectionPrefix}-DATA-${suffix}`;
     let controller = this.collectionControllerMap[collectionName];
     if (controller) return controller as NekostoreCollectionController<T>;
-    return (this.collectionControllerMap[
-      collectionName
-    ] = new NekostoreCollectionController<T>(
+
+    const cc = new NekostoreCollectionController<T>(
       this.socket,
       this.nekostore!,
-      collectionName
-    ));
+      collectionName,
+      suffix
+    );
+    this.collectionControllerMap[collectionName] = cc;
+
+    return cc;
   }
 
-  public chatListCC(): NekostoreCollectionController<ChatInfo> {
-    return this.roomCollectionController<ChatInfo>("chat-list");
+  public chatListCC() {
+    return this.roomCollectionController<ChatStore>("chat-list");
   }
 
-  public chatTabListCC(): NekostoreCollectionController<ChatTabInfo> {
-    return this.roomCollectionController<ChatTabInfo>("chat-tab-list");
+  public chatTabListCC() {
+    return this.roomCollectionController<ChatTabStore>("chat-tab-list");
   }
 
-  public groupChatTabListCC(): NekostoreCollectionController<GroupChatTabInfo> {
-    return this.roomCollectionController<GroupChatTabInfo>(
+  public groupChatTabListCC() {
+    return this.roomCollectionController<GroupChatTabStore>(
       "group-chat-tab-list"
     );
   }
 
-  public sceneListCC(): NekostoreCollectionController<Scene> {
-    return this.roomCollectionController<Scene>("scene-list");
+  public sceneListCC() {
+    return this.roomCollectionController<SceneStore>("scene-list");
   }
 
-  public sceneLayerCC(): NekostoreCollectionController<SceneLayer> {
-    return this.roomCollectionController<SceneLayer>("scene-layer-list");
+  public sceneLayerCC() {
+    return this.roomCollectionController<SceneLayerStore>("scene-layer-list");
   }
 
-  public sceneObjectCC(): NekostoreCollectionController<SceneObject> {
-    return this.roomCollectionController<SceneObject>("scene-object-list");
+  public sceneObjectCC() {
+    return this.roomCollectionController<SceneObjectStore>("scene-object-list");
   }
 
-  public actorStatusCC(): NekostoreCollectionController<ActorStatusStore> {
+  public actorStatusCC() {
     return this.roomCollectionController<ActorStatusStore>("status-list");
   }
 
-  public sceneAndLayerCC(): NekostoreCollectionController<SceneAndLayer> {
-    return this.roomCollectionController<SceneAndLayer>("scene-and-layer-list");
+  public sceneAndLayerCC() {
+    return this.roomCollectionController<SceneAndLayerStore>(
+      "scene-and-layer-list"
+    );
   }
 
-  public sceneAndObjectCC(): NekostoreCollectionController<SceneAndObject> {
-    return this.roomCollectionController<SceneAndObject>(
+  public sceneAndObjectCC() {
+    return this.roomCollectionController<SceneAndObjectStore>(
       "scene-and-object-list"
     );
   }
 
-  public tagNoteCC(): NekostoreCollectionController<TagNoteStore> {
-    return this.roomCollectionController<TagNoteStore>("tag-note-list");
+  public roomDataCC() {
+    return this.roomCollectionController<RoomDataStore>("room-data");
   }
 
-  public roomDataCC(): NekostoreCollectionController<RoomData> {
-    return this.roomCollectionController<RoomData>("room-data");
+  public mediaCC() {
+    return this.roomCollectionController<MediaStore>("media-list");
   }
 
-  public mediaCC(): NekostoreCollectionController<MediaInfo> {
-    return this.roomCollectionController<MediaInfo>("media-list");
+  public cutInDataCC() {
+    return this.roomCollectionController<CutInStore>("cut-in-list");
   }
 
-  public imageTagCC(): NekostoreCollectionController<string> {
-    return this.roomCollectionController<string>("image-tag-list");
+  public userCC() {
+    return this.roomCollectionController<UserStore>("user-list");
   }
 
-  public cutInDataCC(): NekostoreCollectionController<CutInDeclareInfo> {
-    return this.roomCollectionController<CutInDeclareInfo>("cut-in-list");
+  public socketUserCC() {
+    return this.roomCollectionController<SocketUserStore>("socket-user-list");
   }
 
-  public userCC(): NekostoreCollectionController<UserData> {
-    return this.roomCollectionController<UserData>("user-list");
-  }
-
-  public socketUserCC(): NekostoreCollectionController<SocketUserData> {
-    return this.roomCollectionController<SocketUserData>("socket-user-list");
-  }
-
-  public resourceMasterCC(): NekostoreCollectionController<
-    ResourceMasterStore
-  > {
+  public resourceMasterCC() {
     return this.roomCollectionController<ResourceMasterStore>(
       "resource-master-list"
     );
   }
 
-  public resourceCC(): NekostoreCollectionController<ResourceStore> {
+  public resourceCC() {
     return this.roomCollectionController<ResourceStore>("resource-list");
   }
 
-  public initiativeColumnCC(): NekostoreCollectionController<
-    InitiativeColumnStore
-  > {
+  public initiativeColumnCC() {
     return this.roomCollectionController<InitiativeColumnStore>(
       "initiative-column-list"
     );
   }
 
-  public propertySelectionCC(): NekostoreCollectionController<
-    PropertySelectionStore
-  > {
+  public propertySelectionCC() {
     return this.roomCollectionController<PropertySelectionStore>(
       "property-selection-list"
     );
   }
 
-  public actorCC(): NekostoreCollectionController<ActorStore> {
+  public actorCC() {
     return this.roomCollectionController<ActorStore>("actor-list");
   }
 
-  public actorGroupCC(): NekostoreCollectionController<ActorGroup> {
-    return this.roomCollectionController<ActorGroup>("actor-group-list");
+  public actorGroupCC() {
+    return this.roomCollectionController<ActorGroupStore>("actor-group-list");
   }
 
-  public cardMetaCC(): NekostoreCollectionController<CardMeta> {
-    return this.roomCollectionController<CardMeta>("card-meta-list");
+  public cardMetaCC() {
+    return this.roomCollectionController<CardMetaStore>("card-meta-list");
   }
 
-  public cardObjectCC(): NekostoreCollectionController<CardObject> {
-    return this.roomCollectionController<CardObject>("card-object-list");
+  public cardObjectCC() {
+    return this.roomCollectionController<CardObjectStore>("card-object-list");
   }
 
-  public cardDeckBigCC(): NekostoreCollectionController<CardDeckBig> {
-    return this.roomCollectionController<CardDeckBig>("card-deck-big-list");
+  public cardDeckBigCC() {
+    return this.roomCollectionController<CardDeckBigStore>(
+      "card-deck-big-list"
+    );
   }
 
-  public cardDeckSmallCC(): NekostoreCollectionController<CardDeckSmall> {
-    return this.roomCollectionController<CardDeckSmall>("card-deck-small-list");
+  public cardDeckSmallCC() {
+    return this.roomCollectionController<CardDeckSmallStore>(
+      "card-deck-small-list"
+    );
   }
 
-  public chatPaletteListCC(): NekostoreCollectionController<ChatPaletteStore> {
+  public chatPaletteListCC() {
     return this.roomCollectionController<ChatPaletteStore>("chat-palette-list");
   }
 
-  public diceTypeListCC(): NekostoreCollectionController<DiceType> {
-    return this.roomCollectionController<DiceType>("dice-type-list");
+  public diceTypeListCC() {
+    return this.roomCollectionController<DiceTypeStore>("dice-type-list");
   }
 
-  public diceAndPipsListCC(): NekostoreCollectionController<DiceAndPips> {
-    return this.roomCollectionController<DiceAndPips>("dice-and-pips-list");
+  public diceAndPipsListCC() {
+    return this.roomCollectionController<DiceAndPipsStore>(
+      "dice-and-pips-list"
+    );
   }
 
-  public memoCC(): NekostoreCollectionController<MemoStore> {
+  public memoCC() {
     return this.roomCollectionController<MemoStore>("memo-list");
   }
 
-  public keepBcdiceDiceRollResultListCC(): NekostoreCollectionController<
-    KeepBcdiceDiceRollResult
-  > {
-    return this.roomCollectionController<KeepBcdiceDiceRollResult>(
+  public keepBcdiceDiceRollResultListCC() {
+    return this.roomCollectionController<KeepBcdiceDiceRollResultStore>(
       "chat-bcdice-dice-roll-result-list"
     );
   }
 
+  public publicMemoListCC() {
+    return this.roomCollectionController<PublicMemoStore>("public-memo-list");
+  }
+
+  public likeListCC() {
+    return this.roomCollectionController<LikeStore>("like-list");
+  }
+
   public getCC(type: string): NekostoreCollectionController<any> {
-    switch (type) {
-      case "chat":
-        return this.chatListCC();
-      case "chat-tab":
-        return this.chatTabListCC();
-      case "group-chat-tab":
-        return this.groupChatTabListCC();
-      case "scene":
-        return this.sceneListCC();
-      case "room-data":
-        return this.roomDataCC();
-      case "media":
-        return this.mediaCC();
-      case "image-tag":
-        return this.imageTagCC();
-      case "cut-in":
-        return this.cutInDataCC();
-      case "user":
-        return this.userCC();
-      case "resource-master":
-        return this.resourceMasterCC();
-      case "resource":
-        return this.resourceCC();
-      case "initiative-column":
-        return this.initiativeColumnCC();
-      case "property-selection":
-        return this.propertySelectionCC();
-      case "character":
-      case "dice-symbol":
-      case "floor-tile":
-      case "chit":
-      case "map-mask":
-        return this.sceneObjectCC();
-      case "actor":
-        return this.actorCC();
-      case "map-layer":
-        return this.sceneLayerCC();
-      case "map-and-layer":
-        return this.sceneAndLayerCC();
-      case "tag-note":
-        return this.tagNoteCC();
-      case "actor-group":
-        return this.actorGroupCC();
-      case "card-meta":
-        return this.cardMetaCC();
-      case "card-object":
-        return this.cardObjectCC();
-      case "card-deck-big":
-        return this.cardDeckBigCC();
-      case "card-deck-small":
-        return this.cardDeckSmallCC();
-      case "chat-palette":
-        return this.chatPaletteListCC();
-      case "dice-type":
-        return this.diceTypeListCC();
-      case "dice-and-pips":
-        return this.diceAndPipsListCC();
-      case "chat-bcdice-dice-roll-result":
-        return this.keepBcdiceDiceRollResultListCC();
-      case "memo":
-        return this.memoCC();
-      default:
-        throw new ApplicationError(`Invalid type error. type=${type}`);
+    let cc = <NekostoreCollectionController<any>>(
+      [
+        this.chatListCC(),
+        this.chatTabListCC(),
+        this.groupChatTabListCC(),
+        this.sceneListCC(),
+        this.sceneLayerCC(),
+        this.sceneObjectCC(),
+        this.actorStatusCC(),
+        this.sceneAndLayerCC(),
+        this.sceneAndObjectCC(),
+        this.roomDataCC(),
+        this.mediaCC(),
+        this.cutInDataCC(),
+        this.userCC(),
+        this.socketUserCC(),
+        this.resourceMasterCC(),
+        this.resourceCC(),
+        this.initiativeColumnCC(),
+        this.propertySelectionCC(),
+        this.actorCC(),
+        this.actorGroupCC(),
+        this.cardMetaCC(),
+        this.cardObjectCC(),
+        this.cardDeckBigCC(),
+        this.cardDeckSmallCC(),
+        this.chatPaletteListCC(),
+        this.diceTypeListCC(),
+        this.diceAndPipsListCC(),
+        this.memoCC(),
+        this.keepBcdiceDiceRollResultListCC(),
+        this.publicMemoListCC(),
+        this.likeListCC()
+      ].find(cc => cc.collectionNameSuffix === type)
+    );
+    if (!cc) {
+      if (
+        ["character", "map-mask", "chit", "dice-symbol"].some(t => t === type)
+      ) {
+        cc = this.sceneObjectCC();
+      }
     }
+    if (!cc) throw new ApplicationError(`Invalid type error. type=${type}`);
+    return cc;
   }
 }

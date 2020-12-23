@@ -1,20 +1,12 @@
 map:
-  - text: context.view-scene-list
-    taskName: window-open
-    taskArg:
-      type: scene-list-window
-  - text: context.bgm-setting
-    taskName: window-open
-    taskArg:
-      type: cut-in-list-window
   - text: context.add-map-mask
     taskName: window-open
     taskArg:
       type: map-mask-add-window
-  - text: context.add-dice-symbol
+  - text: context.add-map-marker
     taskName: window-open
     taskArg:
-      type: dice-symbol-add-window
+      type: map-marker-add-window
   - text: context.add-chit
     taskName: window-open
     taskArg:
@@ -23,6 +15,10 @@ map:
     taskName: window-open
     taskArg:
       type: character-add-window
+  - text: context.add-dice-symbol
+    taskName: window-open
+    taskArg:
+      type: dice-symbol-add-window
 
 card-object:
   - text: context.turn-on
@@ -81,6 +77,39 @@ map-mask:
   - ref: object-view-border
   - ref: object-hide-highlight
   - ref: object-view-highlight
+  - ~
+  - ref: export-object
+
+map-marker:
+  - text: context.modify
+    taskName: window-open
+    isViewCompare:
+      lhs:
+        refType: permission-check
+        type: edit
+      rhs:
+        true
+    isDisabledCompare:
+      lhs:
+        refType: exclusion-check
+      rhs:
+        true
+    taskArg:
+      type: map-marker-edit-window
+  - ref: object-copy
+  - ref: object-delete
+  - ref: object-chmod
+  - ref: hr-permission-check
+  - ref: object-fix
+  - ref: object-un-fix
+  - ref: object-hide-border
+  - ref: object-view-border
+  - ref: object-hide-marker-deco
+  - ref: object-view-marker-deco
+  - ref: object-hide-marker-back
+  - ref: object-view-marker-back
+  - ~
+  - ref: export-object
 
 chit:
   - text: context.modify
@@ -108,6 +137,8 @@ chit:
   - ref: object-view-border
   - ref: object-hide-highlight
   - ref: object-view-highlight
+  - ~
+  - ref: export-object
 
 character:
   - text: context.modify
@@ -135,15 +166,23 @@ character:
         property: data.url
       rhs: ""
       isNot: true
+  - text: context.create-chat-palette
+    taskName: create-chat-palette
+    isDisabledCompare:
+      lhs:
+        refType: can-create-chat-palette
+      rhs: true
   - text: context.edit-actor
     taskName: edit-actor
-  - ~
+  - ref: hr-permission-check
   - ref: object-fix
   - ref: object-un-fix
   - ref: object-hide-border
   - ref: object-view-border
   - ref: object-hide-highlight
   - ref: object-view-highlight
+  - ~
+  - ref: export-object
 
 dice-symbol:
   - ref: dice-roll
@@ -176,3 +215,23 @@ dice-symbol:
   - ref: object-view-border
   - ref: object-hide-highlight
   - ref: object-view-highlight
+
+public-memo:
+  - text: context.modify
+    taskName: window-open
+    isViewCompare:
+      lhs:
+        refType: permission-check
+        type: edit
+      rhs:
+        true
+    isDisabledCompare:
+      lhs:
+        refType: exclusion-check
+      rhs:
+        true
+    taskArg:
+      type: public-memo-edit-window
+  - ref: object-copy
+  - ref: object-delete
+  - ref: object-chmod

@@ -1,5 +1,6 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
     ref="component"
@@ -15,15 +16,14 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 import GameObjectManager from "../../../GameObjectManager";
-import { findRequireById } from "../../../../core/utility/Utility";
+import { findRequireByKey } from "@/app/core/utility/Utility";
+import SocketFacade from "@/app/core/api/app-server/SocketFacade";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class SelfActorSelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -53,17 +53,19 @@ export default class SelfActorSelect extends Mixins<MultiMixin>(
 
   private createOptionInfoList() {
     this.optionInfoList = this.actorList
-      .filter(a => a.owner === GameObjectManager.instance.mySelfUserId)
+      .filter(a => a.owner === SocketFacade.instance.userKey)
       .map(a => {
         let additionalText = "";
         if (a.data!.type === "user") {
-          const user = findRequireById(this.userList, a.owner);
+          const user = findRequireByKey(this.userList, a.owner);
           additionalText +=
-            "(" + this.$t(`label.${user.data!.type}`)!.toString() + ")";
+            "(" +
+            this.$t(`selection.user-type.${user.data!.type}`)!.toString() +
+            ")";
         }
         return {
-          key: a.id!,
-          value: a.id!,
+          key: a.key,
+          value: a.key,
           text: a.data!.name + additionalText,
           disabled: false
         };

@@ -13,7 +13,7 @@
     <card-component
       class="deck-set-card"
       v-for="cardMeta in getSampleList(deck.cardMetaList)"
-      :key="cardMeta.id"
+      :key="cardMeta.key"
       :cardMeta="cardMeta"
       :size="cardSize"
       :isTurnOff="!isSelected"
@@ -30,18 +30,17 @@
 <script lang="ts">
 import { Component, Mixins } from "vue-mixin-decorator";
 import { Prop } from "vue-property-decorator";
-import { Size } from "address";
-import { StoreUseData } from "../../../@types/store";
 import { createSize } from "../../core/utility/CoordinateUtility";
 import ComponentVue from "../../core/window/ComponentVue";
-import { CardDeckBig, CardMeta } from "../../../@types/gameObject";
+import { CardDeckBigStore, CardMetaStore } from "@/@types/store-data";
 import { getCssPxNum } from "../../core/css/Css";
 import VueEvent from "../../core/decorator/VueEvent";
 import CardComponent from "./CardComponent.vue";
+import { Size } from "@/@types/store-data-optional";
 
 export type DeckInfo = {
-  cardDeckBig: StoreUseData<CardDeckBig>;
-  cardMetaList: StoreUseData<CardMeta>[];
+  cardDeckBig: StoreUseData<CardDeckBigStore>;
+  cardMetaList: StoreUseData<CardMetaStore>[];
 };
 
 @Component({
@@ -73,7 +72,7 @@ export default class CardDeckSetComponent extends Mixins<ComponentVue>(
   }
 
   @VueEvent
-  private getSampleList(list: StoreUseData<CardMeta>[]) {
+  private getSampleList(list: StoreData<CardMetaStore>[]) {
     return list.slice(0, 3);
   }
 }

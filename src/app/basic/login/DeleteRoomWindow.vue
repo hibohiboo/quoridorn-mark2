@@ -13,7 +13,7 @@
     </div>
     <div class="button-area">
       <ctrl-button @click.stop="commit()">
-        <span v-t="'button.execution'"></span>
+        <span v-t="'button.delete'"></span>
       </ctrl-button>
       <ctrl-button @click.stop="rollback()">
         <span v-t="'button.reject'"></span>
@@ -29,7 +29,7 @@ import LifeCycle from "../../core/decorator/LifeCycle";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import BaseInput from "../../core/component/BaseInput.vue";
-import { DeleteRoomInput } from "../../../@types/socket";
+import { DeleteRoomInput } from "@/@types/socket";
 import VueEvent from "../../core/decorator/VueEvent";
 
 @Component({

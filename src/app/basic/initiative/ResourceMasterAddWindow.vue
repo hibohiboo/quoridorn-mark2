@@ -9,7 +9,7 @@
       :resourceType.sync="resourceType"
       :isAutoAddActor.sync="isAutoAddActor"
       :isAutoAddMapObject.sync="isAutoAddMapObject"
-      :iconImageId.sync="iconImageId"
+      :iconImageKey.sync="iconImageKey"
       :iconImageTag.sync="iconImageTag"
       :iconImageDirection.sync="iconImageDirection"
       :refProperty.sync="refProperty"
@@ -24,7 +24,7 @@
     />
 
     <div class="button-area">
-      <ctrl-button @click="commit()">
+      <ctrl-button @click="commit()" :disabled="isDuplicate || !name">
         <span v-t="'button.add'"></span>
       </ctrl-button>
       <ctrl-button @click="rollback()">
@@ -43,27 +43,23 @@ import {
   convertNumberZero
 } from "../../core/utility/PrimaryDataUtility";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
-import {
-  RefProperty,
-  ResourceMasterStore,
-  ResourceType
-} from "../../../@types/gameObject";
+import { ResourceMasterStore } from "@/@types/store-data";
 import VueEvent from "../../core/decorator/VueEvent";
 import { parseColor } from "../../core/utility/ColorUtility";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import LanguageManager from "../../../LanguageManager";
 import ResourceMasterInfoForm from "./ResourceMasterInfoForm.vue";
-import { Direction } from "../../../@types/room";
+import {
+  Direction,
+  RefProperty,
+  ResourceType
+} from "@/@types/store-data-optional";
+import GameObjectManager from "@/app/basic/GameObjectManager";
 
-@Component({
-  components: {
-    CtrlButton,
-    ResourceMasterInfoForm
-  }
-})
+@Component({ components: { CtrlButton, ResourceMasterInfoForm } })
 export default class ResourceMasterAddWindow extends Mixins<
-  WindowVue<string, never>
+  WindowVue<string, boolean>
 >(WindowVue) {
   private isMounted: boolean = false;
   private cc = SocketFacade.instance.resourceMasterCC();
@@ -72,7 +68,7 @@ export default class ResourceMasterAddWindow extends Mixins<
   private resourceType: ResourceType = "no-contents";
   private isAutoAddActor: boolean = false;
   private isAutoAddMapObject: boolean = true;
-  private iconImageId: string | null = null;
+  private iconImageKey: string | null = null;
   private iconImageTag: string | null = null;
   private iconImageDirection: Direction = "none";
   private refProperty: RefProperty | null = null;
@@ -85,10 +81,24 @@ export default class ResourceMasterAddWindow extends Mixins<
   private defaultValueBoolean: boolean = false;
   private defaultValueColor: string = "#000000";
 
+  private resourceMasterList = GameObjectManager.instance.resourceMasterList;
+
   @LifeCycle
   public async mounted() {
     await this.init();
     this.isMounted = true;
+  }
+
+  @VueEvent
+  private get isDuplicate(): boolean {
+    return this.resourceMasterList.some(rm => rm.data!.label === this.name);
+  }
+
+  @Watch("isDuplicate")
+  private onChangeIsDuplicate() {
+    this.windowInfo.message = this.isDuplicate
+      ? this.$t("message.name-duplicate")!.toString()
+      : "";
   }
 
   @Watch("resourceType")
@@ -118,8 +128,8 @@ export default class ResourceMasterAddWindow extends Mixins<
   @VueEvent
   private async commit() {
     // TODO 同名プロパティチェック
-    await this.cc!.addDirect([this.resourceMasterData]);
-    await this.close();
+    await this.cc!.addDirect([{ data: this.resourceMasterData }]);
+    await this.finally(true);
   }
 
   private get resourceMasterData(): ResourceMasterStore {
@@ -134,9 +144,11 @@ export default class ResourceMasterAddWindow extends Mixins<
       systemColumnType: null,
       isAutoAddActor: this.isAutoAddActor,
       isAutoAddMapObject: this.isAutoAddMapObject,
-      iconImageId: this.iconImageId,
-      iconImageTag: this.iconImageTag,
-      iconImageDirection: this.iconImageDirection,
+      icon: {
+        mediaKey: this.iconImageKey,
+        mediaTag: this.iconImageTag,
+        imageDirection: this.iconImageDirection
+      },
       refProperty: isRef ? this.refProperty : null,
       min: isNumber ? this.min : null,
       max: isNumber ? this.max : null,
@@ -154,7 +166,7 @@ export default class ResourceMasterAddWindow extends Mixins<
 
   @VueEvent
   private async rollback() {
-    await this.close();
+    await this.finally();
   }
 
   public static getDefaultValueFromType(

@@ -1,8 +1,8 @@
 <template>
   <ctrl-select
+    :elmId="elmId"
     v-model="localValue"
     :optionInfoList="optionInfoList"
-    :id="id"
     :readonly="readonly"
     ref="component"
   />
@@ -17,13 +17,11 @@ import LifeCycle from "../../../../core/decorator/LifeCycle";
 import TaskProcessor from "../../../../core/task/TaskProcessor";
 import CtrlSelect from "../../../../core/component/CtrlSelect.vue";
 import ComponentVue from "../../../../core/window/ComponentVue";
-import { HtmlOptionInfo } from "../../../../../@types/window";
+import { HtmlOptionInfo } from "@/@types/window";
 
 interface MultiMixin extends SelectMixin, ComponentVue {}
 
-@Component({
-  components: { CtrlSelect }
-})
+@Component({ components: { CtrlSelect } })
 export default class RefPropertySelect extends Mixins<MultiMixin>(
   SelectMixin,
   ComponentVue
@@ -38,7 +36,6 @@ export default class RefPropertySelect extends Mixins<MultiMixin>(
     { value: "actor-tag", key: "", text: "", disabled: false },
     { value: "owner-name", key: "", text: "", disabled: false },
     { value: "owner-type", key: "", text: "", disabled: false },
-    { value: "object-other-text", key: "", text: "", disabled: false },
     { value: "object-layer", key: "", text: "", disabled: false },
     { value: "actor-status-name", key: "", text: "", disabled: false },
     { value: "actor-chat-text-color", key: "", text: "", disabled: false },
@@ -60,8 +57,8 @@ export default class RefPropertySelect extends Mixins<MultiMixin>(
 
   private createOptionInfoList() {
     this.optionInfoList.forEach(o => {
-      const suffix = o.value ? `-${o.value}` : "";
-      o.text = this.$t(`label.ref-property${suffix}`)!.toString();
+      const suffix = o.value || "label";
+      o.text = this.$t(`selection.ref-property.${suffix}`)!.toString();
       o.key = o.value;
     });
   }

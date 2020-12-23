@@ -1,10 +1,9 @@
 import urljoin from "url-join";
-import { Texture } from "@/@types/room";
-import { StoreMetaData, StoreUseData } from "@/@types/store";
 import GameObjectManager from "../../basic/GameObjectManager";
 import LanguageManager from "../../../LanguageManager";
 import { ApplicationError } from "../error/ApplicationError";
 import * as jsonp from "jsonp";
+import { Texture } from "@/@types/store-data-optional";
 
 export function getSrc(
   path: string
@@ -20,7 +19,7 @@ export function getSrc(
   return { url, dataLocation: "server" };
 }
 
-export function shuffleOrder(list: StoreUseData<any>[]): void {
+export function shuffleOrder(list: StoreData<any>[]): void {
   for (let i = list.length - 1; i > 0; i--) {
     const r = Math.floor(Math.random() * (i + 1));
     const tmpOrder = list[i].order;
@@ -160,7 +159,10 @@ export function execCopy(text: string): boolean {
     const message = LanguageManager.instance.getText(
       "message.copy-to-clipboard"
     );
-    alert(`${message}\n${text}`);
+    successDialog({
+      title: LanguageManager.instance.getText("message.success"),
+      text: `${message}\n${text}`
+    }).then();
   }
 
   return result;
@@ -176,7 +178,7 @@ export function getTextureStyle(texture: Texture) {
     style.backgroundColor = texture.backgroundColor;
   } else {
     const mediaList = GameObjectManager.instance.mediaList;
-    const imageData = findById(mediaList, texture.imageId);
+    const imageData = findByKey(mediaList, texture.mediaKey);
     if (imageData && imageData.data) {
       style.backgroundImage = `url('${imageData.data.url}')`;
     }
@@ -188,47 +190,29 @@ export function getTextureStyle(texture: Texture) {
 }
 
 export function createEmptyStoreUseData<T>(
-  id: string | null,
+  key: string,
   data: T
 ): StoreUseData<T> {
   return {
+    id: "",
+    collection: "volatile",
+    key,
+    order: -1,
     ownerType: null,
     owner: null,
-    id,
-    order: -1,
     exclusionOwner: null,
     lastExclusionOwner: null,
-    data,
     permission: null,
     status: "added",
     createTime: new Date(),
-    updateTime: null
+    updateTime: null,
+    refList: [],
+    data
   };
 }
 
 export function someByStr(list: string[], str: string | null): boolean {
   return list.some(s => s === str);
-}
-
-export function findById<T extends StoreMetaData>(
-  list: T[] | null,
-  id: string | null
-): T | null {
-  if (!list) return null;
-  return list.find(obj => obj.id === id) || null;
-}
-
-export function findRequireById<T extends StoreMetaData>(
-  list: T[],
-  id: string | null
-): T {
-  const result = list.find(obj => obj.id === id);
-  if (!result) {
-    throw new ApplicationError(
-      `findRequireById ${JSON.stringify({ id }, null, "  ")}`
-    );
-  }
-  return result;
 }
 
 export function findByKey<T extends { key: string | null }>(
@@ -244,7 +228,9 @@ export function findRequireByKey<T extends { key: string | null }>(
 ): T {
   const result = list.find(obj => obj.key === key);
   if (!result) {
-    throw new ApplicationError(``);
+    throw new ApplicationError(
+      `findRequireByKey ${JSON.stringify({ key }, null, "  ")}`
+    );
   }
   return result;
 }
@@ -269,15 +255,68 @@ export async function getJson(url: string): Promise<any> {
   });
 }
 
-export async function getJsonForTrpgSystemData<T>(
-  url: string,
-  regexpFrom: RegExp,
-  jsonUrlFormat: string
-): Promise<T | null> {
-  const matchResult = url.match(regexpFrom);
-  if (!matchResult) return null;
-  const key = matchResult[1];
-  // const editUrl = 'https://character-sheets.appspot.com/shinobigami/edit.html?key=' + key;
-  const jsonUrl = jsonUrlFormat.replace("{key}", key);
-  return (await getJson(jsonUrl)) as T;
+async function simpleDialog(obj: {
+  title: string;
+  text: string;
+  icon: "warning" | "error" | "success" | "info" | "question";
+}): Promise<void> {
+  const html = `<div style="text-align: left;">${obj.text.replaceAll(
+    "\n",
+    "<br />"
+  )}</div>`;
+  delete obj.text;
+  const confirm = await Swal.fire({
+    ...obj,
+    html
+  });
+}
+
+export async function errorDialog(obj: {
+  title: string;
+  text: string;
+}): Promise<void> {
+  await simpleDialog({
+    ...obj,
+    icon: "error"
+  });
+}
+
+export async function warningDialog(obj: {
+  title: string;
+  text: string;
+}): Promise<void> {
+  await simpleDialog({
+    ...obj,
+    icon: "warning"
+  });
+}
+
+export async function successDialog(obj: {
+  title: string;
+  text: string;
+}): Promise<void> {
+  await simpleDialog({
+    ...obj,
+    icon: "success"
+  });
+}
+
+export async function questionDialog(obj: {
+  title: string;
+  text: string;
+  confirmButtonText: string;
+  cancelButtonText: string;
+}): Promise<boolean> {
+  const html = `<div style="text-align: left;">${obj.text.replaceAll(
+    "\n",
+    "<br />"
+  )}</div>`;
+  delete obj.text;
+  const confirm = await Swal.fire({
+    ...obj,
+    html,
+    icon: "question",
+    showCancelButton: true
+  });
+  return confirm.isConfirmed;
 }

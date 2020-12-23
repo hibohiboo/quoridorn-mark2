@@ -6,21 +6,27 @@
 </template>
 
 <script lang="ts">
-import { Action, Getter } from "vuex-class";
-import { Component, Emit, Prop, Vue } from "vue-property-decorator";
+import { Component, Emit, Prop } from "vue-property-decorator";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
+import VueEvent from "@/app/core/decorator/VueEvent";
 
 @Component
-export default class MenuBooleanItem extends Vue {
+export default class MenuBooleanItem extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: String, required: true })
   private property!: string;
 
   @Emit("click")
   private itemOnClick() {}
 
+  @VueEvent
   private mouseEnter(event: any) {
     this.$emit("mouseenter", event);
   }
 
+  @VueEvent
   private get propValue() {
     return false;
   }

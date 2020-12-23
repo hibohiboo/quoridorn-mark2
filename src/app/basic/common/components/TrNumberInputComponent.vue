@@ -1,7 +1,7 @@
 <template>
   <tr class="tr-number-input-component">
     <th class="label-input">
-      <label :for="key" v-t="`label.${labelName}`"></label>
+      <label :for="key" v-t="labelName"></label>
     </th>
     <td>
       <input
@@ -19,7 +19,7 @@
         @keydown.229.stop
         @keyup.229.stop
       />
-      <span v-if="unitLabel" v-t="`label.${unitLabel}`"></span>
+      <span v-if="unitLabel" v-t="unitLabel"></span>
     </td>
   </tr>
 </template>
@@ -29,6 +29,7 @@ import { Prop } from "vue-property-decorator";
 import { Component, Mixins } from "vue-mixin-decorator";
 import ComponentVue from "../../../core/window/ComponentVue";
 import BaseInput from "../../../core/component/BaseInput.vue";
+import LifeCycle from "@/app/core/decorator/LifeCycle";
 
 @Component({ components: { BaseInput } })
 export default class TrNumberInputComponent extends Mixins<ComponentVue>(
@@ -58,6 +59,7 @@ export default class TrNumberInputComponent extends Mixins<ComponentVue>(
   @Prop({ type: String, default: "" })
   private unitLabel!: string;
 
+  @LifeCycle
   private mounted() {
     if (this.inputWidth) {
       const inputElm = this.$refs.inputElm as HTMLInputElement;

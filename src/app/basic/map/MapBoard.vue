@@ -14,16 +14,15 @@
 
     <scene-layer-component
       v-for="layer in useLayerList"
-      :key="layer.id"
-      :sceneId="sceneId"
+      :key="layer.key"
+      :sceneKey="sceneKey"
       :layer="layer"
     />
   </div>
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue, Watch } from "vue-property-decorator";
-import { Matrix, Size } from "address";
+import { Component, Prop, Watch } from "vue-property-decorator";
 import { ModeInfo } from "mode";
 import LifeCycle from "../../core/decorator/LifeCycle";
 import { createSize } from "../../core/utility/CoordinateUtility";
@@ -31,23 +30,24 @@ import TaskManager from "../../core/task/TaskManager";
 import { drawLine, drawLine2 } from "../../core/utility/CanvasDrawUtility";
 import SceneLayerComponent from "./SceneLayerComponent.vue";
 import GameObjectManager from "../GameObjectManager";
-import { RoomData, Scene } from "../../../@types/room";
-import { findRequireById } from "../../core/utility/Utility";
+import { RoomDataStore, SceneStore } from "@/@types/store-data";
+import { findRequireByKey } from "../../core/utility/Utility";
 import VueEvent from "../../core/decorator/VueEvent";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
+import { Size } from "@/@types/store-data-optional";
 
-@Component({
-  components: { SceneLayerComponent }
-})
-export default class MapBoard extends Vue {
+@Component({ components: { SceneLayerComponent } })
+export default class MapBoard extends Mixins<ComponentVue>(ComponentVue) {
   private isMapDraggingRight: boolean = false;
 
   @Prop({ type: String, required: true })
-  private sceneId!: string;
+  private sceneKey!: string;
 
   @Prop({ type: Object, default: null })
-  private scene!: Scene | null;
+  private scene!: SceneStore | null;
 
-  private roomData: RoomData = GameObjectManager.instance.roomData;
+  private roomData: RoomDataStore = GameObjectManager.instance.roomData;
   private sceneLayerList = GameObjectManager.instance.sceneLayerList;
   private sceneAndLayerList = GameObjectManager.instance.sceneAndLayerList;
 
@@ -57,10 +57,10 @@ export default class MapBoard extends Vue {
   private get useLayerList() {
     return this.sceneAndLayerList
       .filter(
-        mal => mal.data && mal.data.sceneId === this.sceneId && mal.data.isUse
+        mal => mal.data && mal.data.sceneKey === this.sceneKey && mal.data.isUse
       )
-      .map(mal => mal.data!.layerId)
-      .map(layerId => findRequireById(this.sceneLayerList, layerId))
+      .map(mal => mal.data!.layerKey)
+      .map(layerKey => findRequireByKey(this.sceneLayerList, layerKey))
       .filter(ml => ml);
   }
 
@@ -94,7 +94,10 @@ export default class MapBoard extends Vue {
   @Watch("scene", { deep: true })
   private onChangeScene() {
     if (!this.isMounted) return;
-    this.paint();
+    // setTimeoutを入れないと罫線の反映がされない場合がある
+    setTimeout(() => {
+      this.paint();
+    });
   }
 
   private get mapCanvasSize(): Size {
@@ -133,20 +136,20 @@ export default class MapBoard extends Vue {
       }
 
       // マウス下のマスを強調表示
-      ctx.strokeStyle = this.scene.gridColor;
-      ctx.strokeStyle = "red";
-      ctx.globalAlpha = 1;
-      const m: Matrix = {
-        row: 4,
-        column: 6
-      };
-      ctx.rect(
-        (m.column - 1) * gridSize,
-        (m.row - 1) * gridSize,
-        gridSize,
-        gridSize
-      );
-      ctx.stroke();
+      // ctx.strokeStyle = this.scene.gridColor;
+      // ctx.strokeStyle = "red";
+      // ctx.globalAlpha = 1;
+      // const m: Matrix = {
+      //   row: 4,
+      //   column: 6
+      // };
+      // ctx.rect(
+      //   (m.column - 1) * gridSize,
+      //   (m.row - 1) * gridSize,
+      //   gridSize,
+      //   gridSize
+      // );
+      // ctx.stroke();
     }
 
     // マス座標の描画

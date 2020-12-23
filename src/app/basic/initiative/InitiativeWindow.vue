@@ -2,7 +2,7 @@
   <div ref="window-container">
     <div class="button-area space-between margin-bottom">
       <ctrl-button @click="openResourceMasterListWindow">
-        <span v-t="'button.open-resource-master-list-window'"></span>
+        <span v-t="'resource-master-list-window.window-title'"></span>
       </ctrl-button>
     </div>
 
@@ -13,9 +13,9 @@
       :status="status"
       :dataList="initiativeDataList"
       :isUseHeaderI18n="false"
-      keyProp="id"
+      keyProp="key"
       :rowClassGetter="getRowClasses"
-      v-model="selectedTargetId"
+      v-model="selectedTargetKey"
       @adjustWidth="adjustWidth"
     >
       <template #header="{ colDec }">
@@ -23,7 +23,7 @@
       </template>
       <template #contents="{ colDec, data }">
         <keep-alive>
-          <template v-if="data.data[colDec.target] === null">
+          <template v-if="data.data[colDec.target] === undefined">
             <span class="none">-</span>
           </template>
           <template v-else-if="getInputType(colDec.type)">
@@ -36,7 +36,7 @@
           </template>
           <template v-else-if="colDec.type === 'select'">
             <selection-value-select
-              :id="`prop-${data.owner}-${colDec.target}`"
+              :elmId="`prop-${data.owner}-${colDec.target}`"
               :value="data.data[colDec.target].value"
               :selection="data.data[colDec.target].selection"
               @input="
@@ -48,7 +48,7 @@
               "
             />
           </template>
-          <label v-else-if="colDec.type === 'combo'">
+          <template v-else-if="colDec.type === 'combo'">
             <input
               :id="`prop-${data.owner}-${colDec.target}`"
               type="text"
@@ -62,19 +62,17 @@
                 )
               "
             />
-          </label>
-          <label v-else>
+          </template>
+          <template v-else>
             {{ (__staticValue = getStaticValue(colDec, data, "-")) && null }}
             <input
-              type="color"
               v-if="isColorText(__staticValue)"
+              type="color"
               :value="__staticValue"
               disabled="disabled"
             />
-            <span v-else>
-              {{ __staticValue }}
-            </span>
-          </label>
+            <template v-else>{{ __staticValue }}</template>
+          </template>
         </keep-alive>
       </template>
     </table-component>
@@ -91,11 +89,13 @@
       ></option>
     </datalist>
 
+    <!--
     <div class="button-area">
       <ctrl-button @click="changeSettings">
         <span v-t="'button.setting'"></span>
       </ctrl-button>
     </div>
+    -->
   </div>
 </template>
 
@@ -112,27 +112,26 @@ import {
 } from "../../core/utility/PrimaryDataUtility";
 import SocketFacade from "../../core/api/app-server/SocketFacade";
 import TableComponent from "../../core/component/table/TableComponent.vue";
-import { WindowResizeInfo, WindowTableColumn } from "../../../@types/window";
+import { WindowResizeInfo, WindowTableColumn } from "@/@types/window";
 import VueEvent from "../../core/decorator/VueEvent";
-import { StoreUseData } from "../../../@types/store";
 import WindowVue from "../../core/window/WindowVue";
 import CtrlButton from "../../core/component/CtrlButton.vue";
 import GameObjectManager from "../GameObjectManager";
-import LanguageManager from "../../../LanguageManager";
-import { CutInDeclareInfo, UserData } from "../../../@types/room";
-import { DataReference } from "../../../@types/data";
 import {
   ActorStore,
-  RefProperty,
-  SceneObject
-} from "../../../@types/gameObject";
+  SceneObjectStore,
+  CutInStore,
+  UserStore
+} from "@/@types/store-data";
 import {
-  findRequireById,
+  findByKey,
+  findRequireByKey,
   findRequireByOwner
 } from "../../core/utility/Utility";
 import { parseColor } from "../../core/utility/ColorUtility";
 import App from "../../../views/App.vue";
 import SelectionValueSelect from "../common/components/select/SelectionValueSelect.vue";
+import { RefProperty } from "@/@types/store-data-optional";
 
 const uuid = require("uuid");
 
@@ -147,7 +146,7 @@ const uuid = require("uuid");
 export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
   WindowVue
 ) {
-  private selectedTargetId: string | null = null;
+  private selectedTargetKey: string | null = null;
   private userList = GameObjectManager.instance.userList;
   private actorList = GameObjectManager.instance.actorList;
   private actorStatusList = GameObjectManager.instance.actorStatusList;
@@ -208,9 +207,9 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
     const type = colDec.type;
     const target = colDec.target;
 
-    const resourceMaster = this.resourceMasterList.filter(
+    const resourceMaster = this.resourceMasterList.find(
       rm => rm.data!.label === target
-    )[0];
+    );
 
     if (!resourceMaster)
       return data.data![target] === null ? nullText : data.data![target];
@@ -218,37 +217,33 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
 
     const getPropValue = (
       resourceType: "ref-normal" | "ref-owner",
-      dataType: "scene-object" | "actor",
+      dataType: "scene-object-list" | "actor-list",
       refProperty: string,
-      sceneObject: StoreUseData<SceneObject> | null,
-      actor: StoreUseData<ActorStore>
+      sceneObject: StoreData<SceneObjectStore> | null,
+      actor: StoreData<ActorStore>
     ): string => {
-      const owner = findRequireById(
+      const owner = findRequireByKey(
         this.userList,
-        dataType === "scene-object" ? sceneObject!.owner : actor.owner
+        dataType === "scene-object-list" ? sceneObject!.owner : actor.owner
       );
 
       actor =
         resourceType === "ref-normal"
           ? actor
-          : this.actorList.filter(
-              a => a.owner === owner.id && a.data!.type === "user"
-            )[0];
+          : this.actorList.find(
+              a => a.owner === owner.key && a.data!.type === "user"
+            )!;
 
-      const status = this.actorStatusList.filter(
-        as => as.id === actor.data!.statusId
-      )[0];
+      const status = findByKey(this.actorStatusList, actor.data!.statusKey);
 
       const layer = sceneObject
-        ? this.sceneLayerList.filter(
-            sl => sl.id === sceneObject.data!.layerId
-          )[0]
+        ? findByKey(this.sceneLayerList, sceneObject.data!.layerKey)
         : null;
 
-      let base: StoreUseData<SceneObject | ActorStore | UserData> = owner;
+      let base: StoreData<SceneObjectStore | ActorStore | UserStore> = owner;
       let isBaseActor: boolean = false;
       if (resourceType !== "ref-owner") {
-        if (dataType === "actor") {
+        if (dataType === "actor-list") {
           base = actor;
           isBaseActor = true;
         } else {
@@ -258,13 +253,11 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
 
       const getTypeStr = (
         isActor: boolean,
-        d: StoreUseData<SceneObject | ActorStore | UserData>
-      ) => {
-        const typeText = LanguageManager.instance.getText(
-          `type.${d.data!.type}`
-        );
+        d: StoreData<SceneObjectStore | ActorStore | UserStore>
+      ): string => {
+        const typeText = this.$t(`type.${d.data!.type}`)!.toString();
         if (!isActor) return typeText;
-        const actorText = LanguageManager.instance.getText(`type.actor`);
+        const actorText = this.$t(`type.actor`)!.toString();
         return `${actorText}(${typeText})`;
       };
 
@@ -287,23 +280,18 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
           return owner.data!.name;
         case "owner-type":
           return owner.data!.type;
-        case "object-other-text":
-          const memo = GameObjectManager.instance.memoList.filter(
-            m => m.owner === base.id
-          )[0];
-          return memo ? memo.data!.text : nullText;
         case "object-layer": {
           if (!layer) return nullText;
           if (!layer.data!.isSystem) return layer.data!.name!;
-          return LanguageManager.instance.getText(`type.${layer.data!.type}`)!;
+          return this.$t(`type.${layer.data!.type}`)!.toString();
         }
         case "actor-status-name":
-          return status.data!.name;
+          return status!.data!.name;
         case "actor-chat-text-color": {
-          let cActor: StoreUseData<ActorStore> = actor;
+          let cActor: StoreData<ActorStore> = actor;
           if (cActor.data!["chatFontColorType"] !== "original") {
-            const cActorOwner = findRequireById(this.userList, cActor.owner);
-            cActor = findRequireByOwner(this.actorList, cActorOwner.id);
+            const cActorOwner = findRequireByKey(this.userList, cActor.owner);
+            cActor = findRequireByOwner(this.actorList, cActorOwner.key);
           }
           return cActor!.data!["chatFontColor"];
         }
@@ -314,13 +302,13 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
       }
     };
 
-    let sceneObject: StoreUseData<SceneObject> | null = null;
-    let actorId: string = data.owner;
-    if (data.ownerType === "scene-object") {
-      sceneObject = this.sceneObjectList.filter(so => so.id === data.owner)[0];
-      actorId = sceneObject.data!.actorId!;
+    let sceneObject: StoreData<SceneObjectStore> | null = null;
+    let actorKey: string = data.owner;
+    if (data.ownerType === "scene-object-list") {
+      sceneObject = this.sceneObjectList.filter(so => so.key === data.owner)[0];
+      actorKey = sceneObject.data!.actorKey!;
     }
-    const actor = this.actorList.filter(a => a.id === actorId)[0];
+    const actor = this.actorList.filter(a => a.key === actorKey)[0];
 
     if (type === "ref-normal" || type === "ref-owner") {
       return getPropValue(
@@ -340,12 +328,12 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
   private get dataOwnerList(): DataReference[] {
     try {
       type SortableTargetInfo = {
-        type: "scene-object" | "actor";
-        userId: string;
+        type: "scene-object-list" | "actor-list";
+        userKey: string;
         userOrder: number;
-        actorId: string;
+        actorKey: string;
         actorOrder: number;
-        sceneObjectId: string | null;
+        sceneObjectKey: string | null;
         sceneObjectOrder: number | null;
         actorName: string;
         initiative: number | null;
@@ -353,56 +341,65 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
       const sortableTargetInfoList: SortableTargetInfo[] = [];
 
       this.resourceList.forEach(r => {
-        const resourceMaster = this.resourceMasterList.filter(
-          rm => rm.id === r.data!.masterId
-        )[0];
+        const resourceMaster = findRequireByKey(
+          this.resourceMasterList,
+          r.data!.resourceMasterKey
+        );
+
+        if (
+          !resourceMaster.data!.isAutoAddActor &&
+          !resourceMaster.data!.isAutoAddMapObject
+        )
+          return;
 
         // actorの時の値で初期化
-        let sceneObjectId: string | null = null;
+        let sceneObjectKey: string | null = null;
         let sceneObjectOrder: number | null = null;
 
-        let actorId: string = r.owner!;
+        let actorKey: string = r.owner!;
 
-        let userId: string = "";
+        let userKey: string = "";
 
         const initiative: number | null =
           resourceMaster.data!.systemColumnType === "initiative"
             ? convertNumberNull(r.data!.value)
             : null;
 
-        if (r.ownerType === "actor") {
-          actorId = r.owner!;
+        if (r.ownerType === "actor-list") {
+          actorKey = r.owner!;
         } else {
-          sceneObjectId = r.owner;
-          const sceneObject = findRequireById(
+          sceneObjectKey = r.owner;
+          const sceneObject = findRequireByKey(
             this.sceneObjectList,
-            sceneObjectId
+            sceneObjectKey
           );
           sceneObjectOrder = sceneObject.order;
-          actorId = sceneObject.data!.actorId!;
-          userId = sceneObject.owner!;
+          actorKey = sceneObject.data!.actorKey!;
+          userKey = sceneObject.owner!;
         }
-        const actor = findRequireById(this.actorList, actorId);
+        const actor = findRequireByKey(this.actorList, actorKey);
         const actorOrder = actor.order;
         const actorName = actor.data!.name;
-        if (r.ownerType === "actor") {
-          userId = actor.owner!;
+        if (r.ownerType === "actor-list") {
+          userKey = actor.owner!;
         }
 
-        const user = this.userList.filter(u => u.id === userId)[0];
+        const user = findRequireByKey(this.userList, userKey);
         const userOrder = user.order;
 
-        let sortableTargetInfo = sortableTargetInfoList.filter(
-          sti => sti.sceneObjectId === sceneObjectId && sti.actorId === actorId
-        )[0];
+        let sortableTargetInfo = sortableTargetInfoList.find(
+          sti =>
+            sti.sceneObjectKey === sceneObjectKey && sti.actorKey === actorKey
+        );
         if (!sortableTargetInfo) {
           sortableTargetInfo = {
-            type: r.ownerType === "actor" ? "actor" : "scene-object",
-            userId,
+            type:
+              r.ownerType === "actor-list" ? "actor-list" : "scene-object-list",
+            userKey,
             userOrder,
-            actorId,
+            actorKey,
             actorOrder,
-            sceneObjectId,
+            sceneObjectKey,
             sceneObjectOrder,
             initiative,
             actorName
@@ -426,8 +423,8 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
         .sort((sti1, sti2) => {
           if (sti1.initiative !== null && sti2.initiative !== null) {
             // イニシアティブ値が null でないのが2つ
-            if (sti1.initiative < sti2.initiative) return -1;
-            if (sti1.initiative > sti2.initiative) return 1;
+            if (sti1.initiative > sti2.initiative) return -1;
+            if (sti1.initiative < sti2.initiative) return 1;
           } else if (sti1.initiative !== null || sti2.initiative !== null) {
             // イニシアティブ値が null でないのが1つ
             // nullは下の方へ
@@ -455,8 +452,8 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
           return 0;
         })
         .map(sti => ({
-          type: sti.type === "actor" ? "actor" : "scene-object",
-          docId: sti.type === "actor" ? sti.actorId : sti.sceneObjectId!
+          type: sti.type,
+          key: sti.type === "actor-list" ? sti.actorKey : sti.sceneObjectKey!
         }));
     } catch (err) {
       console.error(err);
@@ -465,48 +462,57 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
   }
 
   @VueEvent
-  private get initiativeDataList(): StoreUseData<any>[] {
-    const resultList: StoreUseData<any>[] = [];
+  private get initiativeDataList(): StoreData<any>[] {
+    const resultList: StoreData<any>[] = [];
 
     this.dataOwnerList.forEach((df, ind) => {
-      const resultData: StoreUseData<any> = {
-        id: uuid.v4(),
-        ownerType: df.type,
-        owner: df.docId,
+      const resultData: StoreData<any> = {
+        collection: "initiative-volatile",
+        key: uuid.v4(),
         order: ind,
+        ownerType: df.type,
+        owner: df.key,
         exclusionOwner: null,
         lastExclusionOwner: null,
         permission: GameObjectManager.PERMISSION_DEFAULT,
         status: "added",
         createTime: new Date(),
         updateTime: null,
+        refList: [],
         data: {}
       };
       this.initiativeColumnList
         // 使用列一覧からリソースマスターに変換
         .map(
           ic =>
-            this.resourceMasterList.filter(
-              rm => rm.id === ic.data!.resourceMasterId
-            )[0]
+            this.resourceMasterList.find(
+              rm => rm.key === ic.data!.resourceMasterKey
+            )!
         )
         // リソースマスターからリソース一覧に変換
         .map(rm => ({
           resourceMaster: rm,
-          resource: this.resourceList.filter(
+          resource: this.resourceList.find(
             r =>
-              r.data!.masterId === rm.id &&
-              r.owner === df.docId &&
+              r.data!.resourceMasterKey === rm.key &&
+              r.owner === df.key &&
               r.ownerType === df.type
-          )[0]
+          )
         }))
         .forEach(obj => {
+          if (df.type === "actor" && !obj.resourceMaster.data!.isAutoAddActor)
+            return;
+          if (
+            df.type === "scene-object" &&
+            !obj.resourceMaster.data!.isAutoAddMapObject
+          )
+            return;
           const type = obj.resourceMaster.data!.type;
           if (type === "select" || type === "combo") {
             resultData.data[obj.resourceMaster.data!.label] = {
               value: obj.resource ? obj.resource.data!.value : null,
               selection: obj.resourceMaster.data!.selectionStr,
-              elmId: `${this.windowInfo.key}-selection-list-${obj.resourceMaster.id}`
+              elmId: `${this.windowInfo.key}-selection-list-${obj.resourceMaster.key}`
             };
           } else {
             resultData.data[obj.resourceMaster.data!.label] = obj.resource
@@ -514,6 +520,7 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
               : null;
           }
         });
+      if (!Object.keys(resultData.data).length) return;
       resultList.push(resultData);
     });
     return resultList;
@@ -548,9 +555,9 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
 
     this.inputtingElmId = elmId;
 
-    const resourceMaster = this.resourceMasterList.filter(
+    const resourceMaster = this.resourceMasterList.find(
       rm => rm.data!.label === target
-    )[0];
+    );
     if (!resourceMaster) {
       console.error(`Not found resource(${target}).`);
       return;
@@ -558,46 +565,18 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
 
     const resource = this.resourceList.filter(
       r =>
-        r.data!.masterId === resourceMaster.id &&
+        r.data!.resourceMasterKey === resourceMaster.key &&
         r.ownerType === data.ownerType &&
         r.owner === data.owner
     )[0];
     resource.data!.value = newValue;
-    await SocketFacade.instance
-      .resourceCC()
-      .updatePackage([resource.id!], [resource.data!]);
+    await SocketFacade.instance.resourceCC().updatePackage([
+      {
+        key: resource.key,
+        data: resource.data!
+      }
+    ]);
   }
-
-  //
-  // @Watch("commonPropertyListAll", { immediate: true, deep: true })
-  // private onChangeCommonPropertyListAll() {
-  //   const columnList = this.windowInfo.declare.tableInfoList[0].columnList;
-  //   const newColumnList: WindowTableColumn[] = [];
-  //   this.commonPropertyListAll.forEach(cp => {
-  //     const column: WindowTableColumn = columnList.filter(
-  //       c => c.target === cp.data!.label
-  //     )[0] || {
-  //       width: 50,
-  //       type: cp.data!.type,
-  //       align: "center",
-  //       target: cp.data!.label
-  //     };
-  //     const columnIndex = columnList.findIndex(
-  //       c => c.target === cp.data!.label
-  //     );
-  //     if (columnIndex >= 0) {
-  //       column.width = this.windowInfo.tableInfoList[0].columnWidthList[
-  //         columnIndex
-  //       ];
-  //     }
-  //     newColumnList.push(column);
-  //   });
-  //   listToEmpty(columnList);
-  //   columnList.push(...newColumnList);
-  //   this.windowInfo.tableInfoList[0].columnWidthList = columnList.map(
-  //     c => c.width
-  //   );
-  // }
 
   @VueEvent
   private get selectionInfoList(): { elmId: string; optionList: string[] }[] {
@@ -605,16 +584,16 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
       .map(
         ic =>
           this.resourceMasterList.filter(
-            rm => rm.id === ic.data!.resourceMasterId
+            rm => rm.key === ic.data!.resourceMasterKey
           )[0]
       )
       .filter(rm => rm.data!.type === "select" || rm.data!.type === "combo")
       .map(rm => ({
-        elmId: `${this.windowInfo.key}-selection-list-${rm.id}`,
+        elmId: `${this.windowInfo.key}-selection-list-${rm.key}`,
         optionList: rm
           .data!.selectionStr!.split(",")
           .map(s => s.trim())
-          .filter((s, idx, self) => self.indexOf(s) === idx)
+          .filter((s, index, self) => self.indexOf(s) === index)
       }));
   }
 
@@ -630,7 +609,7 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
       .map(
         ic =>
           this.resourceMasterList.filter(
-            rm => rm.id === ic.data!.resourceMasterId
+            rm => rm.key === ic.data!.resourceMasterKey
           )[0]
       )
       .forEach(rm => {
@@ -657,50 +636,16 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
     this.windowInfo.tableInfoList[0].columnWidthList = columnList.map(
       c => c.width
     );
-    // console.log(JSON.stringify(this.initiativeColumnList, null, "  "));
-    // console.log(JSON.stringify(columnList, null, "  "));
   }
 
-  // private get initiativeList(): StoreUseData<any>[] {
-  //   const resultList: StoreUseData<any>[] = [];
-  //   const dataList = this.propertyList.filter(p => p.owner);
-  //   const ownerList = dataList
-  //     .map(d => d.owner)
-  //     .filter((d, i, self) => self.indexOf(d) === i);
-  //
-  //   ownerList.forEach((owner, ownerInd) => {
-  //     const actor = this.actorList.filter(a => a.id === owner)[0];
-  //     const resultData: StoreUseData<any> = {
-  //       id: uuid.v4(),
-  //       ownerType: "actor",
-  //       owner: actor.id,
-  //       order: ownerInd,
-  //       exclusionOwner: null,
-  //       lastExclusionOwner: null,
-  //       permission: GameObjectManager.PERMISSION_DEFAULT,
-  //       status: "added",
-  //       createTime: new Date(),
-  //       updateTime: null,
-  //       data: {}
-  //     };
-  //     dataList
-  //       .filter(d => d.owner === owner)
-  //       .forEach(d => {
-  //         resultData.data[d.data!.label] = d.data!.value;
-  //       });
-  //     resultList.push(resultData);
-  //   });
-  //   return resultList;
+  // @VueEvent
+  // private async changeSettings() {
+  //   console.log("changeSettings");
   // }
 
   @VueEvent
-  private async changeSettings() {
-    console.log("changeSettings");
-  }
-
-  @VueEvent
   private getRowClasses(
-    data: StoreUseData<CutInDeclareInfo>,
+    data: StoreData<CutInStore>,
     trElm: HTMLTableRowElement | null
   ): string[] {
     const classList: string[] = [];
@@ -713,7 +658,7 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
       if (trElm) {
         trElm.style.setProperty(
           "--msg-locked",
-          `"${LanguageManager.instance.getText("label.editing")}(${name})"`
+          `"${this.$t("label.editing")}(${name})"`
         );
       }
     }
@@ -746,7 +691,7 @@ export default class InitiativeWindow extends Mixins<WindowVue<number, never>>(
     const heightDiffPx = this.windowInfo.diffRect.height;
     const initHeightPx = this.windowInfo.declare.size.heightPx;
     let rowNum = (heightPx + heightDiffPx - initHeightPx) / (fontSize * 2);
-    rowNum = Math.floor(rowNum) + 10;
+    rowNum = Math.floor(rowNum) + 12;
     this.windowInfo.declare.tableInfoList[0].height = rowNum;
   }
 }

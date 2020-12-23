@@ -2,9 +2,9 @@
   <div class="palette-container">
     <div
       class="palette-line"
-      :class="{ odd: idx % 2, even: !(idx % 2) }"
-      v-for="(line, idx) in paletteList"
-      :key="idx"
+      :class="{ odd: !(index % 2), even: index % 2 }"
+      v-for="(line, index) in paletteList"
+      :key="index"
       @click="$emit('selectLine', line)"
       @dblclick="$emit('sendLine')"
     >
@@ -13,18 +13,22 @@
     <div
       class="palette-line-margin"
       :class="{
-        odd: paletteList.length % 2,
-        even: !(paletteList.length % 2)
+        odd: !(paletteList.length % 2),
+        even: paletteList.length % 2
       }"
     ></div>
   </div>
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue, Watch } from "vue-property-decorator";
+import { Component, Prop, Watch } from "vue-property-decorator";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
 
 @Component
-export default class ChatPaletteListComponent extends Vue {
+export default class ChatPaletteListComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: String, required: true })
   private paletteText!: string;
 
@@ -42,7 +46,7 @@ export default class ChatPaletteListComponent extends Vue {
     }
     this.paletteList = this.paletteText.split("\n");
     // .map(s => s.replace(/&lt;[bB][rR] *\/?&gt;/g, "<br />"));
-    console.log(JSON.stringify(this.paletteList, null, "  "));
+    // console.log(JSON.stringify(this.paletteList, null, "  "));
   }
 }
 </script>
@@ -58,7 +62,10 @@ export default class ChatPaletteListComponent extends Vue {
 
 .palette-line {
   @include inline-flex-box(row, flex-start, center);
-  height: 2em;
+  min-height: 2em;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  flex-shrink: 0;
 
   &.even {
     background-color: white;

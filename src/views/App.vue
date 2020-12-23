@@ -26,22 +26,24 @@
       <!-- 右クリックメニュー (z-index: 4) -->
       <Context />
     </template>
-    <!-- 小画面エリア (z-index: 3) -->
+    <!-- 共有メモエリア (z-index: 3) -->
+    <public-memo-area />
+    <!-- 小画面エリア (z-index: 4) -->
     <window-area />
-    <!-- その他欄 (z-index: 6) -->
+    <!-- その他欄 (z-index: 7) -->
     <other-text-frame
       :windowKey="key"
       :otherTextViewInfo="otherTextViewInfo"
       @hide="otherTextHide"
       v-if="otherTextViewInfo"
     />
-    <!-- 放物線シミュレータ (z-index: 7) -->
-    <throw-parabola-simulator v-if="throwParabola" />
     <!-- 放物線シミュレータ (z-index: 8) -->
+    <throw-parabola-simulator v-if="throwParabola" />
+    <!-- 放物線シミュレータ (z-index: 9) -->
     <throw-parabola-container />
-    <!-- カードデッキビルダー (z-index: 9) -->
-    <card-deck-builder v-if="cardView" :cardDeckId="cardDeckId" />
-    <!-- お部屋作成中 (z-index: 10) -->
+    <!-- カードデッキビルダー (z-index: 10) -->
+    <card-deck-builder v-if="cardView" :cardDeckKey="cardDeckKey" />
+    <!-- お部屋作成中 (z-index: 11) -->
     <div id="progress-message-area" v-if="progressMessage">
       <div class="message">{{ progressMessage }}</div>
       <img
@@ -60,20 +62,18 @@
 
 <script lang="ts">
 import { Component, Vue, Watch } from "vue-property-decorator";
-import { Point, Size } from "address";
 import { Task, TaskResult } from "task";
 import { ModeInfo } from "mode";
 import { disableBodyScroll } from "body-scroll-lock";
 import LifeCycle from "../app/core/decorator/LifeCycle";
 import TaskProcessor from "../app/core/task/TaskProcessor";
-import { OtherTextViewInfo } from "@/@types/gameObject";
+import { CutInStore } from "@/@types/store-data";
 import {
   createPoint,
   createSize,
   getEventPoint
 } from "@/app/core/utility/CoordinateUtility";
 import {
-  ClientRoomInfo,
   GetRoomListResponse,
   LoginWindowInput,
   RoomViewResponse,
@@ -84,20 +84,22 @@ import {
   BgmPlayInfo,
   DropPieceInfo,
   TabMoveInfo,
-  ThrowParabolaInfo
+  ThrowParabolaInfo,
+  UpdateResourceInfo
 } from "task-info";
 import { getDropFileList } from "@/app/core/utility/DropFileUtility";
 import WindowManager from "../app/core/window/WindowManager";
-import { StoreUseData } from "@/@types/store";
 import CssManager from "../app/core/css/CssManager";
 import GameObjectManager from "../app/basic/GameObjectManager";
-import { CutInDeclareInfo, MediaUploadInfo } from "@/@types/room";
+import { MediaUploadInfo } from "@/@types/room";
 import SocketFacade from "../app/core/api/app-server/SocketFacade";
 import VueEvent from "../app/core/decorator/VueEvent";
-import { convertNumberZero } from "@/app/core/utility/PrimaryDataUtility";
+import {
+  convertNumberNull,
+  convertNumberZero
+} from "@/app/core/utility/PrimaryDataUtility";
 import YoutubeManager from "../app/basic/cut-in/bgm/YoutubeManager";
 import TaskManager from "../app/core/task/TaskManager";
-import LanguageManager from "../LanguageManager";
 import { WindowOpenInfo } from "@/@types/window";
 import EventProcessor from "../app/core/event/EventProcessor";
 import BcdiceManager from "../app/core/api/bcdice/BcdiceManager";
@@ -112,9 +114,14 @@ import OtherTextFrame from "../app/basic/other-text/OtherTextFrame.vue";
 import ThrowParabolaSimulator from "../app/core/throwParabola/ThrowParabolaSimulator.vue";
 import ThrowParabolaContainer from "../app/core/throwParabola/ThrowParabolaContainer.vue";
 import CardDeckBuilder from "../app/basic/card/builder/CardDeckBuilder.vue";
+import PublicMemoArea from "@/app/basic/public-memo/PublicMemoArea.vue";
+import { findByKey } from "@/app/core/utility/Utility";
+import { importInjection } from "@/app/core/utility/ImportUtility";
+import { OtherTextViewInfo, Point, Size } from "@/@types/store-data-optional";
 
 @Component({
   components: {
+    PublicMemoArea,
     CardDeckBuilder,
     ThrowParabolaContainer,
     ThrowParabolaSimulator,
@@ -138,7 +145,7 @@ export default class App extends Vue {
   private otherTextViewInfo: OtherTextViewInfo | null = null;
   private throwParabola: boolean = false;
   private cardView: boolean = false;
-  private cardDeckId: string = "";
+  private cardDeckKey: string = "";
 
   private cutInList = GameObjectManager.instance.cutInList;
   private isDropPiece: boolean = false;
@@ -169,9 +176,7 @@ export default class App extends Vue {
       value: {
         type: "view-progress",
         value: {
-          message: LanguageManager.instance.getText(
-            "message.setting-up-quoridorn"
-          ),
+          message: this.$t("message.setting-up-quoridorn")!.toString(),
           all: 0,
           current: 0
         }
@@ -224,7 +229,7 @@ export default class App extends Vue {
           // BGM再生通知
           const info = data.data as BgmPlayInfo;
           await BgmManager.instance.callBgm({
-            targetId: info.id,
+            targetKey: info.key,
             data: null
           });
         }
@@ -234,9 +239,7 @@ export default class App extends Vue {
       "notify-progress",
       async (err, { all, current }) => {
         const flag: boolean = all > 0 && all !== current;
-        const message = flag
-          ? LanguageManager.instance.getText("message.processing")
-          : "";
+        const message = flag ? this.$t("message.processing")!.toString() : "";
         await TaskManager.instance.ignition<ModeInfo, never>({
           type: "mode-change",
           owner: "Quoridorn",
@@ -260,22 +263,29 @@ export default class App extends Vue {
     SocketFacade.instance.socketOn<RoomViewResponse[]>(
       "result-room-view",
       (err, changeList) => {
+        if (err) {
+          console.error(err);
+          return;
+        }
         changeList.forEach(change => {
           if (change.changeType === "removed") {
             const index = serverInfo.roomList!.findIndex(
-              (info: StoreUseData<ClientRoomInfo>) => info.id === change.id
+              info => info.id === change.id
             );
             serverInfo.roomList!.splice(index, 1, {
+              id: "",
+              collection: "room-volatile",
+              key: "",
+              order: index,
               ownerType: null,
               owner: null,
-              order: index,
               exclusionOwner: null,
               lastExclusionOwner: null,
               permission: null,
               status: null,
               createTime: new Date(),
               updateTime: null,
-              id: null
+              refList: []
             });
           } else {
             const index = change.data!.order;
@@ -343,16 +353,22 @@ export default class App extends Vue {
 
     // ファイルをドロップインしている場合
     const resultList = await getDropFileList(event.dataTransfer!);
-    await TaskManager.instance.ignition<WindowOpenInfo<MediaUploadInfo>, never>(
-      {
+    // TODO idを独自化
+    await importInjection(resultList);
+
+    if (resultList.length) {
+      await TaskManager.instance.ignition<
+        WindowOpenInfo<MediaUploadInfo>,
+        never
+      >({
         type: "window-open",
         owner: "Quoridorn",
         value: {
           type: "media-upload-window",
           args: { resultList }
         }
-      }
-    );
+      });
+    }
 
     this.isDropping = false;
   }
@@ -377,18 +393,16 @@ export default class App extends Vue {
 
   @Watch("cutInList", { deep: true, immediate: true })
   private async onChangeCutInList() {
-    const openWindowFunc = async (
-      c: StoreUseData<CutInDeclareInfo>
-    ): Promise<void> => {
-      const targetId = c.id!;
+    const openWindowFunc = async (c: StoreData<CutInStore>): Promise<void> => {
+      const targetKey = c.key;
       const windowKeyList: (string | null)[] = [];
       BgmManager.instance.standByWindowList.push({
-        targetId,
+        targetKey,
         windowKeyList
       });
       for (let i = 0; i < 3; i++) {
         windowKeyList.push(null);
-        await BgmManager.openStandByWindow(targetId);
+        await BgmManager.openStandByWindow(targetKey);
       }
     };
 
@@ -396,9 +410,11 @@ export default class App extends Vue {
       .filter(
         c =>
           c.data!.isStandBy &&
-          !BgmManager.instance.standByWindowList.some(s => s.targetId === c.id)
+          !BgmManager.instance.standByWindowList.some(
+            s => s.targetKey === c.key
+          )
       )
-      .map((c: StoreUseData<CutInDeclareInfo>) => () => openWindowFunc(c))
+      .map((c: StoreData<CutInStore>) => () => openWindowFunc(c))
       .reduce((prev, curr) => prev.then(curr), Promise.resolve());
   }
 
@@ -597,12 +613,16 @@ export default class App extends Vue {
     this.otherTextViewInfo = null;
   }
 
-  public static async openSimpleWindow(type: string): Promise<void> {
-    await TaskManager.instance.ignition<WindowOpenInfo<void>, null>({
+  public static async openSimpleWindow(type: string): Promise<boolean> {
+    const result = await TaskManager.instance.ignition<
+      WindowOpenInfo<void>,
+      boolean
+    >({
       type: "window-open",
       owner: "Quoridorn",
       value: { type }
     });
+    return result ? !!result[0] : false;
   }
 
   @TaskProcessor("room-initialize-finished")
@@ -617,7 +637,7 @@ export default class App extends Vue {
       GameObjectManager.instance.keepBcdiceDiceRollResultList.some(
         kbdrr =>
           kbdrr.data!.type === "secret-dice-roll" &&
-          kbdrr.owner === GameObjectManager.instance.mySelfUserId
+          kbdrr.owner === SocketFacade.instance.userKey
       )
     ) {
       await App.openSimpleWindow("secret-dice-roll-window");
@@ -643,9 +663,9 @@ export default class App extends Vue {
     }
     if (taskValue.type === "view-card-deck") {
       const flag: string = taskValue.value.flag;
-      const cardDeckId: string = taskValue.value.cardDeckId;
+      const cardDeckKey: string = taskValue.value.cardDeckKey;
       this.cardView = flag === "on";
-      this.cardDeckId = cardDeckId;
+      this.cardDeckKey = cardDeckKey;
       task.resolve();
     }
     if (taskValue.type === "drop-piece") {
@@ -690,6 +710,43 @@ export default class App extends Vue {
     task: Task<WindowOpenInfo<unknown>, never>
   ): Promise<TaskResult<never> | void> {
     task.value!.key = WindowManager.instance.open(task.value!, task.key);
+  }
+
+  @TaskProcessor("resource-update-finished")
+  private async resourceUpdateFinished(
+    task: Task<UpdateResourceInfo, never>
+  ): Promise<TaskResult<never> | void> {
+    const resourceMasterKey = task.value!.resourceMasterKey;
+    const ownerType = task.value!.ownerType;
+    const ownerKey = task.value!.ownerKey;
+    const operationType = task.value!.operationType;
+    const value = task.value!.value;
+
+    const resourceCC = SocketFacade.instance.resourceCC();
+    const resourceList = GameObjectManager.instance.resourceList;
+    const resourceMasterList = GameObjectManager.instance.resourceMasterList;
+    const resource = resourceList.find(
+      r =>
+        r.ownerType === ownerType &&
+        r.owner === ownerKey &&
+        r.data!.resourceMasterKey === resourceMasterKey
+    );
+    if (!resource) return;
+    const resourceValue = resource.data!.value;
+    if (operationType === "set") {
+      resource.data!.value = value;
+    } else if (operationType === "add") {
+      const resourceMaster = findByKey(resourceMasterList, resourceMasterKey);
+      if (!resourceMaster) return;
+      if (resourceMaster.data!.type !== "number") return;
+      const resourceNumValue = convertNumberNull(resourceValue);
+      const addValue = convertNumberNull(value);
+      if (resourceNumValue === null || addValue === null) return;
+      resource.data!.value = (resourceNumValue + addValue).toString();
+    }
+    await resourceCC.updatePackage([
+      { key: resource.key, data: resource.data! }
+    ]);
   }
 }
 </script>
@@ -828,27 +885,32 @@ label {
   z-index: 4;
 }
 
+#public-memo-area {
+  z-index: 3;
+  display: contents;
+}
+
 #window-area {
   position: fixed;
   left: 0;
   top: 0;
-  z-index: 3;
+  z-index: 4;
 }
 
 #other-text-frame {
-  z-index: 6;
-}
-
-#throw-parabola-simulator {
   z-index: 7;
 }
 
-#throw-parabola-container {
+#throw-parabola-simulator {
   z-index: 8;
 }
 
-#card-deck-builder {
+#throw-parabola-container {
   z-index: 9;
+}
+
+#card-deck-builder {
+  z-index: 10;
 }
 
 #progress-message-area {
@@ -858,7 +920,7 @@ label {
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 10;
+  z-index: 11;
 
   img {
     width: 200px;

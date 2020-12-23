@@ -17,6 +17,9 @@
     <div class="name">
       <span class="owner">{{ ownerStr }}</span>
       <span class="media-name">{{ media.data.name }}</span>
+      <span class="ref-list" v-for="ref in media.refList" :key="ref.key">
+        {{ ref.type }}-{{ ref.key }}
+      </span>
     </div>
     <div class="operation-box">
       <s-button
@@ -60,24 +63,20 @@
 <script lang="ts">
 import { Component, Prop } from "vue-property-decorator";
 import { Mixins } from "vue-mixin-decorator";
-import { StoreUseData } from "../../../@types/store";
 import { permissionCheck } from "../../core/api/app-server/SocketFacade";
 import ComponentVue from "../../core/window/ComponentVue";
-import { MediaInfo } from "../../../@types/room";
+import { MediaStore } from "@/@types/store-data";
 import GameObjectManager from "../GameObjectManager";
-import LanguageManager from "../../../LanguageManager";
 import SButton from "../common/components/SButton.vue";
 import { getYoutubeThunbnail } from "../cut-in/bgm/YoutubeManager";
 import VueEvent from "../../core/decorator/VueEvent";
 
-@Component({
-  components: { SButton }
-})
+@Component({ components: { SButton } })
 export default class MediaItemComponent extends Mixins<ComponentVue>(
   ComponentVue
 ) {
   @Prop({ type: Object, required: true })
-  private media!: StoreUseData<MediaInfo>;
+  private media!: StoreData<MediaStore>;
 
   @Prop({ type: Boolean, required: true })
   private isViewThumbnail!: boolean;
@@ -96,13 +95,13 @@ export default class MediaItemComponent extends Mixins<ComponentVue>(
       default:
         target += "unknown";
     }
-    return LanguageManager.instance.getText(target);
+    return this.$t(target)!.toString();
   }
 
   @VueEvent
   private get tagStr(): string {
     const tag = this.media.data!.tag;
-    return tag || LanguageManager.instance.getText("label.non-tag");
+    return tag || this.$t("label.non-tag")!.toString();
   }
 
   @VueEvent

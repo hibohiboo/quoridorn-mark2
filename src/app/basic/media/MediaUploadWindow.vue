@@ -38,8 +38,8 @@
     >
       <div class="tab-container">
         <media-upload-item-component
-          v-for="(resultInfo, idx) in useLocalResultList"
-          :key="idx"
+          v-for="(resultInfo, index) in useLocalResultList"
+          :key="index"
           :resultInfo="resultInfo"
           @preview="preview(resultInfo)"
           @delete="deleteFile(resultInfo)"
@@ -77,11 +77,11 @@ import {
   raw2UploadMediaInfoList,
   mediaUpload
 } from "../../core/utility/FileUtility";
-import LanguageManager from "../../../LanguageManager";
 import { TabInfo } from "@/@types/window";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import { UploadMediaInfo } from "@/@types/socket";
+import { questionDialog } from "@/app/core/utility/Utility";
 
 @Component({
   components: {
@@ -133,17 +133,13 @@ export default class MediaUploadWindow extends Mixins<
 
   private settingHoverMessage(isHover: boolean, target: string) {
     this.windowInfo.message = isHover
-      ? LanguageManager.instance.getText(
-          `media-upload-window.message-list.${target}`
-        )
+      ? this.$t(`media-upload-window.message-list.${target}`)!.toString()
       : "";
   }
 
   @VueEvent
   private editTags() {
-    const msg = LanguageManager.instance.getText(
-      "media-upload-window.dialog.input-tag"
-    );
+    const msg = this.$t("media-upload-window.dialog.input-tag")!.toString();
     const tag = window.prompt(msg, "");
     console.log(tag);
     if (tag === null || tag === undefined) return;
@@ -153,24 +149,29 @@ export default class MediaUploadWindow extends Mixins<
   }
 
   @VueEvent
-  private deleteAll() {
-    const msg = LanguageManager.instance.getText(
+  private async deleteAll() {
+    const text = this.$t(
       "media-upload-window.dialog.delete-together"
-    );
-    const result = window.confirm(msg);
-    if (!result) return;
+    )!.toString();
+    const confirm = await questionDialog({
+      title: this.$t("button.delete").toString(),
+      text,
+      confirmButtonText: this.$t("button.delete").toString(),
+      cancelButtonText: this.$t("button.reject").toString()
+    });
+    if (!confirm) return;
 
-    const idxList: number[] = [];
+    const indexList: number[] = [];
     this.useLocalResultList.forEach(ur => {
-      idxList.unshift(
+      indexList.unshift(
         this.localResultList.findIndex(
           r => JSON.stringify(ur) === JSON.stringify(r)
         )
       );
     });
 
-    idxList.forEach(idx => {
-      this.localResultList.splice(idx, 1);
+    indexList.forEach(index => {
+      this.localResultList.splice(index, 1);
     });
   }
 
@@ -210,10 +211,10 @@ export default class MediaUploadWindow extends Mixins<
 
   @VueEvent
   private deleteFile(fileInfo: UploadMediaInfo) {
-    const idx = this.localResultList.findIndex(
+    const index = this.localResultList.findIndex(
       ulr => ulr.name === fileInfo.name
     );
-    this.localResultList.splice(idx, 1);
+    this.localResultList.splice(index, 1);
   }
 
   @VueEvent
@@ -222,6 +223,11 @@ export default class MediaUploadWindow extends Mixins<
       uploadMediaInfoList: this.localResultList,
       option: { permission: GameObjectManager.PERMISSION_OWNER_VIEW }
     });
+    await this.close();
+  }
+
+  @VueEvent
+  private async rollback() {
     await this.close();
   }
 }

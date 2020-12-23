@@ -36,7 +36,7 @@ import SocketFacade from "../../../core/api/app-server/SocketFacade";
 @Component({
   components: { ActorInfoForm, CtrlButton }
 })
-export default class ActorAddWindow extends Mixins<WindowVue<void, void>>(
+export default class ActorAddWindow extends Mixins<WindowVue<void, boolean>>(
   WindowVue
 ) {
   private actorList = GameObjectManager.instance.actorList;
@@ -54,7 +54,7 @@ export default class ActorAddWindow extends Mixins<WindowVue<void, void>>(
   }
 
   private get isDuplicate(): boolean {
-    return this.actorList.filter(ct => ct.data!.name === this.name).length > 0;
+    return this.actorList.some(ct => ct.data!.name === this.name);
   }
 
   private get isCommitAble(): boolean {
@@ -64,8 +64,8 @@ export default class ActorAddWindow extends Mixins<WindowVue<void, void>>(
   @Watch("isDuplicate")
   private onChangeIsDuplicate() {
     this.windowInfo.message = this.isDuplicate
-      ? ActorAddWindow.getDialogMessage("duplicate")
-      : ActorAddWindow.getDialogMessage("default");
+      ? this.$t("message.name-duplicate")!.toString()
+      : "";
   }
 
   private static getDialogMessage(target: string) {
@@ -75,29 +75,24 @@ export default class ActorAddWindow extends Mixins<WindowVue<void, void>>(
 
   @VueEvent
   private async commit() {
-    if (this.isCommitAble) {
-      await SocketFacade.instance.actorCC().addDirect(
-        [
-          {
-            name: this.name,
-            tag: this.tag,
-            type: "character",
-            chatFontColorType: this.chatFontColorType,
-            chatFontColor: this.chatFontColor,
-            standImagePosition: this.standImagePosition,
-            pieceIdList: [],
-            statusId: "" // 自動的に付与される
-          }
-        ],
-        [
-          {
-            permission: GameObjectManager.PERMISSION_OWNER_CHANGE
-          }
-        ]
-      );
-    }
+    if (!this.isCommitAble) return;
+    await SocketFacade.instance.actorCC().addDirect([
+      {
+        permission: GameObjectManager.PERMISSION_OWNER_CHANGE,
+        data: {
+          name: this.name,
+          tag: this.tag,
+          type: "character",
+          chatFontColorType: this.chatFontColorType,
+          chatFontColor: this.chatFontColor,
+          standImagePosition: this.standImagePosition,
+          pieceKeyList: [],
+          statusKey: "" // 自動的に付与される
+        }
+      }
+    ]);
     this.isProcessed = true;
-    await this.close();
+    await this.finally(true);
   }
 
   @TaskProcessor("window-close-closing")
@@ -115,7 +110,7 @@ export default class ActorAddWindow extends Mixins<WindowVue<void, void>>(
   private async rollback() {
     if (!this.isProcessed) {
       this.isProcessed = true;
-      await this.close();
+      await this.finally();
     }
   }
 }

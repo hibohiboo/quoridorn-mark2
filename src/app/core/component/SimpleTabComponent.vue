@@ -6,7 +6,7 @@
         v-for="(tab, index) in tabList"
         :class="{ isActive: tab.key === localValue.key }"
         :key="index"
-        @click="localValue = tab"
+        @click="onClickTab(tab)"
         tabindex="0"
         @keydown.space.prevent="localValue = tab"
       >
@@ -28,6 +28,7 @@ import { Task, TaskResult } from "task";
 import ComponentVue from "../window/ComponentVue";
 import { TabInfo } from "@/@types/window";
 import TaskProcessor from "../task/TaskProcessor";
+import VueEvent from "@/app/core/decorator/VueEvent";
 
 @Component
 export default class SimpleTabComponent extends Mixins<ComponentVue>(
@@ -66,9 +67,17 @@ export default class SimpleTabComponent extends Mixins<ComponentVue>(
       const inputElmList = Array.prototype.slice.call(
         this.elm.getElementsByClassName("input")
       ) as HTMLInputElement[];
-      const idx = inputElmList.findIndex(elm => !elm.disabled);
-      if (idx >= 0) inputElmList[idx].focus();
+      const index = inputElmList.findIndex(elm => !elm.disabled);
+      if (index >= 0) inputElmList[index].focus();
     });
+  }
+
+  @VueEvent
+  private onClickTab(tab: TabInfo) {
+    if (this.localValue !== tab) {
+      this.localValue = tab;
+      this.$emit("change");
+    }
   }
 
   private get elm(): HTMLElement {
@@ -85,13 +94,13 @@ export default class SimpleTabComponent extends Mixins<ComponentVue>(
   }
 
   private tabMove(addIndex: number) {
-    let idx = this.tabList.findIndex(
+    let index = this.tabList.findIndex(
       t => JSON.stringify(t) === JSON.stringify(this.localValue)
     );
-    idx += addIndex;
-    if (idx < 0) idx = this.tabList.length - 1;
-    if (idx >= this.tabList.length) idx = 0;
-    this.localValue = this.tabList[idx];
+    index += addIndex;
+    if (index < 0) index = this.tabList.length - 1;
+    if (index >= this.tabList.length) index = 0;
+    this.localValue = this.tabList[index];
   }
 }
 </script>

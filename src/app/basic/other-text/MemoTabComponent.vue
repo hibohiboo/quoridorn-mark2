@@ -3,7 +3,7 @@
     class="tab-info"
     :class="{
       locked: tab.exclusionOwner,
-      changeOrder: changeOrderId === tab.id,
+      changeOrder: changeOrderKey === tab.key,
       dragMode
     }"
     :style="{
@@ -11,11 +11,11 @@
         tab.exclusionOwner
       )})'`
     }"
-    @onMouseDown="changeOrderId = tab.id"
-    @onMouseUp="changeOrderId = ''"
+    @onMouseDown="changeOrderKey = tab.key"
+    @onMouseUp="changeOrderKey = ''"
   >
     <span class="icon-menu drag-mark"></span>
-    <span>{{ tab.data.tab || $t("label.non-tab") }}</span>
+    <span>{{ tab.data.tab || $t("label.non-name") }}</span>
 
     <div class="icon-box">
       <s-button
@@ -41,54 +41,57 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from "vue-property-decorator";
+import { Component, Prop } from "vue-property-decorator";
 import SButton from "@/app/basic/common/components/SButton.vue";
-import { StoreUseData } from "@/@types/store";
 import { permissionCheck } from "@/app/core/api/app-server/SocketFacade";
-import { MemoStore } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import GameObjectManager from "@/app/basic/GameObjectManager";
 import VueEvent from "@/app/core/decorator/VueEvent";
+import ComponentVue from "@/app/core/window/ComponentVue";
+import { Mixins } from "vue-mixin-decorator";
 
 @Component({ components: { SButton } })
-export default class MemoTabComponent extends Vue {
+export default class MemoTabComponent extends Mixins<ComponentVue>(
+  ComponentVue
+) {
   @Prop({ type: Object, required: true })
-  private tab!: StoreUseData<MemoStore>;
+  private tab!: StoreData<MemoStore>;
 
   @Prop({ type: Boolean, required: true })
   private dragMode = false;
 
   @Prop({ type: String, required: true })
-  private changeOrderId: string = "";
+  private changeOrderKey: string = "";
 
   @VueEvent
-  private isEditable(tabInfo: StoreUseData<MemoStore>) {
+  private isEditable(tabInfo: StoreData<MemoStore>) {
     return permissionCheck(tabInfo, "edit", 1);
   }
 
   @VueEvent
-  private async editTab(tabInfo: StoreUseData<MemoStore>) {
+  private async editTab(tabInfo: StoreData<MemoStore>) {
     if (!this.isEditable(tabInfo)) return;
     this.$emit("edit", tabInfo);
   }
 
   @VueEvent
-  private isChmodAble(tabInfo: StoreUseData<MemoStore>) {
+  private isChmodAble(tabInfo: StoreData<MemoStore>) {
     return permissionCheck(tabInfo, "chmod", 1);
   }
 
   @VueEvent
-  private async chmodTab(tabInfo: StoreUseData<MemoStore>) {
+  private async chmodTab(tabInfo: StoreData<MemoStore>) {
     if (!this.isChmodAble(tabInfo)) return;
     this.$emit("chmod", tabInfo);
   }
 
   @VueEvent
-  private isDeletable(tabInfo: StoreUseData<MemoStore>) {
+  private isDeletable(tabInfo: StoreData<MemoStore>) {
     return permissionCheck(tabInfo, "edit", 1);
   }
 
   @VueEvent
-  private async deleteTab(tabInfo: StoreUseData<MemoStore>) {
+  private async deleteTab(tabInfo: StoreData<MemoStore>) {
     if (!this.isDeletable(tabInfo)) return;
     this.$emit("delete", tabInfo);
   }

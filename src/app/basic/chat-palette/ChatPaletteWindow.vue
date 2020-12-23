@@ -20,7 +20,8 @@
       :windowKey="windowKey"
       :tabList="targetTabList"
       v-model="currentTargetTabInfo"
-      :hasSetting="false"
+      :hasSetting="true"
+      @settingOpen="onSettingOpen()"
     >
       {{ (_chatPalette = chatPaletteObj) && null }}
       <div class="chat-palette-box">
@@ -43,13 +44,14 @@
 <script lang="ts">
 import { Component, Watch } from "vue-property-decorator";
 import LifeCycle from "../../core/decorator/LifeCycle";
-import { ChatPaletteStore } from "@/@types/gameObject";
+import { ChatPaletteStore, ResourceStore } from "@/@types/store-data";
 import { CustomDiceBotInfo } from "@/@types/room";
-import SocketFacade from "../../core/api/app-server/SocketFacade";
+import SocketFacade, {
+  permissionCheck
+} from "../../core/api/app-server/SocketFacade";
 import BaseInput from "../../core/component/BaseInput.vue";
 import TableComponent from "../../core/component/table/TableComponent.vue";
 import VueEvent from "../../core/decorator/VueEvent";
-import { StoreUseData } from "@/@types/store";
 import TaskManager from "../../core/task/TaskManager";
 import ChatPaletteListComponent from "./ChatPaletteListComponent.vue";
 import WindowVue from "../../core/window/WindowVue";
@@ -57,9 +59,11 @@ import CtrlButton from "../../core/component/CtrlButton.vue";
 import GameObjectManager from "../GameObjectManager";
 import { TabInfo, WindowOpenInfo } from "@/@types/window";
 import { sendChatLog } from "../../core/utility/ChatUtility";
-import { DataReference } from "@/@types/data";
 import SimpleTabComponent from "../../core/component/SimpleTabComponent.vue";
 import { Mixins } from "vue-mixin-decorator";
+import { findRequireByKey } from "@/app/core/utility/Utility";
+import App from "@/views/App.vue";
+
 const uuid = require("uuid");
 
 @Component({
@@ -75,10 +79,12 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
   WindowVue
 ) {
   // リスト/CC
-  private chatPaletteListCC = SocketFacade.instance.chatPaletteListCC();
   private chatPaletteList = GameObjectManager.instance.chatPaletteList;
   private sceneObjectList = GameObjectManager.instance.sceneObjectList;
+  private userList = GameObjectManager.instance.userList;
   private actorList = GameObjectManager.instance.actorList;
+  private resourceList = GameObjectManager.instance.resourceList;
+  private resourceMasterList = GameObjectManager.instance.resourceMasterList;
 
   // 画面入力を受ける変数
   private sendText: string = "";
@@ -89,11 +95,11 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
   // DB項目
   private chatFontColorType: "owner" | "original" = "owner";
   private chatFontColor: string = "#000000";
-  private actorId: string | null = null;
-  private sceneObjectId: string | null = null;
-  private targetId: string | null = null;
-  private outputTabId: string | null = null;
-  private statusId: string | null = null;
+  private actorKey: string | null = null;
+  private sceneObjectKey: string | null = null;
+  private targetKey: string | null = null;
+  private outputTabKey: string | null = null;
+  private statusKey: string | null = null;
   private system: string | null = null;
   private isSecret: boolean = false;
 
@@ -104,13 +110,22 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
 
     this.chatFontColorType = chatPaletteData.chatFontColorType;
     this.chatFontColor = chatPaletteData.chatFontColor;
-    this.actorId = chatPaletteData.actorId;
-    this.sceneObjectId = chatPaletteData.sceneObjectId;
-    this.targetId = chatPaletteData.targetId;
-    this.outputTabId = chatPaletteData.outputTabId;
-    this.statusId = chatPaletteData.statusId;
+    this.actorKey = chatPaletteData.actorKey;
+    this.sceneObjectKey = chatPaletteData.sceneObjectKey;
+    this.targetKey = chatPaletteData.targetKey;
+    this.outputTabKey = chatPaletteData.outputTabKey;
+    this.statusKey = chatPaletteData.statusKey;
     this.system = chatPaletteData.system;
     this.isSecret = chatPaletteData.isSecret;
+
+    const userKey = this.chatPaletteObj.owner;
+    if (userKey === SocketFacade.instance.userKey) {
+      this.windowInfo.message = "";
+    } else {
+      const user = findRequireByKey(this.userList, userKey);
+      const ownerLabel = this.$t("label.owner").toString();
+      this.windowInfo.message = `${ownerLabel}：${user.data!.name}`;
+    }
   }
 
   /*
@@ -121,11 +136,13 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
 
   @Watch("chatPaletteList", { immediate: true })
   private onChangeChatPaletteList() {
-    this.targetTabList = this.chatPaletteList.map(cp => ({
-      key: uuid.v4(),
-      target: cp.id!,
-      text: cp.data!.name
-    }));
+    this.targetTabList = this.chatPaletteList
+      .filter(cp => permissionCheck(cp, "view"))
+      .map(cp => ({
+        key: uuid.v4(),
+        target: cp.key,
+        text: cp.data!.name
+      }));
     const matchCurrent = this.currentTargetTabInfo
       ? this.targetTabList.find(
           tt => tt.target === this.currentTargetTabInfo!.target
@@ -134,14 +151,13 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
     if (!this.currentTargetTabInfo || !matchCurrent) {
       this.currentTargetTabInfo = this.targetTabList[0];
     }
-    console.log(JSON.stringify(this.currentTargetTabInfo, null, "  "));
   }
 
   @VueEvent
-  private get chatPaletteObj(): StoreUseData<ChatPaletteStore> | undefined {
+  private get chatPaletteObj(): StoreData<ChatPaletteStore> | undefined {
     return this.currentTargetTabInfo
       ? this.chatPaletteList.find(
-          cp => cp.id === this.currentTargetTabInfo!.target
+          cp => cp.key === this.currentTargetTabInfo!.target
         )
       : undefined;
   }
@@ -153,7 +169,80 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
 
   @VueEvent
   private async selectLine(line: string) {
-    this.sendText = line;
+    const refList: { [key: string]: string } = {};
+    if (this.chatPaletteObj) {
+      this.chatPaletteObj.data!.paletteText.split("\n").forEach(line => {
+        const matchResult = line.match(/^\s*\/\/([^=]+)=(.+)$/);
+        if (matchResult) refList[matchResult[1]] = matchResult[2];
+      });
+    }
+    const refReplace = (l: string): string =>
+      l.replace(/{([^}]+)}/g, (match: string, p1: string) => {
+        const refValue = refList[p1];
+        if (refValue) {
+          return refValue.match(/{[^}]+}/) ? refReplace(refValue) : refValue;
+        }
+
+        const splitted = p1.split(".");
+        const label = splitted.length === 1 ? splitted[0] : splitted[1];
+        const sceneObjectName = splitted.length === 1 ? null : splitted[0];
+        const actorKey: string =
+          this.actorKey || GameObjectManager.instance.chatPublicInfo.actorKey;
+        const actor = findRequireByKey(this.actorList, actorKey);
+        const sceneObject = this.sceneObjectList.find(
+          so =>
+            so.data!.actorKey === actorKey && so.data!.name === sceneObjectName
+        );
+        const sceneObjectKey = sceneObject
+          ? sceneObject.key
+          : this.sceneObjectKey;
+
+        // リソース名で検索
+        const resourceMaster = this.resourceMasterList.find(
+          rm => rm.data!.label === label
+        );
+        if (resourceMaster) {
+          const filteredList: StoreUseData<
+            ResourceStore
+          >[] = this.resourceList.filter(
+            r => r.data!.resourceMasterKey === resourceMaster.key
+          );
+
+          if (sceneObjectKey) {
+            // コマまで指定されている場合はコマのリソースを優先して検索する
+            let resource = filteredList.find(f => {
+              if (f.ownerType === "actor-list") return false;
+              return f.owner === sceneObjectKey;
+            });
+            if (resource) return resource.data!.value;
+
+            // コマで見つからない場合はアクターで検索
+            resource = filteredList.find(f => {
+              if (f.ownerType !== "actor-list") return false;
+              return f.owner === actorKey;
+            });
+            if (resource) return resource.data!.value;
+          } else {
+            // コマが指定されていない場合はアクターのリソースを優先して検索する
+            let resource = filteredList.find(f => {
+              if (f.ownerType !== "actor-list") return false;
+              return f.owner === actorKey;
+            });
+            if (resource) return resource.data!.value;
+
+            // アクターのリソースが見つからない場合はコマのリソースを検索する
+            resource = filteredList.find(f => {
+              if (f.ownerType === "actor-list") return false;
+              return actor.data!.pieceKeyList.some(
+                pieceKey => pieceKey === f.owner
+              );
+            });
+            if (resource) return resource.data!.value;
+          }
+        }
+        return match;
+      });
+    this.sendText = refReplace(line);
   }
 
   @VueEvent
@@ -170,7 +259,7 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
         type: "chat-palette-edit-window",
         args: {
           type: "chat-palette",
-          docId: this.currentTargetTabInfo!.target!.toString()
+          key: this.currentTargetTabInfo!.target!.toString()
         }
       }
     });
@@ -180,17 +269,23 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
   private async sendLine() {
     await sendChatLog(
       {
-        actorId: this.actorId,
+        actorKey:
+          this.actorKey || GameObjectManager.instance.chatPublicInfo.actorKey,
         text: this.sendText.replace(/\\n/g, "\n"),
-        tabId: this.outputTabId,
-        statusId: this.statusId, // Actorに設定されているものを使う
-        targetId: this.targetId,
+        tabKey: this.outputTabKey,
+        statusKey: this.statusKey, // Actorに設定されているものを使う
+        targetKey: this.targetKey,
         system: this.system,
         isSecret: this.isSecret
       },
       this.customDiceBotList
     );
     this.sendText = "";
+  }
+
+  @VueEvent
+  private async onSettingOpen() {
+    await App.openSimpleWindow("chat-palette-tab-setting-window");
   }
 }
 </script>
@@ -206,6 +301,7 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
 
 .send-line-block {
   @include flex-box(row, flex-start, center);
+  margin-bottom: 0.5rem;
 
   > *:first-child {
     flex: 1;
@@ -214,12 +310,15 @@ export default class ChatPaletteWindow extends Mixins<WindowVue<number, never>>(
 
 .simple-tab-component {
   flex: 1;
+  position: relative;
+  height: calc(100% - 4em - 1rem);
 }
 
 .chat-palette-box {
   @include inline-flex-box(column, stretch, flex-start);
   border: 1px solid gray;
   width: 100%;
-  height: 100%;
+  max-height: calc(100% - 2em);
+  flex: 1;
 }
 </style>

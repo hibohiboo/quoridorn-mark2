@@ -551,6 +551,50 @@
   resizable: false
   tableInfoList: []
 
+"map-marker-add-window":
+  icon: plus
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    # 12em(ドラッグ部分) + 17em(カラーピッカー) + 5em(ラベル)
+    widthPx: 4
+    widthEm: 34
+    widthRem: 0.4
+    heightPx: 2
+    heightEm: 16
+    heightRem: 0
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: false
+  tableInfoList: []
+
+"map-marker-edit-window":
+  icon: pencil
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    # 12em(ドラッグ部分) + 17em(カラーピッカー) + 5em(ラベル)
+    widthPx: 4
+    widthEm: 34
+    widthRem: 0.4
+    heightPx: 2
+    heightEm: 18
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: false
+  tableInfoList: []
+
 "chit-add-window":
   icon: plus
   parentTypeList: []
@@ -1266,6 +1310,14 @@
   message: ""
   position: center
   size:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 7個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 40
+    # 6em(行数) + 4em(選択画像サイズ) * 3個
+    heightPx: 4
+    heightEm: 18
+  minSize:
     # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 6個
     widthPx: 2
     widthScrollBar: 1
@@ -1273,19 +1325,11 @@
     # 6em(行数) + 4em(選択画像サイズ) * 3個
     heightPx: 4
     heightEm: 18
-  minSize:
-    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 4個
-    widthPx: 2
-    widthScrollBar: 1
-    widthEm: 28
-    # 6em(行数) + 4em(選択画像サイズ) * 3個
-    heightPx: 4
-    heightEm: 18
   maxSize:
-    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 10個
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 15個
     widthPx: 2
     widthScrollBar: 1
-    widthEm: 52
+    widthEm: 72
     # 6em(行数) + 4em(選択画像サイズ) * 6個
     heightPx: 4
     heightEm: 30
@@ -1304,6 +1348,15 @@
   message: ""
   position: center
   size:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 7個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 40
+    # 8em(行数) + 4em(選択画像サイズ) * 3個
+    heightPx: 4
+    heightEm: 20
+    heightRem: 0.5
+  minSize:
     # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 6個
     widthPx: 2
     widthScrollBar: 1
@@ -1312,20 +1365,11 @@
     heightPx: 4
     heightEm: 20
     heightRem: 0.5
-  minSize:
-    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 4個
-    widthPx: 2
-    widthScrollBar: 1
-    widthEm: 28
-    # 8em(行数) + 4em(選択画像サイズ) * 3個
-    heightPx: 4
-    heightEm: 20
-    heightRem: 0.5
   maxSize:
-    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 10個
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 15個
     widthPx: 2
     widthScrollBar: 1
-    widthEm: 52
+    widthEm: 72
     # 8em(行数) + 4em(選択画像サイズ) * 6個
     heightPx: 4
     heightEm: 32
@@ -1491,7 +1535,7 @@
     widthEm: 0
     widthRem: 0
     heightPx: 4
-    heightEm: 40
+    heightEm: 65
     heightRem: 0.5
   minimizable: true
   paneContainable: true
@@ -1706,6 +1750,187 @@
     heightPx: 4
     heightEm: 26
     heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+
+"chat-palette-tab-setting-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthEm: 22
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 14
+    heightRem: 0.5
+  minSize:
+    widthEm: 18
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 10
+    heightRem: 0.5
+  maxSize:
+    widthEm: 30
+    widthScrollBar: 1
+    heightPx: 4
+    heightEm: 26
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+
+"public-memo-add-window":
+  icon: plus
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 6個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 36
+    # 6em(行数) + 4em(選択画像サイズ) * 3個
+    heightPx: 4
+    heightEm: 18
+  minSize:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 4個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 28
+    # 6em(行数) + 4em(選択画像サイズ) * 3個
+    heightPx: 4
+    heightEm: 18
+  maxSize:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 10個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 52
+    # 6em(行数) + 4em(選択画像サイズ) * 6個
+    heightPx: 4
+    heightEm: 50
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+
+"public-memo-edit-window":
+  icon: pencil
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 6個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 36
+    # 8em(行数) + 4em(選択画像サイズ) * 3個
+    heightPx: 4
+    heightEm: 20
+    heightRem: 0.5
+  minSize:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 4個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 28
+    # 8em(行数) + 4em(選択画像サイズ) * 3個
+    heightPx: 4
+    heightEm: 20
+    heightRem: 0.5
+  maxSize:
+    # 12em(ドラッグ部分) + 4em(選択画像サイズ) * 10個
+    widthPx: 2
+    widthScrollBar: 1
+    widthEm: 52
+    # 8em(行数) + 4em(選択画像サイズ) * 6個
+    heightPx: 4
+    heightEm: 52
+    heightRem: 0.5
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+
+"like-add-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14.5
+    heightRem: 0.9
+  minSize:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14.5
+    heightRem: 0.9
+  maxSize:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14.5
+    heightRem: 0.9
+  minimizable: true
+  paneContainable: true
+  closable: true
+  fontSizePickable: true
+  resizable: true
+  tableInfoList: []
+
+"like-edit-window":
+  icon: keyboard
+  parentTypeList: []
+  isInputWindow: true
+  isMovingRendering: false
+  message: ""
+  position: center
+  size:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14.5
+    heightRem: 0.9
+  minSize:
+    widthPx: 200
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14.5
+    heightRem: 0.9
+  maxSize:
+    widthPx: 400
+    widthEm: 0
+    widthRem: 0
+    heightPx: 4
+    heightEm: 14.5
+    heightRem: 0.9
   minimizable: true
   paneContainable: true
   closable: true

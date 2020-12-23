@@ -11,7 +11,7 @@
       :otherTextList.sync="otherTextList"
       :width.sync="width"
       :height.sync="height"
-      :layerId.sync="layerId"
+      :layerKey.sync="layerKey"
       @drag-start="dragStart"
       @drag-end="dragEnd"
     />
@@ -34,13 +34,12 @@ import { AddObjectInfo } from "@/@types/data";
 import VueEvent from "../../../core/decorator/VueEvent";
 import { parseColor } from "@/app/core/utility/ColorUtility";
 import SocketFacade from "../../../core/api/app-server/SocketFacade";
-import { StoreUseData } from "@/@types/store";
-import { MemoStore } from "@/@types/gameObject";
+import { MemoStore } from "@/@types/store-data";
 import { createEmptyStoreUseData } from "@/app/core/utility/Utility";
 const uuid = require("uuid");
 
 @Component({ components: { MapMaskInfoForm } })
-export default class MapMastAddWindow extends Mixins<WindowVue<string, never>>(
+export default class MapMaskAddWindow extends Mixins<WindowVue<string, never>>(
   WindowVue
 ) {
   private name: string = LanguageManager.instance.getText("type.map-mask");
@@ -50,12 +49,13 @@ export default class MapMastAddWindow extends Mixins<WindowVue<string, never>>(
   private height: number = 1;
   private width: number = 1;
   private isMounted: boolean = false;
-  private layerId: string = GameObjectManager.instance.sceneLayerList.find(
+  private layerKey: string = GameObjectManager.instance.sceneLayerList.find(
     ml => ml.data!.type === "map-mask"
-  )!.id!;
-  private otherTextList: StoreUseData<MemoStore>[] = [
+  )!.key;
+  private otherTextList: StoreData<MemoStore>[] = [
     createEmptyStoreUseData(uuid.v4(), {
       tab: "",
+      type: "normal",
       text: ""
     })
   ];
@@ -64,9 +64,7 @@ export default class MapMastAddWindow extends Mixins<WindowVue<string, never>>(
   public async mounted() {
     await this.init();
     this.isMounted = true;
-    this.windowInfo.message = LanguageManager.instance.getText(
-      `${this.windowInfo.type}.message-list.drag-piece`
-    );
+    this.windowInfo.message = this.$t("message.drag-piece")!.toString();
   }
 
   @VueEvent
@@ -107,47 +105,49 @@ export default class MapMastAddWindow extends Mixins<WindowVue<string, never>>(
     const backgroundColor = colorObj.getRGBA();
     const fontColor = colorObj.getRGBReverse();
 
-    const sceneObjectId = (
+    const sceneObjectKey = (
       await SocketFacade.instance.sceneObjectCC().addDirect([
         {
-          type: "map-mask",
-          tag: this.tag,
-          name: this.name,
-          x: point.x,
-          y: point.y,
-          row: matrix.row,
-          column: matrix.column,
-          rows: this.height,
-          columns: this.width,
-          actorId: null,
-          place: "field",
-          isHideBorder: false,
-          isHideHighlight: false,
-          isLock: false,
-          layerId: this.layerId,
-          textures: [
-            {
-              type: "color",
-              backgroundColor,
-              fontColor,
-              text: this.text
-            }
-          ],
-          textureIndex: 0,
-          angle: 0,
-          url: "",
-          subTypeId: "",
-          subTypeValue: "",
-          isHideSubType: false
+          data: {
+            type: "map-mask",
+            tag: this.tag,
+            name: this.name,
+            x: point.x,
+            y: point.y,
+            row: matrix.row,
+            column: matrix.column,
+            rows: this.height,
+            columns: this.width,
+            actorKey: null,
+            place: "field",
+            isHideBorder: false,
+            isHideHighlight: false,
+            isLock: false,
+            layerKey: this.layerKey,
+            textures: [
+              {
+                type: "color",
+                backgroundColor,
+                fontColor,
+                text: this.text
+              }
+            ],
+            textureIndex: 0,
+            angle: 0,
+            url: "",
+            subTypeKey: "",
+            subTypeValue: "",
+            isHideSubType: false
+          }
         }
       ])
     )[0];
 
     await SocketFacade.instance.memoCC().addDirect(
-      this.otherTextList.map(ot => ot.data!),
-      this.otherTextList.map(() => ({
-        ownerType: "scene-object",
-        owner: sceneObjectId
+      this.otherTextList.map(data => ({
+        ownerType: "scene-object-list",
+        owner: sceneObjectKey,
+        data: data.data!
       }))
     );
 
